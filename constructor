@@ -1,0 +1,417 @@
+#! /usr/bin/env python
+# Copyright (c) 2012 Kimball Thurston
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+# OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+#
+# Filename: constructor
+#
+# Author: Kimball Thurston
+#
+#
+
+import os
+import sys
+import errno
+import string
+import subprocess
+import optparse
+
+_constructor_extension = ".py" # ".cns"
+
+def FindOptionalExecutable( exe ):
+    if exe is None:
+        return None
+
+    if sys.platform == "win32" or sys.platform == "win64":
+        if exe[:-4] != ".exe":
+            exe = exe + ".exe"
+        pass
+
+    is_exe = lambda fpath: os.path.isfile( fpath ) and os.access( fpath, os.X_OK )
+
+    fpath, fname = os.path.split( exe )
+    if fpath:
+        if is_exe( exe ):
+            return exe
+    else:
+        for path in os.environ["PATH"].split( os.pathsep ):
+            path = path.strip( '"' )
+            exe_file = os.path.join( path, exe )
+            if is_exe( exe_file ):
+                return exe_file
+    return None
+
+def FindExecutable( exe ):
+    exe_file = FindOptionalExecutable( exe )
+    if exe_file is None:
+        raise OSError( errno.ENOENT, "No such file or directory trying to find executable", exe )
+    return exe_file
+
+class _Dependency:
+    def __init__( self ):
+        self.output_file = None
+
+class _ExternalPackage(_Dependency):
+    def __init__( self, name, cflags, iflags, lflags, ver ):
+        self.name = name
+        self.cflags = cflags.strip()
+        self.iflags = iflags.strip()
+        self.lflags = lflags.strip()
+        self.version = ver.strip()
+
+# pkg-config may exist even under windows
+_pkgconfig = FindOptionalExecutable( "pkg-config" )
+_externResolvers = []
+_externPackages = {}
+
+def AddExternalResolver( f ):
+    global _externResolvers
+    _externResolvers.append( f )
+
+def FindExternalLibrary( name, version=None ):
+    global _pkgconfig
+    global _externPackages
+    global _externResolvers
+    if _pkgconfig is not None:
+        try:
+            lib = name
+            if version is not None:
+                lib += " "
+                lib += version
+            ver = subprocess.check_output( [_pkgconfig, '--modversion', lib] )
+            cflags = subprocess.check_output( [_pkgconfig, '--cflags-only-other', lib] )
+            iflags = subprocess.check_output( [_pkgconfig, '--cflags-only-I', lib] )
+            lflags = subprocess.check_output( [_pkgconfig, '--libs', lib] )
+            e = _ExternalPackage( name=name, cflags=cflags, iflags=iflags, lflags=lflags, ver=ver )
+            _externPackages[name] = e
+            return e
+        except:
+            pass
+    # still here, pkg-config failed
+    # try the user provided external resolver if specified
+    for e in _externResolver:
+        try:
+            retval = e( name, version )
+            _externPackages[name] = retval
+            if retval is not None:
+                return retval
+        except:
+            pass
+
+    # Nothing found so far, check system path
+    if sys.platform == "win32" or sys.platform == "win64":
+        raise NotImplementedError
+
+    libso = os.path.join( 'usr', 'local', 'lib', 'lib' + name + '.so' )
+    libstat = os.path.join( 'usr', 'local', 'lib', 'lib' + name + '.a' )
+    if os.path.exists( libso ) or os.path.exists( libstat ):
+        e = _ExternalPackage( name=name, iflags="-I /usr/local/include", lflags="-L /usr/local/lib -l" + name )
+        _externPackages[name] = e
+        return e
+
+    libso = os.path.join( 'usr', 'lib', 'lib' + name + '.so' )
+    libstat = os.path.join( 'usr', 'lib', 'lib' + name + '.a' )
+    if os.path.exists( libso ) or os.path.exists( libstat ):
+        e = _ExternalPackage( name=name, lflags="-l" + name )
+        _externPackages[name] = e
+        return e
+
+    if sys.platform.startswith( 'darwin' ):
+        Error( "Verify Framework Check" )
+        frm = os.path.join( 'Library', 'Frameworks', name )
+        if os.path.exists( frm ):
+            e = _ExternalPackage( name=name,
+                                  lflags="-framework " + name )
+            _externPackages[name] = e
+            return e
+
+    # Nothing found
+    return None
+
+def HaveExternal( name ):
+    global _externPackages
+    if name in _externPackages:
+        return True
+    return False
+
+def Info( msg ):
+    sys.stdout.write( msg )
+    sys.stdout.write( '\n' )
+    sys.stdout.flush()
+
+def Warning( msg ):
+    sys.stderr.write( "WARNING: " )
+    sys.stderr.write( msg )
+    sys.stderr.write( '\n' )
+    sys.stderr.flush()
+
+def Error( msg ):
+    sys.stderr.write( "ERROR: " )
+    sys.stderr.write( msg )
+    sys.stderr.write( '\n\n' )
+    sys.stderr.flush()
+    sys.exit( 1 )
+
+_build_tree = None
+class _BuildTree:
+    def __init__( self ):
+        self._parsed_build_files = []
+        self._files = []
+        self._build = None
+        self._build_set = {}
+        self._build_dirs = []
+        self._source_root_dir = os.getcwd()
+        self._build_root_dir = self._source_root_dir
+        self._cur_src_dir = None
+        self._cur_rel_src_dir = ""
+        self._generator = "ninja"
+        self._phase = "config"
+        self._globs = {}
+        self._user_features = None
+        self._user_feature_defs = None
+        for key, val in globals().iteritems():
+            if key[0] != '_' and ( key == "os" or key == "sys" or key.lower() != key ):
+                self._globs[key] = val
+        self._conf_options = None
+        self._parser = optparse.OptionParser( usage="usage: %prog [options]", version="%prog 1.0" )
+        self._parser.add_option( '--build',
+                                 help='Allows one to specify build type',
+                                 type="string",
+                                 default=None )
+        self._parser.add_option( '--build-dir',
+                                 type="string",
+                                 help='Specifies output directory used for building (by default <current directory>/<build-type-outlocation>)' )
+        self._parser.add_option( '--source-dir',
+                                 type="string",
+                                 help='Specifies the source root to find build files (by default <current directory>)' )
+        self._parser.add_option( '--generator',
+                                 type="string",
+                                 help='Allows one to specify the generator type',
+                                 default=self._generator )
+
+    def addFile( self, f ):
+        self._files.append( f )
+
+    def processTree( self ):
+        # Pre-seed the source root directory so we can load
+        # the user's config file, which then allows us to build up
+        # the argument parser
+        for i in range(0,len(sys.argv)):
+            arg = sys.argv[i]
+            if arg == "--source-dir":
+                if (i + 1) < len(sys.argv):
+                    self._source_root_dir = os.path.abspath( sys.argv[i+1] )
+            elif arg.startswith( "--source-dir=" ):
+                self._source_root_dir = os.path.abspath( arg.split('=')[1] )
+
+        self._cur_src_dir = self._source_root_dir
+        self._source_file( True )
+
+        self._parseOptions()
+        # Now load up the real deal - the file that will set all the build
+        # targets
+        self._phase = "build"
+        self._source_file( False )
+
+    def _defineFeature( self, name, typename, help=None, default=None ):
+        if self._user_features is not None:
+            Error( "Invalid request to define feature '%s': All available features must be defined before testing to see if any are set" % name )
+
+        if self._user_feature_defs is None:
+            self._user_feature_defs = {}
+
+        ## Hrm, set_defaults doesn't allow us to specify destinations
+        ## by user argument string, so stash off for future use
+        self._user_feature_defs[name] = [ typename, default ]
+
+        if typename == "boolean":
+            self._parser.add_option( '--enable-' + name,
+                                     action="store_true",
+                                     help="Enable " + help,
+                                     dest=name )
+            self._parser.add_option( '--disable-' + name,
+                                     action="store_false",
+                                     help="Disable " + help,
+                                     dest=name )
+        elif typename == "string":
+            self._parser.add_option( '--' + name,
+                                     type="string",
+                                     help=help,
+                                     dest=name,
+                                     default=default )
+        elif typename == "path":
+            self._parser.add_option( '--' + name,
+                                     type="string",
+                                     help=help,
+                                     metavar="PATH",
+                                     dest=name,
+                                     default=default )
+        else:
+            Error( "Unknown typename '%s' for user defined feature '%s'" % (typename, name) )
+
+    def _getFeature( self, name ):
+        if self._user_features is None:
+            self._parseOptions()
+        if name not in self._user_features:
+            Error( "Unknown feature requested '%s', use DefineFeature first" % name )
+        return self._user_features[name]
+
+    def _parseOptions( self ):
+        if self._user_features is not None:
+            return
+        (options, args) = self._parser.parse_args()
+
+        if options.build is not None and len(options.build) > 0:
+            self._build = options.build
+        if options.build_dir is not None and len(options.build_dir) > 0:
+            self._build_root_dir = os.path.abspath( options.build_dir )
+        self._generator = options.generator
+
+        self._user_features = {}
+        if self._user_feature_defs is not None:
+            for k, info in self._user_feature_defs.iteritems():
+                oVal = getattr( options, k, None )
+                t = info[0]
+                default = info[1]
+                if t == "boolean":
+                    if oVal is not None:
+                        self._user_features[k] = oVal
+                    else:
+                        self._user_features[k] = default
+                elif t == "string":
+                    if oVal is not None:
+                        self._user_features[k] = oVal
+                    else:
+                        self._user_features[k] = default
+                elif t == "path":
+                    if oVal is not None and len(oVal) > 0:
+                        self._user_features[k] = os.path.abspath( oVal )
+                    else:
+                        self._user_features[k] = default
+                else:
+                    Error( "Attempt to parse user option '%s' with unknown type '%s'\n" % (k, t) )
+
+    def _source_file( self, optional=False ):
+        try:
+            global _constructor_extension
+            filename = self._phase + _constructor_extension
+            fn = os.path.join( self._cur_src_dir, filename )
+            self._cur_build_file = fn
+            namespace = self._globs.copy()
+            with open( fn, "r" ) as f:
+                self._parsed_build_files.append( fn )
+                exec( compile( f.read() + "\n", filename, 'exec' ), namespace, namespace )
+            if self._phase == "config":
+                new_globs = {}
+                all_names = namespace.get( "__all__" )
+                if all_names is None:
+                    for k, v in namespace.iteritems():
+                        if k[0] != '_' and k not in self._globs:
+                            new_globs[k] = v
+                else:
+                    for k in all_names:
+                        if k not in self._globs:
+                            new_globs[k] = namespace[k]
+                self._globs.update( new_globs )
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                if not optional:
+                    Error( "Unable to read required file '%s'" % fn )
+            else:
+                Error( "Unable to read and process file '%s': %s" % (fn, e.strerror) )
+        except Exception as e:
+            Error( "Error processing file '%s': %s" % ( fn, str(e) ) )
+        finally:
+            self._cur_build_file = None
+
+    def _doSubDir( self, name ):
+        curd = self._cur_rel_src_dir
+        newd = name
+        if len(curd) > 0:
+            newd = os.path.join( curd, name )
+        self._cur_rel_src_dir = newd
+        self._cur_src_dir = os.path.join( self._source_root_dir, newd )
+        self._cur_bin_dir = os.path.join( self._build_root_dir, newd )
+
+        self._source_file( False )
+
+        self._cur_rel_src_dir = curd
+        if len(curd) == 0:
+            self._cur_src_dir = self._source_root_dir
+            self._cur_bin_dir = self._build_root_dir
+        else:
+            self._cur_src_dir = os.path.join( self._source_root_dir, curd )
+            self._cur_bin_dir = os.path.join( self._build_root_dir, curd )
+
+    def _addBuildConfig( tag, outloc, default ):
+        self._build_set[tag] = outloc
+        if default and _build is None:
+            self._build = tag
+        if tag == self._build and self._cur_bin_dir is None:
+            self._build_start_dir = self._build_root_dir
+            self._build_root_dir = os.path.abspath( os.path.join( self._build_root_dir, outloc ) )
+            self._build_dirs.append( self._build_root_dir )
+            self._cur_bin_dir = os.path.abspath( os.path.join( self._build_root_dir, self._cur_rel_src_dir ) )
+
+def DefineFeature( name, typename, help=None, default=None ):
+    global _build_tree
+    _build_tree._defineFeature( name, typename, help, default )
+
+def Feature( name ):
+    global _build_tree
+    return _build_tree._getFeature( name )
+
+def SubDir( name ):
+    global _build_tree
+    _build_tree._doSubDir( name )
+
+def GetCurrentSourceDir():
+    global _build_tree
+    _build_tree._parseOptions()
+    return _build_tree._cur_src_dir
+
+def GetCurrentSourceRelDir():
+    global _build_tree
+    _build_tree._parseOptions()
+    return _build_tree._cur_rel_src_dir
+
+def GetBuildRootDir():
+    global _build_tree
+    _build_tree._parseOptions()
+    return _build_tree._build_root_dir
+
+def BuildConfig( tag, outloc, default = False ):
+    global _build_tree
+    _build_tree._addBuildConfig( tag, outloc, default )
+
+def GetCurrentBinaryDir():
+    global _build_tree
+    if _build_tree._build is None:
+        raise RuntimeError( "No build specified, binary directory is undefined until then" )
+    return _build_tree._cur_bin_dir
+
+def Building( b ):
+    global _build_tree
+    _build_tree._parseOptions()
+    return _build_tree._build == b
+
+if __name__ == "__main__":
+    _build_tree = _BuildTree()
+    _build_tree.processTree()
