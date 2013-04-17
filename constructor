@@ -35,6 +35,237 @@ import optparse
 
 _constructor_extension = ".py" # ".cns"
 
+# Work around some differences between python 2 and 3
+# that we can't just handle generically
+
+if sys.version_info[0] == 3:
+    def _iterate( x ):
+        return x.items()
+else:
+    def _iterate( x ):
+        return x.iteritems()
+
+class _Dependency:
+    def __init__( self ):
+        self.output_file = None
+
+class _ExternalPackage(_Dependency):
+    def __init__( self, name, cflags, iflags, lflags, ver ):
+        self.name = name
+        self.cflags = cflags.strip()
+        self.iflags = iflags.strip()
+        self.lflags = lflags.strip()
+        self.version = ver.strip()
+
+class _Directory:
+    def __init__( self, path, relpath, binpath ):
+        self.cur_src_dir = path
+        self.cur_rel_src_dir = relpath
+        self.cur_bin_path = binpath
+        self.targets = None
+        self.subdirs = None
+
+_build_tree = None
+class _BuildTree:
+    def __init__( self ):
+        self.parsed_build_files = []
+        self.files = []
+        self.build = None
+        self.build_set = {}
+        self.build_dirs = []
+        self.processed_dirs = []
+        self.source_root_dir = os.getcwd()
+        self.build_root_dir = self.source_root_dir
+        self.generator = "ninja"
+        self.phase = "config"
+        self.globs = {}
+        self.user_features = None
+        self.user_feature_defs = None
+        for key, val in _iterate( globals() ):
+            if key[0] != '_' and ( key == "os" or key == "sys" or key.lower() != key ):
+                self.globs[key] = val
+        self.conf_options = None
+        self.parser = optparse.OptionParser( usage="usage: %prog [options]", version="%prog 1.0" )
+        self.parser.add_option( '--build',
+                                 help='Allows one to specify build type',
+                                 type="string",
+                                 default=None )
+        self.parser.add_option( '--build-dir',
+                                 type="string",
+                                 help='Specifies output directory used for building (by default <current directory>/<build-type-outlocation>)' )
+        self.parser.add_option( '--source-dir',
+                                 type="string",
+                                 help='Specifies the source root to find build files (by default <current directory>)' )
+        self.parser.add_option( '--generator',
+                                 type="string",
+                                 help='Allows one to specify the generator type',
+                                 default=self.generator )
+
+    def addFile( self, f ):
+        self.files.append( f )
+
+    def processTree( self ):
+        # Pre-seed the source root directory so we can load
+        # the user's config file, which then allows us to build up
+        # the actual argument parser
+        for i in range(0,len(sys.argv)):
+            arg = sys.argv[i]
+            if arg == "--source-dir":
+                if (i + 1) < len(sys.argv):
+                    self.source_root_dir = os.path.abspath( sys.argv[i+1] )
+            elif arg.startswith( "--source-dir=" ):
+                self.source_root_dir = os.path.abspath( arg.split('=')[1] )
+
+        dobj = _Directory( self.source_root_dir, "", None )
+        self.cur_dir = dobj
+        self.processed_dirs.append( dobj )
+        self._source_file( True )
+
+        self.parseOptions()
+        # Now load up the real deal - the file that will set all the build
+        # targets
+        self.phase = "build"
+        self._source_file( False )
+        self.cur_dir = None
+
+    def defineFeature( self, name, typename, help=None, default=None ):
+        if self.user_features is not None:
+            Error( "Invalid request to define feature '%s': All available features must be defined before testing to see if any are set" % name )
+
+        if self.user_feature_defs is None:
+            self.user_feature_defs = {}
+
+        ## Hrm, set_defaults doesn't allow us to specify destinations
+        ## by user argument string, so stash off for future use
+        self.user_feature_defs[name] = [ typename, default ]
+
+        if typename == "boolean":
+            self.parser.add_option( '--enable-' + name,
+                                     action="store_true",
+                                     help="Enable " + help,
+                                     dest=name )
+            self.parser.add_option( '--disable-' + name,
+                                     action="store_false",
+                                     help="Disable " + help,
+                                     dest=name )
+        elif typename == "string":
+            self.parser.add_option( '--' + name,
+                                     type="string",
+                                     help=help,
+                                     dest=name,
+                                     default=default )
+        elif typename == "path":
+            self.parser.add_option( '--' + name,
+                                     type="string",
+                                     help=help,
+                                     metavar="PATH",
+                                     dest=name,
+                                     default=default )
+        else:
+            Error( "Unknown typename '%s' for user defined feature '%s'" % (typename, name) )
+
+    def getFeature( self, name ):
+        if self.user_features is None:
+            self.parseOptions()
+        if name not in self.user_features:
+            Error( "Unknown feature requested '%s', use DefineFeature first" % name )
+        return self.user_features[name]
+
+    def parseOptions( self ):
+        if self.user_features is not None:
+            return
+        (options, args) = self.parser.parse_args()
+
+        if options.build is not None and len(options.build) > 0:
+            self.build = options.build
+        if options.build_dir is not None and len(options.build_dir) > 0:
+            self.build_root_dir = os.path.abspath( options.build_dir )
+        self.generator = options.generator
+
+        self.user_features = {}
+        if self.user_feature_defs is not None:
+            for k, info in _iterate( self.user_feature_defs ):
+                oVal = getattr( options, k, None )
+                t = info[0]
+                default = info[1]
+                if t == "boolean":
+                    if oVal is not None:
+                        self.user_features[k] = oVal
+                    else:
+                        self.user_features[k] = default
+                elif t == "string":
+                    if oVal is not None:
+                        self.user_features[k] = oVal
+                    else:
+                        self.user_features[k] = default
+                elif t == "path":
+                    if oVal is not None and len(oVal) > 0:
+                        self.user_features[k] = os.path.abspath( oVal )
+                    else:
+                        self.user_features[k] = default
+                else:
+                    Error( "Attempt to parse user option '%s' with unknown type '%s'\n" % (k, t) )
+
+    def doSubDir( self, name ):
+        curd = self.cur_dir
+        newd = curd.cur_rel_src_dir
+        if len(newd) > 0:
+            newd = os.path.join( newd, name )
+        else:
+            newd = name
+
+        dobj = _Directory( os.path.join( self.source_root_dir, newd ),
+                           newd,
+                           os.path.join( self.build_root_dir, newd ) )
+
+        self.cur_dir = dobj
+        self.processed_dirs.append( dobj )
+        self._source_file( False )
+        self.cur_dir = curd
+
+    def addBuildConfig( tag, outloc, default ):
+        self.build_set[tag] = outloc
+        if default and _build is None:
+            self.build = tag
+        if tag == self.build and self.cur_dir.cur_bin_dir is None:
+            self.build_root_dir = os.path.abspath( os.path.join( self.build_root_dir, outloc ) )
+            self.build_dirs.append( self.build_root_dir )
+            self.cur_dir.cur_bin_dir = os.path.abspath( os.path.join( self.build_root_dir, self.cur_dir.cur_rel_src_dir ) )
+
+    def _source_file( self, optional=False ):
+        try:
+            global _constructor_extension
+            filename = self.phase + _constructor_extension
+            fn = os.path.join( self.cur_dir.cur_src_dir, filename )
+            namespace = self.globs.copy()
+            with open( fn, "r" ) as f:
+                self.parsed_build_files.append( fn )
+                exec( compile( f.read() + "\n", filename, 'exec' ), namespace, namespace )
+            if self.phase == "config":
+                new_globs = {}
+                all_names = namespace.get( "__all__" )
+                if all_names is None:
+                    for k, v in _iterate( namespace ):
+                        if k[0] != '_' and k not in self.globs:
+                            new_globs[k] = v
+                else:
+                    for k in all_names:
+                        if k not in self.globs:
+                            new_globs[k] = namespace[k]
+                self.globs.update( new_globs )
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                if not optional:
+                    Error( "Unable to read required file '%s'" % fn )
+            else:
+                Error( "Unable to read and process file '%s': %s" % (fn, e.strerror) )
+        except Exception as e:
+            Error( "Error processing file '%s': %s" % ( fn, str(e) ) )
+
+
+########################################
+########################################
+
 def FindOptionalExecutable( exe ):
     if exe is None:
         return None
@@ -63,18 +294,6 @@ def FindExecutable( exe ):
     if exe_file is None:
         raise OSError( errno.ENOENT, "No such file or directory trying to find executable", exe )
     return exe_file
-
-class _Dependency:
-    def __init__( self ):
-        self.output_file = None
-
-class _ExternalPackage(_Dependency):
-    def __init__( self, name, cflags, iflags, lflags, ver ):
-        self.name = name
-        self.cflags = cflags.strip()
-        self.iflags = iflags.strip()
-        self.lflags = lflags.strip()
-        self.version = ver.strip()
 
 # pkg-config may exist even under windows
 _pkgconfig = FindOptionalExecutable( "pkg-config" )
@@ -169,248 +388,47 @@ def Error( msg ):
     sys.stderr.flush()
     sys.exit( 1 )
 
-_build_tree = None
-class _BuildTree:
-    def __init__( self ):
-        self._parsed_build_files = []
-        self._files = []
-        self._build = None
-        self._build_set = {}
-        self._build_dirs = []
-        self._source_root_dir = os.getcwd()
-        self._build_root_dir = self._source_root_dir
-        self._cur_src_dir = None
-        self._cur_rel_src_dir = ""
-        self._generator = "ninja"
-        self._phase = "config"
-        self._globs = {}
-        self._user_features = None
-        self._user_feature_defs = None
-        for key, val in globals().iteritems():
-            if key[0] != '_' and ( key == "os" or key == "sys" or key.lower() != key ):
-                self._globs[key] = val
-        self._conf_options = None
-        self._parser = optparse.OptionParser( usage="usage: %prog [options]", version="%prog 1.0" )
-        self._parser.add_option( '--build',
-                                 help='Allows one to specify build type',
-                                 type="string",
-                                 default=None )
-        self._parser.add_option( '--build-dir',
-                                 type="string",
-                                 help='Specifies output directory used for building (by default <current directory>/<build-type-outlocation>)' )
-        self._parser.add_option( '--source-dir',
-                                 type="string",
-                                 help='Specifies the source root to find build files (by default <current directory>)' )
-        self._parser.add_option( '--generator',
-                                 type="string",
-                                 help='Allows one to specify the generator type',
-                                 default=self._generator )
-
-    def addFile( self, f ):
-        self._files.append( f )
-
-    def processTree( self ):
-        # Pre-seed the source root directory so we can load
-        # the user's config file, which then allows us to build up
-        # the argument parser
-        for i in range(0,len(sys.argv)):
-            arg = sys.argv[i]
-            if arg == "--source-dir":
-                if (i + 1) < len(sys.argv):
-                    self._source_root_dir = os.path.abspath( sys.argv[i+1] )
-            elif arg.startswith( "--source-dir=" ):
-                self._source_root_dir = os.path.abspath( arg.split('=')[1] )
-
-        self._cur_src_dir = self._source_root_dir
-        self._source_file( True )
-
-        self._parseOptions()
-        # Now load up the real deal - the file that will set all the build
-        # targets
-        self._phase = "build"
-        self._source_file( False )
-
-    def _defineFeature( self, name, typename, help=None, default=None ):
-        if self._user_features is not None:
-            Error( "Invalid request to define feature '%s': All available features must be defined before testing to see if any are set" % name )
-
-        if self._user_feature_defs is None:
-            self._user_feature_defs = {}
-
-        ## Hrm, set_defaults doesn't allow us to specify destinations
-        ## by user argument string, so stash off for future use
-        self._user_feature_defs[name] = [ typename, default ]
-
-        if typename == "boolean":
-            self._parser.add_option( '--enable-' + name,
-                                     action="store_true",
-                                     help="Enable " + help,
-                                     dest=name )
-            self._parser.add_option( '--disable-' + name,
-                                     action="store_false",
-                                     help="Disable " + help,
-                                     dest=name )
-        elif typename == "string":
-            self._parser.add_option( '--' + name,
-                                     type="string",
-                                     help=help,
-                                     dest=name,
-                                     default=default )
-        elif typename == "path":
-            self._parser.add_option( '--' + name,
-                                     type="string",
-                                     help=help,
-                                     metavar="PATH",
-                                     dest=name,
-                                     default=default )
-        else:
-            Error( "Unknown typename '%s' for user defined feature '%s'" % (typename, name) )
-
-    def _getFeature( self, name ):
-        if self._user_features is None:
-            self._parseOptions()
-        if name not in self._user_features:
-            Error( "Unknown feature requested '%s', use DefineFeature first" % name )
-        return self._user_features[name]
-
-    def _parseOptions( self ):
-        if self._user_features is not None:
-            return
-        (options, args) = self._parser.parse_args()
-
-        if options.build is not None and len(options.build) > 0:
-            self._build = options.build
-        if options.build_dir is not None and len(options.build_dir) > 0:
-            self._build_root_dir = os.path.abspath( options.build_dir )
-        self._generator = options.generator
-
-        self._user_features = {}
-        if self._user_feature_defs is not None:
-            for k, info in self._user_feature_defs.iteritems():
-                oVal = getattr( options, k, None )
-                t = info[0]
-                default = info[1]
-                if t == "boolean":
-                    if oVal is not None:
-                        self._user_features[k] = oVal
-                    else:
-                        self._user_features[k] = default
-                elif t == "string":
-                    if oVal is not None:
-                        self._user_features[k] = oVal
-                    else:
-                        self._user_features[k] = default
-                elif t == "path":
-                    if oVal is not None and len(oVal) > 0:
-                        self._user_features[k] = os.path.abspath( oVal )
-                    else:
-                        self._user_features[k] = default
-                else:
-                    Error( "Attempt to parse user option '%s' with unknown type '%s'\n" % (k, t) )
-
-    def _source_file( self, optional=False ):
-        try:
-            global _constructor_extension
-            filename = self._phase + _constructor_extension
-            fn = os.path.join( self._cur_src_dir, filename )
-            self._cur_build_file = fn
-            namespace = self._globs.copy()
-            with open( fn, "r" ) as f:
-                self._parsed_build_files.append( fn )
-                exec( compile( f.read() + "\n", filename, 'exec' ), namespace, namespace )
-            if self._phase == "config":
-                new_globs = {}
-                all_names = namespace.get( "__all__" )
-                if all_names is None:
-                    for k, v in namespace.iteritems():
-                        if k[0] != '_' and k not in self._globs:
-                            new_globs[k] = v
-                else:
-                    for k in all_names:
-                        if k not in self._globs:
-                            new_globs[k] = namespace[k]
-                self._globs.update( new_globs )
-        except IOError as e:
-            if e.errno == errno.ENOENT:
-                if not optional:
-                    Error( "Unable to read required file '%s'" % fn )
-            else:
-                Error( "Unable to read and process file '%s': %s" % (fn, e.strerror) )
-        except Exception as e:
-            Error( "Error processing file '%s': %s" % ( fn, str(e) ) )
-        finally:
-            self._cur_build_file = None
-
-    def _doSubDir( self, name ):
-        curd = self._cur_rel_src_dir
-        newd = name
-        if len(curd) > 0:
-            newd = os.path.join( curd, name )
-        self._cur_rel_src_dir = newd
-        self._cur_src_dir = os.path.join( self._source_root_dir, newd )
-        self._cur_bin_dir = os.path.join( self._build_root_dir, newd )
-
-        self._source_file( False )
-
-        self._cur_rel_src_dir = curd
-        if len(curd) == 0:
-            self._cur_src_dir = self._source_root_dir
-            self._cur_bin_dir = self._build_root_dir
-        else:
-            self._cur_src_dir = os.path.join( self._source_root_dir, curd )
-            self._cur_bin_dir = os.path.join( self._build_root_dir, curd )
-
-    def _addBuildConfig( tag, outloc, default ):
-        self._build_set[tag] = outloc
-        if default and _build is None:
-            self._build = tag
-        if tag == self._build and self._cur_bin_dir is None:
-            self._build_start_dir = self._build_root_dir
-            self._build_root_dir = os.path.abspath( os.path.join( self._build_root_dir, outloc ) )
-            self._build_dirs.append( self._build_root_dir )
-            self._cur_bin_dir = os.path.abspath( os.path.join( self._build_root_dir, self._cur_rel_src_dir ) )
-
 def DefineFeature( name, typename, help=None, default=None ):
     global _build_tree
-    _build_tree._defineFeature( name, typename, help, default )
+    _build_tree.defineFeature( name, typename, help, default )
 
 def Feature( name ):
     global _build_tree
-    return _build_tree._getFeature( name )
+    return _build_tree.getFeature( name )
 
 def SubDir( name ):
     global _build_tree
-    _build_tree._doSubDir( name )
+    _build_tree.doSubDir( name )
 
 def GetCurrentSourceDir():
     global _build_tree
-    _build_tree._parseOptions()
-    return _build_tree._cur_src_dir
+    _build_tree.parseOptions()
+    return _build_tree.cur_dir.cur_src_dir
 
 def GetCurrentSourceRelDir():
     global _build_tree
-    _build_tree._parseOptions()
-    return _build_tree._cur_rel_src_dir
+    _build_tree.parseOptions()
+    return _build_tree.cur_dir.cur_rel_src_dir
 
 def GetBuildRootDir():
     global _build_tree
-    _build_tree._parseOptions()
-    return _build_tree._build_root_dir
+    _build_tree.parseOptions()
+    return _build_tree.build_root_dir
 
 def BuildConfig( tag, outloc, default = False ):
     global _build_tree
-    _build_tree._addBuildConfig( tag, outloc, default )
+    _build_tree.addBuildConfig( tag, outloc, default )
 
 def GetCurrentBinaryDir():
     global _build_tree
-    if _build_tree._build is None:
+    if _build_tree.build is None:
         raise RuntimeError( "No build specified, binary directory is undefined until then" )
-    return _build_tree._cur_bin_dir
+    return _build_tree.cur_dir.cur_bin_dir
 
 def Building( b ):
     global _build_tree
-    _build_tree._parseOptions()
-    return _build_tree._build == b
+    _build_tree.parseOptions()
+    return _build_tree.build == b
 
 if __name__ == "__main__":
     _build_tree = _BuildTree()
