@@ -7,6 +7,6 @@ for the build machine. Unlike either, it uses a simple
 function and list like syntax to define the build targets.
 
 It was primarily created to build ninja (http://martine.github.com/ninja/)
-files, but should be general purpose enough to use for
-other systems.
+build files, but should be general purpose enough to use for
+other systems (make, etc.).
 
