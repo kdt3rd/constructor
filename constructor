@@ -45,12 +45,15 @@ else:
     def _iterate( x ):
         return x.iteritems()
 
-class _Dependency(object):
+class Dependency(object):
     def __init__( self, orderonly ):
         self._dependencies = {}
         self.orderonly = orderonly
 
     def add_dependency( self, group, dep ):
+        if not isinstance( dep, Dependency ):
+            Error( "Attempt to add dependency that is not a subclass of Dependency" )
+
         try:
             deps = self._dependencies[group]
         except KeyError:
@@ -70,20 +73,21 @@ class _Dependency(object):
             return self._dependencies[group]
         return []
             
-class _FileDependency(_Dependency):
+class _FileDependency(Dependency):
     def __init__( self, infile, orderonly ):
         super(_FileDependency, self).__init__( orderonly )
         self.filename = infile
 
-class _ExternalPackage(_Dependency):
+class _ExternalPackage(Dependency):
     def __init__( self, name, cflags, iflags, lflags, ver ):
+        super(_ExternalPackage, self).__init__( False )
         self.name = name
         self.cflags = cflags.strip()
         self.iflags = iflags.strip()
         self.lflags = lflags.strip()
         self.version = ver.strip()
 
-class _Directory(_Dependency):
+class _Directory(Dependency):
     def __init__( self, path, relpath, binpath, pardir = None, globs = None ):
         super(_Directory, self).__init__( False )
         self.pardir = pardir
@@ -150,6 +154,62 @@ class _Directory(_Dependency):
     def _configPassPostProc( curdir, namespace ):
         curdir.addToGlobals( namespace )
 
+class _Rule(object):
+    def __init__( self, rargs ):
+        self.name = rargs['tag']
+        cmd = rargs['cmd']
+        if isinstance( cmd, list ):
+            command = ""
+            for c in cmd:
+                command += ' ' + c
+        else:
+            command = cmd
+        self.command = command
+        self.description = rargs.get( 'desc' )
+        self.use_input_in_desc = rargs.get( 'use_input_in_desc' )
+        self.dependency_file = rargs.get( 'depfile' )
+
+        self._use_count = 0
+
+    def addUse( self ):
+        self._use_count = self._use_count + 1
+
+    def isUsed( self ):
+        return self._use_count > 0
+
+class Target(Dependency):
+    def __init__( self, orderonly = False ):
+        super(Target, self).__init__( orderonly )
+        pass
+
+class FileType(object):
+    def __init__( self, ext ):
+        self.extension = ext
+
+def _handleFile( f, operation ):
+    (base, ext) = os.path.splitext( f )
+    handler = _extension_handlers.get( ext )
+    if handler is not None:
+        return getattr( handler, operation )( f )
+    else:
+        Error( "No handler defined for extension '%s'" % ext )
+    return None
+
+# Produces a list of targets
+def Compile( *args ):
+    ret = []
+    for f in args:
+        if isinstance( f, Target ):
+            ret.append( f )
+        if isinstance( f, (str, basestring) ):
+            ret.append( _handleFile( f, "compile" ) )
+        elif isinstance( f, list ):
+            ret.append( Compile( *f ) )
+        elif isinstance( f, tuple ):
+            for x in f:
+                ret.append( Compile( x ) )
+    return ret
+
 class ProcessPhase(object):
     def __init__( self, name, fileroot, optional, postproc = None ):
         self.name = name
@@ -213,33 +273,6 @@ class Ninja(Generator):
             Info( "Build depends on: %s" % cf )
 
 _generators = { "ninja": Ninja }
-
-class _Rule(object):
-    def __init__( self, rargs ):
-        self.name = rargs['tag']
-        cmd = rargs['cmd']
-        if isinstance( cmd, list ):
-            command = ""
-            for c in cmd:
-                command += ' ' + c
-        else:
-            command = cmd
-        self.command = command
-        self.description = rargs.get( 'desc' )
-        self.use_input_in_desc = rargs.get( 'use_input_in_desc' )
-        self.dependency_file = rargs.get( 'depfile' )
-
-        self._use_count = 0
-
-    def addUse( self ):
-        self._use_count = self._use_count + 1
-
-    def isUsed( self ):
-        return self._use_count > 0
-
-class _Target(object):
-    def __init__( self, targs ):
-        pass
 
 class _BuildTree(object):
     """The master class for constructor that stores the parsed contents for
