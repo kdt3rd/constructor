@@ -33,7 +33,7 @@ import string
 import subprocess
 import optparse
 
-_constructor_extension = ".py" # ".cns"
+_constructor_extension = ".cns" #".py" # 
 
 # Work around some differences between python 2 and 3
 # that we can't just handle generically
@@ -45,9 +45,35 @@ else:
     def _iterate( x ):
         return x.iteritems()
 
-class _Dependency:
-    def __init__( self ):
-        self.output_file = None
+class _Dependency(object):
+    def __init__( self, orderonly ):
+        self._dependencies = {}
+        self.orderonly = orderonly
+
+    def add_dependency( self, group, dep ):
+        try:
+            deps = self._dependencies[group]
+        except KeyError:
+            deps = []
+            self._dependencies[group] = deps
+
+        found = False
+        for d in deps:
+            if d is dep:
+                found = True
+                break
+        if not found:
+            deps.append( dep )
+
+    def dependencies( self, group ):
+        if group in self._dependencies:
+            return self._dependencies[group]
+        return []
+            
+class _FileDependency(_Dependency):
+    def __init__( self, infile, orderonly ):
+        super(_FileDependency, self).__init__( orderonly )
+        self.filename = infile
 
 class _ExternalPackage(_Dependency):
     def __init__( self, name, cflags, iflags, lflags, ver ):
@@ -57,15 +83,138 @@ class _ExternalPackage(_Dependency):
         self.lflags = lflags.strip()
         self.version = ver.strip()
 
-class _Directory:
-    def __init__( self, path, relpath, binpath ):
-        self.cur_src_dir = path
-        self.cur_rel_src_dir = relpath
-        self.cur_bin_path = binpath
+class _Directory(_Dependency):
+    def __init__( self, path, relpath, binpath, pardir = None, globs = None ):
+        super(_Directory, self).__init__( False )
+        self.pardir = pardir
+        self.globs = globs
+        self.src_dir = path
+        self.rel_src_dir = relpath
+        self.bin_path = binpath
         self.targets = None
-        self.subdirs = None
+        self.subdirs = {}
 
-class _Rule:
+    def set_globals( self, globs ):
+        self.globs = globs
+
+    def get_globals( self ):
+        if self.globs is None:
+            return self.pardir.get_globals()
+        return self.globs
+
+    def set_bin_dir( self, path ):
+        self.bin_path = path
+        if len(self.rel_src_dir) > 0:
+            self.bin_path = os.path.join( path, self.rel_src_dir )
+        for sd in self.subdirs:
+            sd.set_bin_dir( path )
+
+    def make_bin_tree( self):
+        Info( "make bin tree: %s" % self.bin_path )
+
+    def add_sub_dir( self, name ):
+        try:
+            dobj = self.subdirs[name]
+        except KeyError as e:
+            newd = self.rel_src_dir
+            if len(newd) > 0:
+                newd = os.path.join( newd, name )
+            else:
+                newd = name
+
+            dobj = _Directory( os.path.join( self.src_dir, name ),
+                               newd,
+                               os.path.join( self.bin_path, name ),
+                               self )
+            self.add_dependency( "config", dobj )
+            self.subdirs[name] = dobj
+
+        return dobj
+
+    def addToGlobals( self, namespace ):
+        if self.globs is None:
+            self.globs = self.get_globals().copy()
+
+        new_globs = {}
+        all_names = namespace.get( "__all__" )
+        if all_names is None:
+            for k, v in _iterate( namespace ):
+                if k[0] != '_' and k not in self.globs:
+                    new_globs[k] = v
+        else:
+            for k in all_names:
+                if k not in self.globs:
+                    new_globs[k] = namespace[k]
+        self.globs.update( new_globs )
+
+    def _configPassPostProc( curdir, namespace ):
+        curdir.addToGlobals( namespace )
+
+class ProcessPhase(object):
+    def __init__( self, name, fileroot, optional, postproc = None ):
+        self.name = name
+        self.file_root = fileroot
+        self.optional = optional
+        self.post_proc = postproc
+        self.cur_dir = None
+
+    def subdir( self, name ):
+        if self.cur_dir is None:
+            Error( "Attempt to process a sub directory with no current directory" )
+        newd = self.cur_dir.add_sub_dir( name )
+        self.process_dir( newd )
+
+    def process_dir( self, curdir ):
+        oldd = self.cur_dir
+        try:
+            self.cur_dir = curdir
+            global _constructor_extension
+            filename = self.file_root + _constructor_extension
+            fn = os.path.join( curdir.src_dir, filename )
+            namespace = curdir.get_globals().copy()
+            with open( fn, "r" ) as f:
+                curdir.add_dependency( "config", _FileDependency( fn, False ) )
+                exec( compile( f.read() + "\n", filename, 'exec' ), namespace, namespace )
+            if self.post_proc:
+                self.post_proc( curdir, namespace )
+        except IOError as e:
+            if e.errno == errno.ENOENT:
+                if not self.optional:
+                    Error( "Unable to read required file '%s'" % fn )
+            else:
+                Error( "Unable to read and process file '%s': %s" % (fn, e.strerror) )
+        except Exception as e:
+            Error( "Error processing file '%s': %s" % ( fn, str(e) ) )
+        finally:
+            self.cur_dir = oldd
+
+class Generator(ProcessPhase):
+    def __init__( self, name ):
+        super( Generator, self ).__init__( name, None, False, None )
+
+    def process_dir( self, curdir ):
+        Error( "Sub-class of generator should override process_dir" )
+
+class Ninja(Generator):
+    def __init__( self ):
+        super( Ninja, self ).__init__( "ninja" )
+
+    def process_dir( self, curdir ):
+        curdir.make_bin_tree()
+        config_file_list = []
+        def _traverse_config_files( deps ):
+            for d in deps:
+                if isinstance( d, _Directory ):
+                    _traverse_config_files( d.dependencies( "config" ) )
+                else:
+                    config_file_list.append( d.filename )
+        _traverse_config_files( curdir.dependencies( "config" ) )
+        for cf in config_file_list:
+            Info( "Build depends on: %s" % cf )
+
+_generators = { "ninja": Ninja }
+
+class _Rule(object):
     def __init__( self, rargs ):
         self.name = rargs['tag']
         cmd = rargs['cmd']
@@ -88,30 +237,32 @@ class _Rule:
     def isUsed( self ):
         return self._use_count > 0
 
-class _Target:
+class _Target(object):
     def __init__( self, targs ):
         pass
 
-_build_tree = None
-class _BuildTree:
+class _BuildTree(object):
+    """The master class for constructor that stores the parsed contents for
+       an entire build tree"""
+    _singleton = None
+
     def __init__( self ):
-        self.parsed_build_files = []
-        self.files = []
+        if _BuildTree._singleton is not None:
+            Error( "More than one Build Tree object instantiated" )
+        _BuildTree._singleton = self
+
         self.build = None
+        self.build_dir = None
         self.build_set = {}
-        self.build_dirs = []
-        self.processed_dirs = []
-        self.source_root_dir = os.getcwd()
-        self.build_root_dir = self.source_root_dir
+
         self.generator = "ninja"
-        self.phase = "config"
-        self.globs = {}
+
+        self.phases = [ ProcessPhase( "config", "config", True, _Directory._configPassPostProc ),
+                        ProcessPhase( "build", "build", False ) ]
+
         self.user_features = None
         self.user_feature_defs = None
-        for key, val in _iterate( globals() ):
-            if key[0] != '_' and ( key == "os" or key == "sys" or key.lower() != key ):
-                self.globs[key] = val
-        self.conf_options = None
+
         self.parser = optparse.OptionParser( usage="usage: %prog [options]", version="%prog 1.0" )
         self.parser.add_option( '--build',
                                  help='Allows one to specify build type',
@@ -128,34 +279,57 @@ class _BuildTree:
                                  help='Allows one to specify the generator type',
                                  default=self.generator )
 
-    def addFile( self, f ):
-        self.files.append( f )
-
-    def processTree( self ):
+    def process( self ):
         # Pre-seed the source root directory so we can load
         # the user's config file, which then allows us to build up
         # the actual argument parser
+        src_root = os.getcwd()
         for i in range(0,len(sys.argv)):
             arg = sys.argv[i]
             if arg == "--source-dir":
                 if (i + 1) < len(sys.argv):
-                    self.source_root_dir = os.path.abspath( sys.argv[i+1] )
+                    src_root = os.path.abspath( sys.argv[i+1] )
             elif arg.startswith( "--source-dir=" ):
-                self.source_root_dir = os.path.abspath( arg.split('=')[1] )
+                src_root = os.path.abspath( arg.split('=')[1] )
 
-        dobj = _Directory( self.source_root_dir, "", None )
-        self.cur_dir = dobj
-        self.processed_dirs.append( dobj )
-        self._source_file( True )
+        globs = {}
+        for key, val in _iterate( globals() ):
+            if key[0] != '_' and ( key == "os" or key == "sys" or key.lower() != key ):
+                globs[key] = val
 
-        self.parseOptions()
-        # Now load up the real deal - the file that will set all the build
-        # targets
-        self.phase = "build"
-        self._source_file( False )
-        self.cur_dir = None
+        self.root_dir = _Directory( src_root, "", None, None, globs )
+        # Config pass is sort of special since user can potentially
+        # register other phases, and we need to parse the options
+        # after configuration
+        self.cur_phase = self.phases[0]
+        conf = self.phases[0].process_dir( self.root_dir )
+        self.parse_options()
 
-    def defineFeature( self, name, typename, help=None, default=None ):
+        if self.build_dir is None:
+            self.build_dir = src_root
+
+        if not isinstance( self.phases[len(self.phases) - 1], Generator ):
+            global _generators
+            self.phases.append( _generators[self.generator]() )
+
+        for p in self.phases[1:]:
+            self.cur_phase = p
+            p.process_dir( self.root_dir )
+        del(self.cur_phase)
+
+    def add_phase( self, after, phase ):
+        if not isinstance( phase, ProcessPhase ):
+            Error( "Attempt to add processing phase, but need a subclass of ProcessPhase" )
+        foundidx = -1
+        for p in self.phases:
+            if p.name == after:
+                foundidx = idx
+                break
+        if foundidx < 0:
+            Error( "Attempt to add processing phase after unknown phase '%s'" % after )
+        self.phases.insert( foundidx + 1, phase )
+
+    def add_feature( self, name, typename, help=None, default=None ):
         if self.user_features is not None:
             Error( "Invalid request to define feature '%s': All available features must be defined before testing to see if any are set" % name )
 
@@ -191,23 +365,33 @@ class _BuildTree:
         else:
             Error( "Unknown typename '%s' for user defined feature '%s'" % (typename, name) )
 
-    def getFeature( self, name ):
+    def feature( self, name ):
         if self.user_features is None:
-            self.parseOptions()
+            self.parse_options()
         if name not in self.user_features:
             Error( "Unknown feature requested '%s', use DefineFeature first" % name )
         return self.user_features[name]
 
-    def parseOptions( self ):
+    def parse_options( self ):
         if self.user_features is not None:
             return
         (options, args) = self.parser.parse_args()
 
         if options.build is not None and len(options.build) > 0:
             self.build = options.build
+
         if options.build_dir is not None and len(options.build_dir) > 0:
-            self.build_root_dir = os.path.abspath( options.build_dir )
+            self.build_dir = options.build_dir
+            
+        if self.build_dir is None:
+            self.build_dir = self.root_dir.src_dir
+
         self.generator = options.generator
+
+        if len(self.build_set) == 0:
+            Error( "Attempt to parse options triggered prior to any build configurations specified" )
+
+        self.root_dir.set_bin_dir( os.path.abspath( os.path.join( self.build_dir, self.build_set[self.build] ) ) )
 
         self.user_features = {}
         if self.user_feature_defs is not None:
@@ -233,62 +417,10 @@ class _BuildTree:
                 else:
                     Error( "Attempt to parse user option '%s' with unknown type '%s'\n" % (k, t) )
 
-    def doSubDir( self, name ):
-        curd = self.cur_dir
-        newd = curd.cur_rel_src_dir
-        if len(newd) > 0:
-            newd = os.path.join( newd, name )
-        else:
-            newd = name
-
-        dobj = _Directory( os.path.join( self.source_root_dir, newd ),
-                           newd,
-                           os.path.join( self.build_root_dir, newd ) )
-
-        self.cur_dir = dobj
-        self.processed_dirs.append( dobj )
-        self._source_file( False )
-        self.cur_dir = curd
-
-    def addBuildConfig( tag, outloc, default ):
+    def add_config( self, tag, outloc, default ):
         self.build_set[tag] = outloc
-        if default and _build is None:
+        if default and self.build is None:
             self.build = tag
-        if tag == self.build and self.cur_dir.cur_bin_dir is None:
-            self.build_root_dir = os.path.abspath( os.path.join( self.build_root_dir, outloc ) )
-            self.build_dirs.append( self.build_root_dir )
-            self.cur_dir.cur_bin_dir = os.path.abspath( os.path.join( self.build_root_dir, self.cur_dir.cur_rel_src_dir ) )
-
-    def _source_file( self, optional=False ):
-        try:
-            global _constructor_extension
-            filename = self.phase + _constructor_extension
-            fn = os.path.join( self.cur_dir.cur_src_dir, filename )
-            namespace = self.globs.copy()
-            with open( fn, "r" ) as f:
-                self.parsed_build_files.append( fn )
-                exec( compile( f.read() + "\n", filename, 'exec' ), namespace, namespace )
-            if self.phase == "config":
-                new_globs = {}
-                all_names = namespace.get( "__all__" )
-                if all_names is None:
-                    for k, v in _iterate( namespace ):
-                        if k[0] != '_' and k not in self.globs:
-                            new_globs[k] = v
-                else:
-                    for k in all_names:
-                        if k not in self.globs:
-                            new_globs[k] = namespace[k]
-                self.globs.update( new_globs )
-        except IOError as e:
-            if e.errno == errno.ENOENT:
-                if not optional:
-                    Error( "Unable to read required file '%s'" % fn )
-            else:
-                Error( "Unable to read and process file '%s': %s" % (fn, e.strerror) )
-        except Exception as e:
-            Error( "Error processing file '%s': %s" % ( fn, str(e) ) )
-
 
 ########################################
 ########################################
@@ -417,47 +549,43 @@ def Error( msg ):
     sys.exit( 1 )
 
 def DefineFeature( name, typename, help=None, default=None ):
-    global _build_tree
-    _build_tree.defineFeature( name, typename, help, default )
+    _BuildTree._singleton.add_feature( name, typename, help, default )
 
 def Feature( name ):
-    global _build_tree
-    return _build_tree.getFeature( name )
-
-def SubDir( name ):
-    global _build_tree
-    _build_tree.doSubDir( name )
-
-def GetCurrentSourceDir():
-    global _build_tree
-    _build_tree.parseOptions()
-    return _build_tree.cur_dir.cur_src_dir
-
-def GetCurrentSourceRelDir():
-    global _build_tree
-    _build_tree.parseOptions()
-    return _build_tree.cur_dir.cur_rel_src_dir
-
-def GetBuildRootDir():
-    global _build_tree
-    _build_tree.parseOptions()
-    return _build_tree.build_root_dir
+    return _BuildTree._singleton.feature( name )
 
 def BuildConfig( tag, outloc, default = False ):
-    global _build_tree
-    _build_tree.addBuildConfig( tag, outloc, default )
+    _BuildTree._singleton.add_config( tag, outloc, default )
+
+def AddGeneratorClass( name, classRef ):
+    global _generators
+    _generators[name] = classRef
+
+def AddProcessingPhase( name, after, phase ):
+    _BuildTree._singleton.add_phase( name, after, phase )
+
+def SubDir( name ):
+    _BuildTree._singleton.cur_phase.subdir( name )
+
+def GetCurrentSourceDir():
+    _BuildTree._singleton.parse_options()
+    return _BuildTree._singleton.cur_phase.cur_dir.src_dir
+
+def GetCurrentSourceRelDir():
+    _BuildTree._singleton.parse_options()
+    return _BuildTree._singleton.cur_phase.cur_dir.rel_src_dir
+
+def GetBuildRootDir():
+    _BuildTree._singleton.parse_options()
+    return _BuildTree._singleton.root_dir.bin_path
 
 def GetCurrentBinaryDir():
-    global _build_tree
-    if _build_tree.build is None:
-        raise RuntimeError( "No build specified, binary directory is undefined until then" )
-    return _build_tree.cur_dir.cur_bin_dir
+    _BuildTree._singleton.parse_options()
+    return _BuildTree._singleton.cur_phase.cur_dir.bin_dir
 
 def Building( b ):
-    global _build_tree
-    _build_tree.parseOptions()
-    return _build_tree.build == b
+    _BuildTree._singleton.parse_options()
+    return _BuildTree._singleton.build == b
 
 if __name__ == "__main__":
-    _build_tree = _BuildTree()
-    _build_tree.processTree()
+    _BuildTree().process()
