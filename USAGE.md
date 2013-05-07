@@ -72,6 +72,25 @@ GetCurrentSourceRelDir()
 GetBuildRootDir()
 GetCurrentBinaryDir()
 
+Design
+------
+
+target
+ - output file
+ - rule
+ - dependencies (inputs)
+
+rule
+module
+ - rules
+ - features
+ - variables
+ - extensions handled (in -> out)
+ - functions provided
+
+
+
+
 C/C++ Compilation Features
 --------------------------
 
