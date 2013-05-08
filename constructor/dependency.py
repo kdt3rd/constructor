@@ -20,7 +20,11 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+from .output import Debug, Error
+
 class Dependency(object):
+    """Base class for all things that represent a dependency tree"""
+
     def __init__( self, orderonly ):
         self._dependencies = {}
         self.orderonly = orderonly
@@ -48,3 +52,9 @@ class Dependency(object):
             return self._dependencies[group]
         return []
             
+class FileDependency(Dependency):
+    """Simple sub-class to represent a direct file in a dependency tree"""
+    def __init__( self, infile, orderonly ):
+        super(FileDependency, self).__init__( orderonly )
+        self.filename = infile
+

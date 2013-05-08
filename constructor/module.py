@@ -1,3 +1,4 @@
+#
 # Copyright (c) 2013 Kimball Thurston
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -19,13 +20,5 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from constructor.output import SetDebug, SetVerbose, IsVerbose, SetDebugContext, Debug, Info, Warn, Error
-from constructor.utility import *
-from constructor.dependency import *
-from constructor.phase import SetConstructorExtension, Phase
-from constructor.generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
-from constructor.rule import Rule
-from constructor.target import Target
-
-from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, GetCurrentSourceDir, GetCurrentSourceRelDir, GetBuildRootDir, GetCurrentBinaryDir, Building
-
+def EnableModule( m ):
+    pass

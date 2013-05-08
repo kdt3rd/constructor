@@ -86,6 +86,7 @@ module
  - features
  - variables
  - extensions handled (in -> out)
+ - other modules needed
  - functions provided
 
 

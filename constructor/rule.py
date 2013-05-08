@@ -1,3 +1,4 @@
+#
 # Copyright (c) 2013 Kimball Thurston
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -19,13 +20,27 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from constructor.output import SetDebug, SetVerbose, IsVerbose, SetDebugContext, Debug, Info, Warn, Error
-from constructor.utility import *
-from constructor.dependency import *
-from constructor.phase import SetConstructorExtension, Phase
-from constructor.generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
-from constructor.rule import Rule
-from constructor.target import Target
+class Rule(object):
+    def __init__( self, rargs ):
+        self.name = rargs['tag']
+        cmd = rargs['cmd']
+        if isinstance( cmd, list ):
+            command = ""
+            for c in cmd:
+                command += ' ' + c
+        else:
+            command = cmd
+        self.command = command
+        self.description = rargs.get( 'desc' )
+        self.use_input_in_desc = rargs.get( 'use_input_in_desc' )
+        self.dependency_file = rargs.get( 'depfile' )
 
-from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, GetCurrentSourceDir, GetCurrentSourceRelDir, GetBuildRootDir, GetCurrentBinaryDir, Building
+        self._use_count = 0
+
+    def addUse( self ):
+        self._use_count = self._use_count + 1
+
+    def isUsed( self ):
+        return self._use_count > 0
+
 

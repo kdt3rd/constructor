@@ -1,3 +1,4 @@
+#
 # Copyright (c) 2013 Kimball Thurston
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -18,14 +19,26 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
+#
 
-from constructor.output import SetDebug, SetVerbose, IsVerbose, SetDebugContext, Debug, Info, Warn, Error
-from constructor.utility import *
-from constructor.dependency import *
-from constructor.phase import SetConstructorExtension, Phase
-from constructor.generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
-from constructor.rule import Rule
-from constructor.target import Target
+from ..output import Info
+from ..generator import Generator
+from ..directory import Directory
 
-from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, GetCurrentSourceDir, GetCurrentSourceRelDir, GetBuildRootDir, GetCurrentBinaryDir, Building
+class Ninja(Generator):
+    def __init__( self ):
+        super( Ninja, self ).__init__( "ninja" )
+
+    def process_dir( self, curdir ):
+        curdir.make_bin_tree()
+        config_file_list = []
+        def _traverse_config_files( deps ):
+            for d in deps:
+                if isinstance( d, Directory ):
+                    _traverse_config_files( d.dependencies( "config" ) )
+                else:
+                    config_file_list.append( d.filename )
+        _traverse_config_files( curdir.dependencies( "config" ) )
+        for cf in config_file_list:
+            Info( "Build depends on: %s" % cf )
 

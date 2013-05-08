@@ -23,12 +23,9 @@
 import sys
 import os
 
+iterate = lambda x: x.iteritems()
 if sys.version_info[0] == 3:
-    def iterate( x ):
-        return x.items()
-else:
-    def iterate( x ):
-        return x.iteritems()
+    iterate = lambda x:x.items()
 
 
 def FindOptionalExecutable( exe ):
