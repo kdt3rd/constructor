@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-# Copyright (c) 2012 Kimball Thurston
+# Copyright (c) 2013 Kimball Thurston
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the "Software"),
@@ -33,46 +33,14 @@ import string
 import subprocess
 import optparse
 
-_constructor_extension = ".cns" #".py" # 
+_constructor_extension = ".cns" #".py" #
+
+sys.path.append('.')
+from constructor import *
 
 # Work around some differences between python 2 and 3
 # that we can't just handle generically
 
-if sys.version_info[0] == 3:
-    def _iterate( x ):
-        return x.items()
-else:
-    def _iterate( x ):
-        return x.iteritems()
-
-class Dependency(object):
-    def __init__( self, orderonly ):
-        self._dependencies = {}
-        self.orderonly = orderonly
-
-    def add_dependency( self, group, dep ):
-        if not isinstance( dep, Dependency ):
-            Error( "Attempt to add dependency that is not a subclass of Dependency" )
-
-        try:
-            deps = self._dependencies[group]
-        except KeyError:
-            deps = []
-            self._dependencies[group] = deps
-
-        found = False
-        for d in deps:
-            if d is dep:
-                found = True
-                break
-        if not found:
-            deps.append( dep )
-
-    def dependencies( self, group ):
-        if group in self._dependencies:
-            return self._dependencies[group]
-        return []
-            
 class _FileDependency(Dependency):
     def __init__( self, infile, orderonly ):
         super(_FileDependency, self).__init__( orderonly )
@@ -142,7 +110,7 @@ class _Directory(Dependency):
         new_globs = {}
         all_names = namespace.get( "__all__" )
         if all_names is None:
-            for k, v in _iterate( namespace ):
+            for k, v in iterate( namespace ):
                 if k[0] != '_' and k not in self.globs:
                     new_globs[k] = v
         else:
@@ -192,7 +160,7 @@ def _handleFile( f, operation ):
     (base, ext) = os.path.splitext( f )
     handler = _extension_handlers.get( ext )
     if handler is None:
-        for e, h in _iterate( _extension_handlers ):
+        for e, h in iterate( _extension_handlers ):
             if f.endswith( e ):
                 handler = h
                 break
@@ -235,7 +203,6 @@ def Compile( *args ):
     return ret
 
 class ProcessPhase(object):
-    cur_file = None
 
     def __init__( self, name, fileroot, optional, postproc = None ):
         self.name = name
@@ -260,7 +227,7 @@ class ProcessPhase(object):
             namespace = curdir.get_globals().copy()
             with open( fn, "r" ) as f:
                 curdir.add_dependency( "config", _FileDependency( fn, False ) )
-                cur_file = fn
+                SetDebugContext( fn )
                 exec( compile( f.read() + "\n", filename, 'exec' ), namespace, namespace )
             if self.post_proc:
                 self.post_proc( curdir, namespace )
@@ -354,7 +321,7 @@ class _BuildTree(object):
                 src_root = os.path.abspath( arg.split('=')[1] )
 
         globs = {}
-        for key, val in _iterate( globals() ):
+        for key, val in iterate( globals() ):
             if key[0] != '_' and ( key == "os" or key == "sys" or key.lower() != key ):
                 globs[key] = val
 
@@ -456,7 +423,7 @@ class _BuildTree(object):
 
         self.user_features = {}
         if self.user_feature_defs is not None:
-            for k, info in _iterate( self.user_feature_defs ):
+            for k, info in iterate( self.user_feature_defs ):
                 oVal = getattr( options, k, None )
                 t = info[0]
                 default = info[1]
@@ -491,62 +458,6 @@ class _BuildTree(object):
 ########################################
 
 
-def Info( msg ):
-    if ProcessPhase.cur_file is not None:
-        sys.stdout.write( ProcessPhase.cur_file )
-        sys.stdout.write( ": " )
-    sys.stdout.write( msg )
-    sys.stdout.write( '\n' )
-    sys.stdout.flush()
-
-def Warning( msg ):
-    if ProcessPhase.cur_file is not None:
-        sys.stderr.write( ProcessPhase.cur_file )
-        sys.stderr.write( ": " )
-    sys.stderr.write( "WARNING: " )
-    sys.stderr.write( msg )
-    sys.stderr.write( '\n' )
-    sys.stderr.flush()
-
-def Error( msg ):
-    if ProcessPhase.cur_file is not None:
-        sys.stderr.write( ProcessPhase.cur_file )
-        sys.stderr.write( ": " )
-    sys.stderr.write( "ERROR: " )
-    sys.stderr.write( msg )
-    sys.stderr.write( '\n\n' )
-    sys.stderr.flush()
-    sys.exit( 1 )
-
-def FindOptionalExecutable( exe ):
-    if exe is None:
-        return None
-
-    if sys.platform == "win32" or sys.platform == "win64":
-        if exe[:-4] != ".exe":
-            exe = exe + ".exe"
-        pass
-
-    is_exe = lambda fpath: os.path.isfile( fpath ) and os.access( fpath, os.X_OK )
-
-    fpath, fname = os.path.split( exe )
-    if fpath:
-        if is_exe( exe ):
-            return exe
-    else:
-        for path in os.environ["PATH"].split( os.pathsep ):
-            path = path.strip( '"' )
-            exe_file = os.path.join( path, exe )
-            if is_exe( exe_file ):
-                return exe_file
-    return None
-
-def FindExecutable( exe ):
-    exe_file = FindOptionalExecutable( exe )
-    if exe_file is None:
-        raise OSError( errno.ENOENT, "No such file or directory trying to find executable", exe )
-    return exe_file
-
 # pkg-config may exist even under windows
 _pkgconfig = FindOptionalExecutable( "pkg-config" )
 _externResolvers = []
@@ -566,6 +477,7 @@ def FindExternalLibrary( name, version=None ):
             if version is not None:
                 lib += " "
                 lib += version
+            Debug( "Running pkg-config with library name/version '%s'" % lib )
             ver = subprocess.check_output( [_pkgconfig, '--modversion', lib] )
             cflags = subprocess.check_output( [_pkgconfig, '--cflags-only-other', lib] )
             iflags = subprocess.check_output( [_pkgconfig, '--cflags-only-I', lib] )
@@ -575,6 +487,7 @@ def FindExternalLibrary( name, version=None ):
             return e
         except:
             pass
+
     # still here, pkg-config failed
     # try the user provided external resolver if specified
     for e in _externResolver:
@@ -661,7 +574,6 @@ def Building( b ):
     _BuildTree._singleton.parse_options()
     return _BuildTree._singleton.build == b
 
-def AddRule( 
 ########################################
 ########################################
 ## finally, run it
