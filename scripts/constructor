@@ -28,8 +28,6 @@
 
 import os
 import sys
-import errno
-import string
 import subprocess
 
 sys.path.append('.')

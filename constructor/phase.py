@@ -21,6 +21,7 @@
 #
 
 import os
+import errno
 
 from .output import Debug, SetDebugContext
 from .dependency import *
