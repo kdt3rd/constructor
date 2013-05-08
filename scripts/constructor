@@ -36,9 +36,6 @@ LoadGenerator( 'Ninja' )
 
 #SetConstructorExtension( ".py" )
 
-# Work around some differences between python 2 and 3
-# that we can't just handle generically
-
 class _ExternalPackage(Dependency):
     def __init__( self, name, cflags, iflags, lflags, ver ):
         super(_ExternalPackage, self).__init__( False )

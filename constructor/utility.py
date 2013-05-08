@@ -23,6 +23,9 @@
 import sys
 import os
 
+
+# Python 2.xx and 3 are incompatible in regards to iterating over things
+# let's define our own iterate function that does the Right Thing (tm)
 iterate = lambda x: x.iteritems()
 if sys.version_info[0] == 3:
     iterate = lambda x:x.items()
