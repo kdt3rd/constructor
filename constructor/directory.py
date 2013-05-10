@@ -35,6 +35,10 @@ class Directory(Dependency):
         self.bin_path = binpath
         self.targets = None
         self.subdirs = {}
+        # Stuff that the user really turns on
+        self.modules = None
+        self.rules = None
+        self.variables = None
 
     def set_globals( self, globs ):
         self.globs = globs

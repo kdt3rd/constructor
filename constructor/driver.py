@@ -25,7 +25,7 @@ import sys
 import optparse
 from .output import *
 from .utility import *
-from .phase import Phase
+from .phase import Phase, DirParsePhase
 from .directory import Directory
 from .generator import Generator, GetGeneratorClass
 
@@ -45,8 +45,8 @@ class Driver(object):
 
         self.generator = defgenerator
 
-        self.phases = [ Phase( "config", "config", True, Directory._configPassPostProc ),
-                        Phase( "build", "build", False ) ]
+        self.phases = [ DirParsePhase( "config", "config", True, Directory._configPassPostProc ),
+                        DirParsePhase( "build", "build", False ) ]
 
         self.user_features = None
         self.user_feature_defs = None

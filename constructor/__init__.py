@@ -22,7 +22,7 @@
 from constructor.output import SetDebug, SetVerbose, IsVerbose, SetDebugContext, Debug, Info, Warn, Error
 from constructor.utility import *
 from constructor.dependency import *
-from constructor.phase import SetConstructorExtension, Phase
+from constructor.phase import SetConstructorExtension, Phase, DirParsePhase
 from constructor.generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
 from constructor.rule import Rule
 from constructor.target import Target

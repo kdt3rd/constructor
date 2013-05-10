@@ -45,52 +45,6 @@ class _ExternalPackage(Dependency):
         self.lflags = lflags.strip()
         self.version = ver.strip()
 
-def _handleFile( f, operation ):
-    global _extension_handlers
-    (base, ext) = os.path.splitext( f )
-    handler = _extension_handlers.get( ext )
-    if handler is None:
-        for e, h in iterate( _extension_handlers ):
-            if f.endswith( e ):
-                handler = h
-                break
-
-    if handler is not None:
-        res = getattr( handler, operation )( f )
-        if isinstance( res, list ) or instance( res, Dependency ):
-            return res
-        else:
-            Error( "Handler '%s' did not return a valid dependency object or list of dependencies handling file '%s'" % ( handler.get_name(), f ) )
-    else:
-        Error( "No handler defined for extension '%s' (file '%s')" % (ext,f) )
-    return None
-
-def _handleTarget( t, operation ):
-    fn = t.get_output_file()
-    res = _handleFile( fn, operation )
-    if isinstance( res, list ):
-        for r in res:
-            res.add_dependency( "build", t )
-    elif isinstance( res, Dependency ):
-        res.add_dependency( "build", t )
-    else:
-        Error( "Handler '%s' did not return a valid dependency object or list of dependencies handling target '%s'" % ( handler.get_name(), t.get_output_file() ) )
-    return res
-
-# Produces a list of targets
-def Compile( *args ):
-    ret = []
-    for f in args:
-        if isinstance( f, Target ):
-            ret.append( _handleTarget( f, "compile" ) )
-        if isinstance( f, (str, basestring) ):
-            ret.append( _handleFile( f, "compile" ) )
-        elif isinstance( f, list ):
-            ret.append( Compile( *f ) )
-        elif isinstance( f, tuple ):
-            for x in f:
-                ret.append( Compile( x ) )
-    return ret
 
 ########################################
 ########################################

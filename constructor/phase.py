@@ -34,23 +34,39 @@ def SetConstructorExtension( ext ):
 class Phase(object):
     """Class to handle various phases of creating build files"""
 
-    def __init__( self, name, fileroot, optional, postproc = None ):
+    def __init__( self, name ):
         self.name = name
-        self.file_root = fileroot
-        self.optional = optional
-        self.post_proc = postproc
         self.cur_dir = None
 
     def subdir( self, name ):
         if self.cur_dir is None:
             Error( "Attempt to process a sub directory with no current directory" )
         newd = self.cur_dir.add_sub_dir( name )
-        self.process_dir( newd )
+        self.process( newd )
 
-    def process_dir( self, curdir ):
+    def process( self, curdir ):
         oldd = self.cur_dir
         try:
             self.cur_dir = curdir
+            self.process_dir( curdir )
+        finally:
+            self.cur_dir = oldd
+            cur_file = None
+
+    def process_dir( self, curdir ):
+        Error( "Sub-class of Phase must implement process_dir" )
+
+class DirParsePhase(Phase):
+    """Class to handle various phases of creating build files"""
+
+    def __init__( self, name, fileroot, optional, postproc = None ):
+        super(DirParsePhase, self).__init__( name )
+        self.file_root = fileroot
+        self.optional = optional
+        self.post_proc = postproc
+
+    def process_dir( self, curdir ):
+        try:
             global _constructor_extension
             filename = self.file_root + _constructor_extension
             fn = os.path.join( curdir.src_dir, filename )
@@ -71,7 +87,4 @@ class Phase(object):
                 Error( "Unable to read and process file '%s': %s" % (fn, e.strerror) )
         except Exception as e:
             Error( "Error processing file '%s': %s" % ( fn, str(e) ) )
-        finally:
-            self.cur_dir = oldd
-            cur_file = None
 

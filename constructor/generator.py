@@ -31,10 +31,7 @@ import constructor.generators
 class Generator(Phase):
     _generators = {}
     def __init__( self, name ):
-        super( Generator, self ).__init__( name, None, False, None )
-
-    def process_dir( self, curdir ):
-        Error( "Sub-class of generator should override process_dir" )
+        super( Generator, self ).__init__( name )
 
 def AddGeneratorClass( name, classRef ):
     g = Generator._generators.get( name )
@@ -51,9 +48,6 @@ def LoadGenerator( classname, modname=None ):
     try:
         gmod = importlib.import_module( mname )
     except ImportError as e:
-        pass
-
-    if gmod is None:
         Error( "Unable to locate module '%s' for generator class '%s'" % (modname,classname) )
 
     found = False
