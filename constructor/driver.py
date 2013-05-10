@@ -100,7 +100,7 @@ class Driver(object):
         # register other phases, and we need to parse the options
         # after configuration
         self.cur_phase = self.phases[0]
-        conf = self.phases[0].process_dir( self.root_dir )
+        conf = self.phases[0].process( self.root_dir )
         self.parse_options()
 
         if self.build_dir is None:
@@ -112,7 +112,7 @@ class Driver(object):
 
         for p in self.phases[1:]:
             self.cur_phase = p
-            p.process_dir( self.root_dir )
+            p.process( self.root_dir )
         del(self.cur_phase)
 
     def add_phase( self, after, phase ):
