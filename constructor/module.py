@@ -74,8 +74,11 @@ class Module(object):
                 else:
                     Error( "Modules '%s' and '%s' have conflicting/ambiguous handlers for extension '%s'" % ( name, curh.name, k ) )
 
-_modules = {}
-_loading_modules = []
+    def addGlobals( self, globs, phase ):
+        if self.provided_functions is not None:
+            pfuncs = self.provided_functions.get( phase )
+            if pfuncs is not None:
+                globs.update( pfuncs )
 
 def ProcessFiles( operation, *args ):
     ret = []
@@ -91,45 +94,50 @@ def ProcessFiles( operation, *args ):
                 ret.append( ProcessFiles( x ) )
     return ret
 
+_modules = {}
+_loading_modules = []
+
 def EnableModule( name, packageprefix=None ):
     global _modules
     global _loading_modules
-    if _modules.get( name ) is not None:
-        return
+    newmod = _modules.get( name )
+    if newmod is None:
+        if name in _loading_modules:
+            Error( "Dependency cycle in modules found, please re-factor modules. module chain: %s" % _loading_modules )
 
-    if name in _loading_modules:
-        Error( "Dependency cycle in modules found, please re-factor modules. module chain: %s" % _loading_modules )
-
-    _loading_modules.append( name )
-    try:
-        mname = name
-        if packageprefix is not None:
-            mname = packageprefix + '.' + name
-        else:
-            mname = 'constructor.modules.' + name
-
+        _loading_modules.append( name )
         try:
-            Debug( "Attempting to import module '%s' using module package path" % name )
-            gmod = importlib.import_module( mname )
-        except ImportError as e:
-            Error( "Unable to locate module '%s' for module '%s'" % (modname,name) )
+            mname = name
+            if packageprefix is not None:
+                mname = packageprefix + '.' + name
+            else:
+                mname = 'constructor.modules.' + name
 
-        mods = getattr( gmod, "modules" )
-        if mods is not None:
-            for m in mods:
-                if isinstance( m, (str, basestring) ):
-                    EnableModule( m )
-                elif isinstance( m, list ):
-                    EnableModule( m[0], m[1] )
-                else:
-                    Error( "Invalid dependent module specification: %s, need string or 2-element array" % m )
+            try:
+                Debug( "Attempting to import module '%s' using module package path" % name )
+                gmod = importlib.import_module( mname )
+            except ImportError as e:
+                Error( "Unable to locate module '%s' for module '%s'" % (modname,name) )
 
-        m = Module( name = name, rules = getattr( gmod, "rules" ),
-                    features = getattr( gmod, "features" ),
-                    variables = getattr( gmod, "variables" ),
-                    extensions = getattr( gmod, "extension_handlers" ),
-                    funcs = getattr( gmod, "functions" ) )
-        _modules[name] = m
-    finally:
-        _loading_modules.pop()
+            mods = getattr( gmod, "modules" )
+            if mods is not None:
+                for m in mods:
+                    if isinstance( m, (str, basestring) ):
+                        EnableModule( m )
+                    elif isinstance( m, list ):
+                        EnableModule( m[0], m[1] )
+                    else:
+                        Error( "Invalid dependent module specification: %s, need string or 2-element array" % m )
+
+            newmod = Module( name = name, rules = getattr( gmod, "rules" ),
+                             features = getattr( gmod, "features" ),
+                             variables = getattr( gmod, "variables" ),
+                             extensions = getattr( gmod, "extension_handlers" ),
+                             funcs = getattr( gmod, "functions_by_phase" ) )
+            _modules[name] = newmod
+        finally:
+            _loading_modules.pop()
+    curdir = GetCurrentDirectoryObj()
+    curdir.enableModule( newmod )
+
 

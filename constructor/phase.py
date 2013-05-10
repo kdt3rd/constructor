@@ -70,7 +70,7 @@ class DirParsePhase(Phase):
             global _constructor_extension
             filename = self.file_root + _constructor_extension
             fn = os.path.join( curdir.src_dir, filename )
-            namespace = curdir.get_globals().copy()
+            namespace = curdir.get_globals( self.name )
             Debug( "Parsing file '%s'" % fn )
             with open( fn, "r" ) as f:
                 curdir.add_dependency( "config", FileDependency( fn, False ) )
@@ -78,7 +78,7 @@ class DirParsePhase(Phase):
                 exec( compile( f.read() + "\n", filename, 'exec' ), namespace, namespace )
             if self.post_proc:
                 Debug( "Running post process after file '%s'" % fn )
-                self.post_proc( curdir, namespace )
+                self.post_proc( self.name, curdir, namespace )
         except IOError as e:
             if e.errno == errno.ENOENT:
                 if not self.optional:

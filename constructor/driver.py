@@ -235,21 +235,9 @@ def AddPhase( name, after, phase ):
 def SubDir( name ):
     Driver._singleton.cur_phase.subdir( name )
 
-def GetCurrentSourceDir():
+def CurDir():
     Driver._singleton.parse_options()
-    return Driver._singleton.cur_phase.cur_dir.src_dir
-
-def GetCurrentSourceRelDir():
-    Driver._singleton.parse_options()
-    return Driver._singleton.cur_phase.cur_dir.rel_src_dir
-
-def GetBuildRootDir():
-    Driver._singleton.parse_options()
-    return Driver._singleton.root_dir.bin_path
-
-def GetCurrentBinaryDir():
-    Driver._singleton.parse_options()
-    return Driver._singleton.cur_phase.cur_dir.bin_dir
+    return Driver._singleton.cur_phase.cur_dir
 
 def Building( b ):
     Driver._singleton.parse_options()

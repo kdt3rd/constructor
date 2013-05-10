@@ -27,5 +27,5 @@ from constructor.generator import Generator, AddGeneratorClass, LoadGenerator, G
 from constructor.rule import Rule
 from constructor.target import Target
 
-from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, GetCurrentSourceDir, GetCurrentSourceRelDir, GetBuildRootDir, GetCurrentBinaryDir, Building
+from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, CurDir, Building
 

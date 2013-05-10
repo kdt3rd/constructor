@@ -33,9 +33,9 @@ class Directory(Dependency):
         self.src_dir = path
         self.rel_src_dir = relpath
         self.bin_path = binpath
-        self.targets = None
+        # Stuff that the user really turns on / triggers via directives
         self.subdirs = {}
-        # Stuff that the user really turns on
+        self.targets = None
         self.modules = None
         self.rules = None
         self.variables = None
@@ -43,10 +43,19 @@ class Directory(Dependency):
     def set_globals( self, globs ):
         self.globs = globs
 
-    def get_globals( self ):
-        if self.globs is None:
-            return self.pardir.get_globals()
-        return self.globs
+    def get_globals( self, phase=None ):
+        retval = self.globs
+        if retval is None:
+            retval = self.pardir.get_globals( phase )
+
+        if phase is None:
+            return retval
+
+        retval = retval.copy()
+        if self.modules is not None:
+            for k, v in iterate( self.modules ):
+                v.addGlobals( retval, phase )
+        return retval
 
     def set_bin_dir( self, path ):
         self.bin_path = path
@@ -77,22 +86,23 @@ class Directory(Dependency):
 
         return dobj
 
-    def addToGlobals( self, namespace ):
+    def addToGlobals( self, phase, namespace ):
         if self.globs is None:
             self.globs = self.get_globals().copy()
 
+        phaseglobs = self.get_globals( phase )
         new_globs = {}
         all_names = namespace.get( "__all__" )
         if all_names is None:
             for k, v in iterate( namespace ):
-                if k[0] != '_' and k not in self.globs:
+                if k[0] != '_' and k not in phaseglobs:
                     new_globs[k] = v
         else:
             for k in all_names:
-                if k not in self.globs:
+                if k not in phaseglobs:
                     new_globs[k] = namespace[k]
         self.globs.update( new_globs )
 
-    def _configPassPostProc( curdir, namespace ):
-        curdir.addToGlobals( namespace )
+    def _configPassPostProc( phase, curdir, namespace ):
+        curdir.addToGlobals( phase, namespace )
 
