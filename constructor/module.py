@@ -23,7 +23,7 @@
 import importlib
 from .dependency import Dependency
 from .target import Target
-from .output import Debug, Error, Info
+from .output import Debug, Error, FatalException, Info
 from .utility import iterate
 from .directory import CurDir
 
@@ -118,8 +118,8 @@ def EnableModule( name, packageprefix=None ):
             try:
                 Debug( "Attempting to import module '%s' using module package path" % name )
                 gmod = importlib.import_module( mname )
-            except ImportError as e:
-                Error( "Unable to locate module '%s' for module '%s'" % (modname,name) )
+            except:
+                FatalException( "Unable to load module '%s'" % name )
 
             mods = getattr( gmod, "modules" )
             if mods is not None:

@@ -21,8 +21,7 @@
 #
 #
 
-import sys
-
+import sys, traceback
 _is_debug = False
 _is_verbose = False
 _current_context = None
@@ -41,7 +40,12 @@ def IsVerbose():
 
 def SetDebugContext( ctxt ):
     global _current_context
-    _current_context = ctxt
+    global _is_debug
+    global _is_verbose
+    if (_is_debug or _is_verbose):
+        _current_context = ctxt
+    else:
+        _current_context = None
 
 def Debug( msg ):
     global _is_debug
@@ -84,5 +88,15 @@ def Error( msg ):
     sys.stderr.flush()
     sys.exit( 1 )
 
-
+def FatalException( msg ):
+    global _current_context
+    if _current_context is not None:
+        sys.stderr.write( _current_context )
+        sys.stderr.write( ": " )
+    sys.stderr.write( "ERROR: " )
+    sys.stderr.write( msg )
+    sys.stderr.write( '\n\n' )
+    sys.stderr.write( traceback.format_exc() )
+    sys.stderr.flush()
+    sys.exit( 1 )
 
