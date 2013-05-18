@@ -26,6 +26,7 @@ from constructor.phase import SetConstructorExtension, Phase, DirParsePhase
 from constructor.generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
 from constructor.rule import Rule
 from constructor.target import Target
+from constructor.module import EnableModule, ProcessFiles, Module
 
 from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, CurDir, Building
 

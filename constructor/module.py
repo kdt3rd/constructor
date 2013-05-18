@@ -20,10 +20,12 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import importlib
 from .dependency import Dependency
 from .target import Target
-from .output import Debug, Error
+from .output import Debug, Error, Info
 from .utility import iterate
+from .directory import CurDir
 
 class Module(object):
     """Class encapsulating a module, which defines how certain types of code are compiled, or how other things are processed"""
@@ -137,7 +139,7 @@ def EnableModule( name, packageprefix=None ):
             _modules[name] = newmod
         finally:
             _loading_modules.pop()
-    curdir = GetCurrentDirectoryObj()
+    curdir = CurDir()
     curdir.enableModule( newmod )
 
 

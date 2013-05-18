@@ -25,6 +25,8 @@ import errno
 
 from .output import Debug, SetDebugContext
 from .dependency import *
+from .directory import CurDir, SetCurDir
+from .module import EnableModule
 
 _constructor_extension = ".py"
 def SetConstructorExtension( ext ):
@@ -66,7 +68,9 @@ class DirParsePhase(Phase):
         self.post_proc = postproc
 
     def process_dir( self, curdir ):
+        olddir = CurDir()
         try:
+            SetCurDir( curdir )
             global _constructor_extension
             filename = self.file_root + _constructor_extension
             fn = os.path.join( curdir.src_dir, filename )
@@ -87,4 +91,5 @@ class DirParsePhase(Phase):
                 Error( "Unable to read and process file '%s': %s" % (fn, e.strerror) )
         except Exception as e:
             Error( "Error processing file '%s': %s" % ( fn, str(e) ) )
-
+        finally:
+            SetCurDir( olddir )

@@ -26,8 +26,11 @@ import optparse
 from .output import *
 from .utility import *
 from .phase import Phase, DirParsePhase
-from .directory import Directory
-from .generator import Generator, GetGeneratorClass
+from .directory import Directory, CurDir, SetCurDir
+from .generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
+from .rule import Rule
+from .target import Target
+from .module import EnableModule, ProcessFiles, Module
 
 class Driver(object):
     """The master class for constructor that stores the parsed contents for
@@ -99,6 +102,7 @@ class Driver(object):
         # Config pass is sort of special since user can potentially
         # register other phases, and we need to parse the options
         # after configuration
+        SetCurDir( self.root_dir )
         self.cur_phase = self.phases[0]
         conf = self.phases[0].process( self.root_dir )
         self.parse_options()
@@ -234,10 +238,6 @@ def AddPhase( name, after, phase ):
 
 def SubDir( name ):
     Driver._singleton.cur_phase.subdir( name )
-
-def CurDir():
-    Driver._singleton.parse_options()
-    return Driver._singleton.cur_phase.cur_dir
 
 def Building( b ):
     Driver._singleton.parse_options()

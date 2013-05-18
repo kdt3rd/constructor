@@ -66,7 +66,7 @@ def Info( msg ):
 def Warn( msg ):
     global _current_context
     if _current_context is not None:
-        sys.stdout.write( _current_context )
+        sys.stderr.write( _current_context )
         sys.stderr.write( ": " )
     sys.stderr.write( "WARNING: " )
     sys.stderr.write( msg )
@@ -76,7 +76,7 @@ def Warn( msg ):
 def Error( msg ):
     global _current_context
     if _current_context is not None:
-        sys.stdout.write( _current_context )
+        sys.stderr.write( _current_context )
         sys.stderr.write( ": " )
     sys.stderr.write( "ERROR: " )
     sys.stderr.write( msg )

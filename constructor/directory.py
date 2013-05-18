@@ -25,11 +25,21 @@ from .dependency import Dependency
 from .output import Info
 from .utility import iterate
 
+_curdir = None
+def CurDir():
+    global _curdir
+    return _curdir
+
+def SetCurDir( d ):
+    global _curdir
+    _curdir = d
+
 class Directory(Dependency):
     def __init__( self, path, relpath, binpath, pardir = None, globs = None ):
         super(Directory, self).__init__( False )
         self.pardir = pardir
         self.globs = globs
+        self._cur_namespace = None
         self.src_dir = path
         self.rel_src_dir = relpath
         self.bin_path = binpath
@@ -39,6 +49,13 @@ class Directory(Dependency):
         self.modules = None
         self.rules = None
         self.variables = None
+
+    def enableModule( self, mod ):
+        if self.modules is None:
+            self.modules = {}
+        self.modules[mod.name] = mod
+        if self._cur_namespace is not None:
+            mod.addGlobals( self._cur_namespace, "config" )
 
     def set_globals( self, globs ):
         self.globs = globs
@@ -55,6 +72,7 @@ class Directory(Dependency):
         if self.modules is not None:
             for k, v in iterate( self.modules ):
                 v.addGlobals( retval, phase )
+        self._cur_namespace = retval
         return retval
 
     def set_bin_dir( self, path ):
