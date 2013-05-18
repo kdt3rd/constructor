@@ -128,5 +128,9 @@ functions_by_phase = { "config":
                            "AddExternalResolver": _AddExternalResolver,
                            "FindExternalLibrary": _FindExternalLibrary,
                            "HaveExternal": _HaveExternal,
+                       },
+                       "build":
+                       {
+                           "HaveExternal": _HaveExternal,
                        }
                      }
