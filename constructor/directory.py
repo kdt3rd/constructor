@@ -21,8 +21,9 @@
 #
 
 import os
+import errno
 from .dependency import Dependency
-from .output import Info
+from .output import Info, Debug
 from .utility import iterate
 
 _curdir = None
@@ -55,7 +56,7 @@ class Directory(Dependency):
             self.modules = {}
         self.modules[mod.name] = mod
         if self._cur_namespace is not None:
-            mod.addGlobals( self._cur_namespace, "config" )
+            mod.add_globals( self._cur_namespace, "config" )
 
     def add_module_features( self, driver ):
         if self.modules is not None:
@@ -63,7 +64,7 @@ class Directory(Dependency):
                 if m.features is not None:
                     for f in m.features:
                         driver.add_feature( f["name"], f["type"], f["help"], f["default"] )
-        for sd in self.subdirs:
+        for sn, sd in iterate( self.subdirs ):
             sd.add_module_features( driver )
 
     def set_globals( self, globs ):
@@ -80,7 +81,7 @@ class Directory(Dependency):
         retval = retval.copy()
         if self.modules is not None:
             for k, v in iterate( self.modules ):
-                v.addGlobals( retval, phase )
+                v.add_globals( retval, phase )
         self._cur_namespace = retval
         return retval
 
@@ -88,11 +89,19 @@ class Directory(Dependency):
         self.bin_path = path
         if len(self.rel_src_dir) > 0:
             self.bin_path = os.path.join( path, self.rel_src_dir )
-        for sd in self.subdirs:
+        for sn, sd in iterate( self.subdirs ):
             sd.set_bin_dir( path )
 
     def make_bin_tree( self):
-        Info( "make bin tree: %s" % self.bin_path )
+        Debug( "make bin tree: %s" % self.bin_path )
+        try:
+            os.makedirs( self.bin_path )
+        except OSError as e:
+            if e.errno is not errno.EEXIST:
+                raise
+
+        for sn, sd in iterate( self.subdirs ):
+            sd.make_bin_tree()
 
     def add_sub_dir( self, name ):
         try:

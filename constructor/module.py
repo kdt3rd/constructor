@@ -76,7 +76,7 @@ class Module(object):
                 else:
                     Error( "Modules '%s' and '%s' have conflicting/ambiguous handlers for extension '%s'" % ( name, curh.name, k ) )
 
-    def addGlobals( self, globs, phase ):
+    def add_globals( self, globs, phase ):
         if self.provided_functions is not None:
             pfuncs = self.provided_functions.get( phase )
             if pfuncs is not None:
