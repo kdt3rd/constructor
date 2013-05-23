@@ -48,7 +48,7 @@ class Driver(object):
 
         self.generator = defgenerator
 
-        self.phases = [ DirParsePhase( "config", "config", True, Directory._configPassPostProc ),
+        self.phases = [ DirParsePhase( "config", "config", True, lambda p, c, n: c.add_to_globals( p, n ) ),
                         DirParsePhase( "build", "build", False ) ]
 
         self.user_features = None

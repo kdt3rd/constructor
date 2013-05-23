@@ -20,7 +20,7 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import importlib
+#import importlib
 from .dependency import Dependency
 from .target import Target
 from .output import Debug, Error, Info
@@ -109,15 +109,12 @@ def EnableModule( name, packageprefix=None ):
 
         _loading_modules.append( name )
         try:
-            mname = name
-            if packageprefix is not None:
-                mname = packageprefix + '.' + name
-            else:
-                mname = 'constructor.modules.' + name
+            if packageprefix is None:
+                packageprefix = 'constructor.modules'
 
             try:
                 Debug( "Attempting to import module '%s' using module package path" % name )
-                gmod = importlib.import_module( mname )
+                gmod = __import__( "%s.%s" % ( packageprefix, name ), fromlist=[packageprefix] )
             except ImportError as e:
                 Error( "Unable to locate module '%s' for module '%s'" % (modname,name) )
 
@@ -140,6 +137,6 @@ def EnableModule( name, packageprefix=None ):
         finally:
             _loading_modules.pop()
     curdir = CurDir()
-    curdir.enableModule( newmod )
+    curdir.enable_module( newmod )
 
 
