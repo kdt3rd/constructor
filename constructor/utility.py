@@ -22,7 +22,7 @@
 
 import sys
 import os
-
+import subprocess
 
 # Python 2.xx and 3 are incompatible in regards to iterating over things
 # let's define our own iterate function that does the Right Thing (tm)
@@ -59,4 +59,37 @@ def FindExecutable( exe ):
     if exe_file is None:
         raise OSError( errno.ENOENT, "No such file or directory trying to find executable", exe )
     return exe_file
+
+def Is64bit():
+    if sys.platform == "win64":
+        return True
+    elif sys.platform == "win32":
+        return False
+    (syst, node, rel, ver, machine) = os.uname()
+    if machine == "x86_64":
+        return True
+
+    return False
+
+_dist = None
+_rel = None
+def Distribution():
+    global _dist
+    global _rel
+    if _dist is None:
+        (syst, node, rel, ver, machine) = os.uname()
+        if syst == "Linux":
+            _dist = subprocess.check_output( ['lsb_release', '-s', '-i' ], universal_newlines=True )
+            _rel = subprocess.check_output( ['lsb_release', '-s', '-r' ], universal_newlines=True )
+
+        Error( "Unimplemented function" )
+    return _dist
+
+def Release():
+    global _rel
+    if _rel is None:
+        # use the above distribution function to populate both
+        d = Distribution()
+
+    return _rel
 
