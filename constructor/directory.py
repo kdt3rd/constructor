@@ -50,12 +50,21 @@ class Directory(Dependency):
         self.rules = None
         self.variables = None
 
-    def enableModule( self, mod ):
+    def enable_module( self, mod ):
         if self.modules is None:
             self.modules = {}
         self.modules[mod.name] = mod
         if self._cur_namespace is not None:
             mod.addGlobals( self._cur_namespace, "config" )
+
+    def add_module_features( self, driver ):
+        if self.modules is not None:
+            for n, m in iterate( self.modules ):
+                if m.features is not None:
+                    for f in m.features:
+                        driver.add_feature( f["name"], f["type"], f["help"], f["default"] )
+        for sd in self.subdirs:
+            sd.add_module_features( driver )
 
     def set_globals( self, globs ):
         self.globs = globs
@@ -104,7 +113,7 @@ class Directory(Dependency):
 
         return dobj
 
-    def addToGlobals( self, phase, namespace ):
+    def add_to_globals( self, phase, namespace ):
         if self.globs is None:
             self.globs = self.get_globals().copy()
 
@@ -120,7 +129,4 @@ class Directory(Dependency):
                 if k not in phaseglobs:
                     new_globs[k] = namespace[k]
         self.globs.update( new_globs )
-
-    def _configPassPostProc( phase, curdir, namespace ):
-        curdir.addToGlobals( phase, namespace )
 

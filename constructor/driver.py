@@ -177,6 +177,9 @@ class Driver(object):
     def parse_options( self ):
         if self.user_features is not None:
             return
+        if self.root_dir is not None:
+            self.root_dir.add_module_features( self )
+
         (options, args) = self.parser.parse_args()
 
         if options.build is not None and len(options.build) > 0:
