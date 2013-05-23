@@ -74,6 +74,9 @@ def _Library( *f ):
 def _Executable( *f ):
     pass
 
+def _Compile( *f ):
+    pass
+
 modules = [ "external_pkg" ]
 rules = []
 features = [ { "name": "shared", "type": "boolean", "help": "Build shared libraries", "default": True },
@@ -101,6 +104,7 @@ functions_by_phase = {
     {
         "Library": _Library,
         "Executable": _Executable,
+        "Compile": _Compile,
         "CFlags": _CFlags,
         "CXXFlags": _CXXFlags,
         "Warnings": _Warnings,
