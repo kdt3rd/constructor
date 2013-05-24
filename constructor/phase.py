@@ -23,7 +23,7 @@
 import os
 import errno
 
-from .output import Debug, SetDebugContext
+from .output import *
 from .dependency import *
 from .directory import CurDir, SetCurDir
 from .module import EnableModule
@@ -75,21 +75,25 @@ class DirParsePhase(Phase):
             filename = self.file_root + _constructor_extension
             fn = os.path.join( curdir.src_dir, filename )
             namespace = curdir.get_globals( self.name )
+            localspace = {}
             Debug( "Parsing file '%s'" % fn )
             with open( fn, "r" ) as f:
                 curdir.add_dependency( "config", FileDependency( fn, False ) )
-                SetDebugContext( fn )
-                exec( compile( f.read() + "\n", filename, 'exec' ), namespace, namespace )
+                PushDebugContext( os.path.join( curdir.rel_src_dir, filename ) )
+                exec( compile( f.read() + "\n", filename, 'exec' ), namespace, localspace )
             if self.post_proc:
                 Debug( "Running post process after file '%s'" % fn )
-                self.post_proc( self.name, curdir, namespace )
+                self.post_proc( self.name, curdir, namespace, localspace )
         except IOError as e:
             if e.errno == errno.ENOENT:
                 if not self.optional:
                     Error( "Unable to read required file '%s'" % fn )
             else:
                 Error( "Unable to read and process file '%s': %s" % (fn, e.strerror) )
-        except Exception as e:
-            Error( "Error processing file '%s': %s" % ( fn, str(e) ) )
+        except SystemExit:
+            raise
+        except:
+            BadException( "Error processing file '%s'" % fn )
         finally:
             SetCurDir( olddir )
+            PopDebugContext()

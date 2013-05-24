@@ -22,10 +22,11 @@
 #
 
 import sys
+import traceback
 
 _is_debug = False
 _is_verbose = False
-_current_context = None
+_current_context = []
 
 def SetDebug( flag ):
     global _is_debug
@@ -39,50 +40,55 @@ def IsVerbose():
     global _is_verbose
     return _is_verbose
 
-def SetDebugContext( ctxt ):
+def PushDebugContext( ctxt ):
     global _current_context
-    _current_context = ctxt
+    _current_context.append( ctxt )
+
+def PopDebugContext():
+    global _current_context
+    if len(_current_context) > 0:
+        _current_context.pop()
+
+def AddDebugContext( output ):
+    global _current_context
+    if len(_current_context) > 0:
+        output.write( _current_context[-1] )
+        output.write( ":\n   " )
 
 def Debug( msg ):
     global _is_debug
     if _is_debug:
-        global _current_context
-        if _current_context is not None:
-            sys.stdout.write( _current_context )
-            sys.stdout.write( ": " )
+        AddDebugContext( sys.stdout )
         sys.stdout.write( msg )
         sys.stdout.write( '\n' )
         sys.stdout.flush()
 
 def Info( msg ):
-    global _current_context
-    if _current_context is not None:
-        sys.stdout.write( _current_context )
-        sys.stdout.write( ": " )
+    AddDebugContext( sys.stdout )
     sys.stdout.write( msg )
     sys.stdout.write( '\n' )
     sys.stdout.flush()
 
 def Warn( msg ):
-    global _current_context
-    if _current_context is not None:
-        sys.stderr.write( _current_context )
-        sys.stderr.write( ": " )
+    AddDebugContext( sys.stderr )
     sys.stderr.write( "WARNING: " )
     sys.stderr.write( msg )
     sys.stderr.write( '\n' )
     sys.stderr.flush()
 
 def Error( msg ):
-    global _current_context
-    if _current_context is not None:
-        sys.stderr.write( _current_context )
-        sys.stderr.write( ": " )
+    AddDebugContext( sys.stderr )
     sys.stderr.write( "ERROR: " )
     sys.stderr.write( msg )
     sys.stderr.write( '\n\n' )
     sys.stderr.flush()
     sys.exit( 1 )
 
-
-
+def BadException( msg ):
+    AddDebugContext( sys.stderr )
+    sys.stderr.write( msg )
+    sys.stderr.write( '\n\n' )
+    einfo = traceback.format_exc()
+    sys.stderr.write( einfo )
+    sys.stderr.flush()
+    sys.exit( 1 )

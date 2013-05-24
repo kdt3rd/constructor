@@ -19,7 +19,7 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from constructor.output import SetDebug, SetVerbose, IsVerbose, SetDebugContext, Debug, Info, Warn, Error
+from constructor.output import SetDebug, SetVerbose, IsVerbose, PushDebugContext, PopDebugContext, Debug, Info, Warn, Error, BadException
 from constructor.utility import *
 from constructor.dependency import *
 from constructor.phase import SetConstructorExtension, Phase, DirParsePhase

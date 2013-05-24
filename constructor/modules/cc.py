@@ -23,30 +23,49 @@
 import os
 import sys
 import subprocess
-from constructor.utility import FindOptionalExecutable
-from constructor.output import Info, Debug, Error
+from constructor.utility import FindOptionalExecutable, CheckEnvironOverride
+from constructor.output import Info, Debug, Error, Warn
 from constructor.dependency import Dependency
 from constructor.driver import CurDir
+from constructor.module import ProcessFiles
+
+variables = {}
 
 if sys.platform.startswith( "linux" ):
-    _def_cc = FindOptionalExecutable( "gcc" )
-    _def_cxx = FindOptionalExecutable( "g++" )
+    variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "gcc" ) )
+    variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "g++" ) )
 elif sys.platform.startswith( "darwin" ):
-    _def_cc = FindOptionalExecutable( "clang" )
-    _def_cxx = FindOptionalExecutable( "clang++" )
+    variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "clang" ) )
+    variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "clang++" ) )
 elif sys.platform.startswith( "win" ):
-    _def_cc = FindOptionalExecutable( "cl" )
-    _def_cxx = FindOptionalExecutable( "cl" )
+    variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "cl" ) )
+    variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "cl" ) )
+else:
+    Warn( "Un-handled platform '%s', defaulting compiler to gcc" % sys.platform )
+    variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "gcc" ) )
+    variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "g++" ) )
+
+variables["CFLAGS"] = CheckEnvironOverride( "CFLAGS", [] )
+variables["CXXFLAGS"] = CheckEnvironOverride( "CXXFLAGS", [] )
+variables["WARNINGS"] = CheckEnvironOverride( "WARNINGS", [] )
 
 def _SetCompiler( cc=None, cxx=None ):
     if cc is not None:
-        _def_cc = FindExecutable( cc )
+        if os.environ.get( "CC" ):
+            Info( "Compiler '%s' overridden with environment flag to '%s'" % (cc, os.environ.get( "CC" )) )
+        else:
+            CurDir().set_variable( "CC", FindExecutable( cc ) )
     if cxx is not None:
-        _def_cxx = FindExecutable( cxx )
+        if os.environ.get( "CC" ):
+            Info( "Compiler '%s' overridden with environment flag to '%s'" % (cc, os.environ.get( "CC" )) )
+        else:
+            CurDir().set_variable( "CXX", FindExecutable( cxx ) )
 
 _defBuildShared = True
 _defBuildStatic = True
 def _SetDefaultLibraryStyle( style ):
+    global _defBuildShared
+    global _defBuildStatic
     if style == "both":
         _defBuildShared = True
         _defBuildStatic = True
@@ -60,12 +79,15 @@ def _SetDefaultLibraryStyle( style ):
         Error( "Unknown default library build style '%s'" % style)
 
 def _CFlags( *f ):
+    CurDir().add_to_variable( "CFLAGS", f )
     pass
 
 def _CXXFlags( *f ):
+    CurDir().add_to_variable( "CXXFLAGS", f )
     pass
 
 def _Warnings( *f ):
+    CurDir().add_to_variable( "WARNINGS", f )
     pass
 
 def _Library( *f ):
@@ -74,23 +96,34 @@ def _Library( *f ):
 def _Executable( *f ):
     pass
 
-def _Compile( *f ):
+def _OptExecutable( *f ):
     pass
+
+def _Compile( *f ):
+    ret = ProcessFiles( f )
+    CurDir().add_targets( ret )
+    return ret
+
+def _CPPTarget( f ):
+    Debug( "Processing C++ target '%s'" % f )
+
+def _CTarget( f ):
+    Debug( "Processing C target '%s'" % f )
+
+def _NilTarget( f ):
+    Debug( "Processing nil target '%s'" % f )
 
 modules = [ "external_pkg" ]
 rules = []
 features = [ { "name": "shared", "type": "boolean", "help": "Build shared libraries", "default": True },
              { "name": "static", "type": "boolean", "help": "Build static libraries", "default": True } ]
 
-variables = {
-    "CC": _def_cc,
-    "CXX": _def_cxx,
-    "CFLAGS": "",
-    "CXXFLAGS": "",
-    "WARNINGS": ""
-    }
+extension_handlers = {
+    ".cpp": _CPPTarget,
+    ".c": _CTarget,
+    ".o": _NilTarget,
+}
 
-extension_handlers = None
 functions_by_phase = {
     "config":
     {
@@ -104,9 +137,10 @@ functions_by_phase = {
     {
         "Library": _Library,
         "Executable": _Executable,
+        "OptExecutable": _OptExecutable,
         "Compile": _Compile,
         "CFlags": _CFlags,
         "CXXFlags": _CXXFlags,
         "Warnings": _Warnings,
     }
- }
+}
