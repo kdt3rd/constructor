@@ -30,7 +30,6 @@ iterate = lambda x: x.iteritems()
 if sys.version_info[0] == 3:
     iterate = lambda x:x.items()
 
-
 def FindOptionalExecutable( exe ):
     if exe is None:
         return None
@@ -59,6 +58,19 @@ def FindExecutable( exe ):
     if exe_file is None:
         raise OSError( errno.ENOENT, "No such file or directory trying to find executable", exe )
     return exe_file
+
+_environ_overrides = {}
+def CheckEnvironOverride( v, default ):
+    tmp = os.environ.get( v )
+    if tmp:
+        global _environ_overrides
+        _environ_overrides[v] = tmp
+        return tmp
+    return default
+
+def GetEnvironOverrides():
+    global _environ_overrides
+    return _environ_overrides
 
 def Is64bit():
     if sys.platform == "win64":
