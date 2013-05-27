@@ -20,48 +20,19 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import importlib
+import os
 from .dependency import Dependency
 from .target import Target
 from .output import Debug, Error, FatalException, Info
 from .utility import iterate
 from .directory import CurDir
 
+_extension_handlers = {}
+
 class Module(object):
     """Class encapsulating a module, which defines how certain types of code are compiled, or how other things are processed"""
-    _extension_handlers = {}
-
-    def _handleFile( f, operation ):
-        (base, ext) = os.path.splitext( f )
-        handler = _extension_handlers.get( ext )
-        if handler is None:
-            for e, h in iterate( _extension_handlers ):
-                if f.endswith( e ):
-                    handler = h
-                    break
-
-        if handler is not None:
-            res = getattr( handler, operation )( f )
-            if isinstance( res, list ) or instance( res, Dependency ):
-                return res
-            else:
-                Error( "Handler '%s' did not return a valid dependency object or list of dependencies handling file '%s'" % ( handler.get_name(), f ) )
-        else:
-            Error( "No handler defined for extension '%s' (file '%s')" % (ext,f) )
-
-    def _handleTarget( t, operation ):
-        fn = t.get_output_file()
-        res = _handleFile( fn, operation )
-        if isinstance( res, list ):
-            for r in res:
-                res.add_dependency( "build", t )
-        elif isinstance( res, Dependency ):
-            res.add_dependency( "build", t )
-        else:
-            Error( "Handler '%s' did not return a valid dependency object or list of dependencies handling target '%s'" % ( handler.get_name(), t.get_output_file() ) )
-        return res
-
     def __init__( self, name, rules = None, features = None, variables = None, extensions = None, funcs = None ):
+        global _extension_handlers
         self.name = name
         self.rules = rules
         self.features = features
@@ -70,25 +41,68 @@ class Module(object):
         self.provided_functions = funcs
         if extensions is not None:
             for k, v in iterate( extensions ):
+                k = k.lower()
                 curh = _extension_handlers.get( k )
                 if curh is None:
                     _extension_handlers[k] = self
                 else:
                     Error( "Modules '%s' and '%s' have conflicting/ambiguous handlers for extension '%s'" % ( name, curh.name, k ) )
 
-    def addGlobals( self, globs, phase ):
+    def add_globals( self, globs, phase ):
         if self.provided_functions is not None:
             pfuncs = self.provided_functions.get( phase )
             if pfuncs is not None:
                 globs.update( pfuncs )
 
-def ProcessFiles( operation, *args ):
+    def dispatch_handler( self, f, ext ):
+        return self.extensions[ext]( f )
+
+    def set_variables( self, curd ):
+        if self.variables:
+            for k, v in iterate( self.variables ):
+                curd.set_variable( k, v )
+
+def _handleFile( f ):
+    global _extension_handlers
+    (base, ext) = os.path.splitext( f )
+    ext = ext.lower()
+    handler = _extension_handlers.get( ext )
+    if handler is None:
+        tmp = f.lower()
+        for e, h in iterate( _extension_handlers ):
+            if tmp.endswith( e ):
+                ext = e
+                handler = h
+                break
+
+    if handler is not None:
+        res = handler.dispatch_handler( f, ext )
+        if isinstance( res, list ) or isinstance( res, Dependency ):
+            return res
+        else:
+            Error( "Module '%s', handling file '%s', extension handler for extension '%s' did not return a valid dependency object or list" % ( handler.name, f, ext ) )
+    else:
+        Error( "No handler defined for extension '%s' (file '%s')" % (ext,f) )
+
+def _handleTarget( t ):
+    fn = t.get_output_file()
+    res = _handleFile( fn )
+    if isinstance( res, list ):
+        for r in res:
+            res.add_dependency( "build", t )
+    elif isinstance( res, Dependency ):
+        res.add_dependency( "build", t )
+    else:
+        Error( "Handler '%s' did not return a valid dependency object or list of dependencies handling target '%s'" % ( handler.get_name(), t.get_output_file() ) )
+    return res
+
+def ProcessFiles( *args ):
     ret = []
     for f in args:
         if isinstance( f, Target ):
-            ret.append( Module._handleTarget( f, operation ) )
-        if isinstance( f, (str, basestring) ):
-            ret.append( Module._handleFile( f, operation ) )
+            ret.append( _handleTarget( f ) )
+        elif isinstance( f, (str, basestring) ):
+            ret.append( _handleFile( f ) )
         elif isinstance( f, list ):
             ret.append( ProcessFiles( *f ) )
         elif isinstance( f, tuple ):
@@ -109,15 +123,12 @@ def EnableModule( name, packageprefix=None ):
 
         _loading_modules.append( name )
         try:
-            mname = name
-            if packageprefix is not None:
-                mname = packageprefix + '.' + name
-            else:
-                mname = 'constructor.modules.' + name
+            if packageprefix is None:
+                packageprefix = 'constructor.modules'
 
             try:
                 Debug( "Attempting to import module '%s' using module package path" % name )
-                gmod = importlib.import_module( mname )
+                gmod = __import__( "%s.%s" % ( packageprefix, name ), fromlist=[packageprefix] )
             except:
                 FatalException( "Unable to load module '%s'" % name )
 
@@ -140,6 +151,6 @@ def EnableModule( name, packageprefix=None ):
         finally:
             _loading_modules.pop()
     curdir = CurDir()
-    curdir.enableModule( newmod )
+    curdir.enable_module( newmod )
 
 

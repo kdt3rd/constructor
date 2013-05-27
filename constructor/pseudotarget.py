@@ -1,3 +1,4 @@
+#
 # Copyright (c) 2013 Kimball Thurston
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -19,15 +20,35 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from constructor.output import SetDebug, SetVerbose, IsVerbose, PushDebugContext, PopDebugContext, Debug, Info, Warn, Error, BadException
-from constructor.utility import *
-from constructor.dependency import *
-from constructor.phase import SetConstructorExtension, Phase, DirParsePhase
-from constructor.generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
-from constructor.rule import Rule
-from constructor.target import Target
-from constructor.module import EnableModule, ProcessFiles, Module
-from constructor.pseudotarget import GetTarget, AddTarget
 
-from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, CurDir, Building
+from .dependency import Dependency
+from .output import Error, Debug
 
+class PseudoTarget(Dependency):
+    def __init__( self, targtype=None, name=None, target=None ):
+        self.target = target
+        self.target_type = targtype
+        self.name = name
+
+    def setTarget( self, targ ):
+        if self.target is not None:
+            Error( "Attempt to store duplicate target %s : %s" % (self.target_type, self.name) )
+        self.target = targ
+
+_symbol_table = {}
+
+def GetTarget( targtype, name ):
+    global _symbol_table
+    symName = targtype + ":" + name
+    pt = _symbol_table.get( symName )
+    if pt is None:
+        Debug( "Creating pseudo target %s" % symName )
+        pt = PseudoTarget( targtype=targtype, name=name )
+        _symbol_table[symName] = pt
+    return pt
+
+def AddTarget( targtype, name, target ):
+    if target is None:
+        Error( "Invalid target provided" )
+    pt = GetTarget( targtype, name )
+    pt.setTarget( target )

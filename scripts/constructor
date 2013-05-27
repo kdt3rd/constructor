@@ -28,24 +28,21 @@
 
 import os
 import sys
-import subprocess
 
-sys.path.append('.')
+# We always add the current directory that
+# the script is being called from such that
+# If the user has added their own modules or
+# generators, they can just put them in a 
+# package at the top level and have them found
+# without also having to manipulate the path
+# (it also helps with debugging constructor itself)
+sys.path.insert( 0, os.getcwd() )
+
+
 from constructor import *
+# The default generator is ninja, but the user
+# is free to override later...
 LoadGenerator( 'Ninja' )
-
-#SetConstructorExtension( ".py" )
-
-########################################
-########################################
-## Functions exposed to all things constructor
-########################################
-########################################
-
-
-########################################
-########################################
-## finally, run it
 
 if __name__ == "__main__":
     Driver( "ninja" ).process()

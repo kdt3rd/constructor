@@ -21,16 +21,96 @@
 #
 #
 
+import os
+import string
+import errno
+import sys
+
 from ..output import Info
 from ..generator import Generator
 from ..directory import Directory
+from ..utility import iterate, GetEnvironOverrides
+
+def _escape( s ):
+    assert '\n' not in s, 'ninja syntax does not allow newlines'
+    return s.replace( '$', '$$' )
+
+def _escape_path( f ):
+    return f.replace( '$ ', '$$ ' ).replace( ' ', '$ ' ).replace( ':', '$:' )
+
+def _create_file( curdir ):
+    try:
+        os.makedirs( curdir.bin_path )
+    except OSError as e:
+        if e.errno is not errno.EEXIST:
+            raise
+    fn = os.path.join( curdir.bin_path, "build.ninja" )
+    out = open( fn, 'wb' )
+    return out, fn
+
+def _emit_rules( out, curdir ):
+    pass
+
+def _emit_variables( out, curdir ):
+    if curdir.variables is None:
+        return
+    for k, v in iterate( curdir.variables ):
+        out.write( _escape( k ) )
+        out.write( ' =' )
+        if isinstance( v, list ):
+            out.write( string.join( v ) )
+        else:
+            out.write( ' ' )
+            out.write( v )
+        out.write( '\n' )
+    out.write( '\n' )
+    pass
+
+def _emit_targets( out, curdir ):
+    if curdir.targets is None:
+        return
+    pass
+
+def _emit_unix_style_rebuild( out, curdir, fn, cf ):
+    out.write( "\n\nrule regen_config\n" )
+    out.write( "  command =cd %s && env " % os.path.abspath( '.' ) )
+    for g, v in iterate( GetEnvironOverrides() ):
+        out.write( " %s=%s" % (g, _escape(v)) )
+    # be careful, python might swallow real arg0 if you run something
+    # as python xxx.py
+    for i in range(0,len(sys.argv)):
+        out.write( ' ' )
+        out.write( sys.argv[i] )
+    out.write( '\n  description = Regenerating build\n  generator = 1\n' )
+    out.write( '\nbuild build.ninja: regen_config |' )
+    for x in cf:
+        out.write( ' ' )
+        out.write( _escape_path( x ) )
+    out.write( '\n\n' )
+
+def _emit_dir( curdir, cf=None ):
+    if curdir.targets is None and len(curdir.subdirs) == 0:
+        return None
+    ( out, fn ) = _create_file( curdir )
+    _emit_rules( out, curdir )
+    _emit_variables( out, curdir )
+    for sn, sd in iterate( curdir.subdirs ):
+        sfn = _emit_dir( sd )
+        if sfn:
+            out.write( 'subninja %s\n' % _escape_path( sfn ) )
+    _emit_targets( out, curdir )
+    if cf:
+        # top level, add the rule to rebuild the ninja files
+        if sys.platform == 'win32':
+            raise NotImplementedError
+        _emit_unix_style_rebuild( out, curdir, fn, cf )
+    return fn
 
 class Ninja(Generator):
     def __init__( self ):
         super( Ninja, self ).__init__( "ninja" )
 
     def process_dir( self, curdir ):
-        curdir.make_bin_tree()
         config_file_list = []
         def _traverse_config_files( deps ):
             for d in deps:
@@ -41,4 +121,5 @@ class Ninja(Generator):
         _traverse_config_files( curdir.dependencies( "config" ) )
         for cf in config_file_list:
             Info( "Build depends on: %s" % cf )
+        _emit_dir( curdir, config_file_list )
 

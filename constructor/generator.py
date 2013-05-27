@@ -20,8 +20,6 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import importlib
-
 from .phase import Phase
 from .output import Debug, Error
 from .utility import iterate
@@ -40,13 +38,14 @@ def AddGeneratorClass( name, classRef ):
             Debug( "Overriding previous generator class '%s' with new class" % name )
     Generator._generators[name] = classRef
     
-def LoadGenerator( classname, modname=None ):
-    mname = modname
-    if mname is None:
-        mname = 'constructor.generators.' + classname.lower()
+def LoadGenerator( classname, modname=None, package=None ):
+    if package is None:
+        package = 'constructor.generators'
+    if modname is None:
+        modname = classname.lower()
 
     try:
-        gmod = importlib.import_module( mname )
+        gmod = __import__( "%s.%s" % ( package, modname ), fromlist=[package] )
     except ImportError as e:
         Error( "Unable to locate module '%s' for generator class '%s'" % (modname,classname) )
 

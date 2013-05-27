@@ -21,8 +21,9 @@
 #
 
 import os
+import errno
 from .dependency import Dependency
-from .output import Info
+from .output import Info, Debug
 from .utility import iterate
 
 _curdir = None
@@ -50,12 +51,48 @@ class Directory(Dependency):
         self.rules = None
         self.variables = None
 
-    def enableModule( self, mod ):
+    def enable_module( self, mod ):
         if self.modules is None:
             self.modules = {}
         self.modules[mod.name] = mod
         if self._cur_namespace is not None:
-            mod.addGlobals( self._cur_namespace, "config" )
+            mod.add_globals( self._cur_namespace, "config" )
+        mod.set_variables( self )
+
+    def add_module_features( self, driver ):
+        if self.modules is not None:
+            for n, m in iterate( self.modules ):
+                if m.features is not None:
+                    for f in m.features:
+                        driver.add_feature( f["name"], f["type"], f["help"], f["default"] )
+        for sn, sd in iterate( self.subdirs ):
+            sd.add_module_features( driver )
+
+    def set_variable( self, varname, f ):
+        if self.variables is None:
+            self.variables = { varname: f }
+        else:
+            self.variables[varname] = f
+                
+    def add_to_variable( self, varname, f ):
+        if not isinstance( f, list ):
+            if isinstance( f, tuple ):
+                tl = []
+                for x in f:
+                    tl.append( x )
+                f = tl
+            else:
+                f = [ f ]
+
+        if self.variables is None:
+            self.variables = { varname: f }
+        else:
+            v = self.variables.get( varname )
+            if v is None:
+                self.variables[varname] = f
+            else:
+                for x in f:
+                    v.append( x )
 
     def set_globals( self, globs ):
         self.globs = globs
@@ -71,7 +108,7 @@ class Directory(Dependency):
         retval = retval.copy()
         if self.modules is not None:
             for k, v in iterate( self.modules ):
-                v.addGlobals( retval, phase )
+                v.add_globals( retval, phase )
         self._cur_namespace = retval
         return retval
 
@@ -79,11 +116,13 @@ class Directory(Dependency):
         self.bin_path = path
         if len(self.rel_src_dir) > 0:
             self.bin_path = os.path.join( path, self.rel_src_dir )
-        for sd in self.subdirs:
+        for sn, sd in iterate( self.subdirs ):
             sd.set_bin_dir( path )
 
-    def make_bin_tree( self):
-        Info( "make bin tree: %s" % self.bin_path )
+    def get_root_bin_dir( self ):
+        if self.pardir is None:
+            return self.bin_path
+        return self.pardir.get_root_bin_dir()
 
     def add_sub_dir( self, name ):
         try:
@@ -99,28 +138,34 @@ class Directory(Dependency):
                               newd,
                               os.path.join( self.bin_path, name ),
                               self )
+
+            if self.bin_path:
+                dobj.set_bin_dir( self.get_root_bin_dir() )
+
             self.add_dependency( "config", dobj )
             self.subdirs[name] = dobj
 
         return dobj
 
-    def addToGlobals( self, phase, namespace ):
+    def add_to_globals( self, phase, globnames, locnames ):
         if self.globs is None:
             self.globs = self.get_globals().copy()
 
         phaseglobs = self.get_globals( phase )
         new_globs = {}
-        all_names = namespace.get( "__all__" )
-        if all_names is None:
-            for k, v in iterate( namespace ):
-                if k[0] != '_' and k not in phaseglobs:
-                    new_globs[k] = v
-        else:
-            for k in all_names:
-                if k not in phaseglobs:
-                    new_globs[k] = namespace[k]
+        def _search_globs( ns ):
+            all_names = ns.get( "__all__" )
+            if all_names is None:
+                for k, v in iterate( ns ):
+                    if k[0] != '_' and k not in phaseglobs:
+                        Debug( "Adding '%s' to globals" % k )
+                        new_globs[k] = v
+            else:
+                for k in all_names:
+                    if k not in phaseglobs:
+                        Debug( "Adding '%s' to globals" % k )
+                        new_globs[k] = ns[k]
+        _search_globs( globnames )
+        _search_globs( locnames )
         self.globs.update( new_globs )
-
-    def _configPassPostProc( phase, curdir, namespace ):
-        curdir.addToGlobals( phase, namespace )
 
