@@ -93,7 +93,7 @@ class DirParsePhase(Phase):
         except SystemExit:
             raise
         except:
-            BadException( "Error processing file '%s'" % fn )
+            FatalException( "Error processing file '%s'" % fn )
         finally:
             SetCurDir( olddir )
             PopDebugContext()
