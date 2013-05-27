@@ -29,7 +29,13 @@ import sys
 from ..output import Info
 from ..generator import Generator
 from ..directory import Directory
-from ..utility import iterate, GetEnvironOverrides
+from ..utility import iterate, GetEnvironOverrides, FileOutput
+
+###
+### NB: We use the fileout class from utility to provide transparent
+### encoding such that python 2.x and 3 work, but don't have to have
+### encodes all over the place
+###
 
 def _escape( s ):
     assert '\n' not in s, 'ninja syntax does not allow newlines'
@@ -45,7 +51,7 @@ def _create_file( curdir ):
         if e.errno is not errno.EEXIST:
             raise
     fn = os.path.join( curdir.bin_path, "build.ninja" )
-    out = open( fn, 'wb' )
+    out = FileOutput( fn )
     return out, fn
 
 def _emit_rules( out, curdir ):
@@ -72,10 +78,10 @@ def _emit_targets( out, curdir ):
     pass
 
 def _emit_unix_style_rebuild( out, curdir, fn, cf ):
-    out.write( "\n\nrule regen_config\n" )
-    out.write( "  command =cd %s && env " % os.path.abspath( '.' ) )
+    out.write( '\n\nrule regen_config\n' )
+    out.write( '  command =cd %s && env ' % os.path.abspath( '.' ) )
     for g, v in iterate( GetEnvironOverrides() ):
-        out.write( " %s=%s" % (g, _escape(v)) )
+        out.write( ' %s=%s' % (g, _escape(v)) )
     # be careful, python might swallow real arg0 if you run something
     # as python xxx.py
     for i in range(0,len(sys.argv)):

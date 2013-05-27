@@ -27,8 +27,18 @@ import subprocess
 # Python 2.xx and 3 are incompatible in regards to iterating over things
 # let's define our own iterate function that does the Right Thing (tm)
 iterate = lambda x: x.iteritems()
+_OutputStr = lambda o, s: o.write( s )
+
 if sys.version_info[0] == 3:
     iterate = lambda x:x.items()
+    _OutputStr = lambda o, s: o.write( s.encode( 'utf-8' ) )
+
+class FileOutput(object):
+    def __init__( self, fn ):
+        self.out = open( fn, 'wb' )
+
+    def write( self, s ):
+        _OutputStr( self.out, s )
 
 def FindOptionalExecutable( exe ):
     if exe is None:
