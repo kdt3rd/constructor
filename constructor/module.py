@@ -21,7 +21,7 @@
 #
 
 import os
-from .dependency import Dependency
+from .dependency import Dependency, FileDependency
 from .target import Target
 from .output import Debug, Error, FatalException, Info
 from .utility import iterate
@@ -54,8 +54,8 @@ class Module(object):
             if pfuncs is not None:
                 globs.update( pfuncs )
 
-    def dispatch_handler( self, f, ext ):
-        return self.extensions[ext]( f )
+    def dispatch_handler( self, f, base, ext ):
+        return self.extensions[ext]( f, base, ext )
 
     def set_variables( self, curd ):
         if self.variables:
@@ -72,11 +72,12 @@ def _handleFile( f ):
         for e, h in iterate( _extension_handlers ):
             if tmp.endswith( e ):
                 ext = e
+                base = f[:-len(e)]
                 handler = h
                 break
 
     if handler is not None:
-        res = handler.dispatch_handler( f, ext )
+        res = handler.dispatch_handler( f, base, ext )
         if isinstance( res, list ) or isinstance( res, Dependency ):
             return res
         else:
@@ -84,30 +85,34 @@ def _handleFile( f ):
     else:
         Error( "No handler defined for extension '%s' (file '%s')" % (ext,f) )
 
-def _handleTarget( t ):
-    fn = t.get_output_file()
-    res = _handleFile( fn )
-    if isinstance( res, list ):
-        for r in res:
-            res.add_dependency( "build", t )
-    elif isinstance( res, Dependency ):
-        res.add_dependency( "build", t )
-    else:
-        Error( "Handler '%s' did not return a valid dependency object or list of dependencies handling target '%s'" % ( handler.get_name(), t.get_output_file() ) )
-    return res
-
 def ProcessFiles( *args ):
     ret = []
     for f in args:
         if isinstance( f, Target ):
-            ret.append( _handleTarget( f ) )
+            res = _handleFile( f.output_file )
+            if isinstance( res, list ):
+                for r in res:
+                    r.add_dependency( 'build', f )
+                ret.extend( res )
+            else:
+                res.add_dependency( 'build', f )
+                ret.append( res )
         elif isinstance( f, (str, basestring) ):
-            ret.append( _handleFile( f ) )
+            res = _handleFile( f )
+            curd = CurDir()
+            d = FileDependency( infile=os.path.join( curd.src_dir, f ), orderonly=False )
+            if isinstance( res, list ):
+                for r in res:
+                    r.add_dependency( 'build', d )
+                ret.extend( res )
+            else:
+                res.add_dependency( 'build', d )
+                ret.append( res )
         elif isinstance( f, list ):
-            ret.append( ProcessFiles( *f ) )
+            ret.extend( ProcessFiles( *f ) )
         elif isinstance( f, tuple ):
             for x in f:
-                ret.append( ProcessFiles( x ) )
+                ret.extend( ProcessFiles( x ) )
     return ret
 
 _modules = {}

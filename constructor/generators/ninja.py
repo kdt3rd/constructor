@@ -30,6 +30,7 @@ from ..output import Info
 from ..generator import Generator
 from ..directory import Directory
 from ..utility import iterate, GetEnvironOverrides, FileOutput
+from ..dependency import Dependency, FileDependency
 
 ###
 ### NB: We use the fileout class from utility to provide transparent
@@ -55,6 +56,19 @@ def _create_file( curdir ):
     return out, fn
 
 def _emit_rules( out, curdir ):
+    for n, m in iterate( curdir.modules ):
+        if m.rules is not None:
+            for tag, rule in iterate( m.rules ):
+                if rule.is_used():
+                    out.write( 'rule %s\n' % rule.name )
+                    out.write( '  command = %s\n' % rule.command )
+                    if rule.description:
+                        out.write( '  description = %s\n' % rule.description )
+                    if rule.dependency_file:
+                        out.write( '  depfile = %s\n' % rule.dependency_file )
+                    if rule.check_if_changed:
+                        out.write( '  restat = 1\n' )
+                    out.write( '\n' )
     pass
 
 def _emit_variables( out, curdir ):
@@ -70,16 +84,33 @@ def _emit_variables( out, curdir ):
             out.write( v )
         out.write( '\n' )
     out.write( '\n' )
-    pass
+
+def _emit_target( out, t ):
+    out.write( 'build %s: %s ' % ( t.output_file, t.rule.name ) )
+    deps = t.dependencies( 'build' )
+    oonly = ""
+    for d in deps:
+        if isinstance( d, FileDependency ):
+            if d.orderonly:
+                oonly = oonly + d.filename + ' '
+            else:
+                out.write( '%s ' % d.filename )
+    if len(oonly) > 0:
+        out.write( '| %s' % oonly )
+    out.write( '\n' )
 
 def _emit_targets( out, curdir ):
-    if curdir.targets is None:
-        return
-    pass
+    if curdir.targets:
+        for t in curdir.targets:
+            if isinstance( t, list ):
+                for x in t:
+                    _emit_target( out, x )
+            else:
+                _emit_target( out, t )
 
 def _emit_unix_style_rebuild( out, curdir, fn, cf ):
     out.write( '\n\nrule regen_config\n' )
-    out.write( '  command =cd %s && env ' % os.path.abspath( '.' ) )
+    out.write( '  command = cd %s && env ' % os.path.abspath( '.' ) )
     for g, v in iterate( GetEnvironOverrides() ):
         out.write( ' %s=%s' % (g, _escape(v)) )
     # be careful, python might swallow real arg0 if you run something

@@ -24,12 +24,11 @@
 from .dependency import Dependency
 
 class Target(Dependency):
-    def __init__( self, orderonly = False ):
+    def __init__( self, outfile, rule = None, orderonly = False ):
         super(Target, self).__init__( orderonly )
-        self.rule = None
-        self._output_file = ""
+        self.rule = rule
+        if rule:
+            rule.add_use()
+        self.output_file = outfile
         pass
-
-    def get_output_file( self ):
-        return self._output_extension
 

@@ -25,29 +25,78 @@ import sys
 import subprocess
 from constructor.utility import FindOptionalExecutable, CheckEnvironOverride
 from constructor.output import Info, Debug, Error, Warn
-from constructor.dependency import Dependency
+from constructor.dependency import Dependency, FileDependency
 from constructor.driver import CurDir
 from constructor.module import ProcessFiles
+from constructor.rule import Rule
+from constructor.target import Target
 
 variables = {}
 
+_objExt = '.o'
+_exeExt = ''
+
 if sys.platform.startswith( "linux" ):
+    variables["AR"] = CheckEnvironOverride( "AR", FindOptionalExecutable( "ar" ) )
+    variables["LD"] = CheckEnvironOverride( "LD", FindOptionalExecutable( "ld" ) )
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "gcc" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "g++" ) )
+    _depFlags = [ '-MMD', '-MF', '$out.d' ]
 elif sys.platform.startswith( "darwin" ):
+    variables["AR"] = CheckEnvironOverride( "AR", FindOptionalExecutable( "ar" ) )
+    variables["LD"] = CheckEnvironOverride( "LD", FindOptionalExecutable( "ld" ) )
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "clang" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "clang++" ) )
+    _depFlags = [ '-MMD', '-MF', '$out.d' ]
 elif sys.platform.startswith( "win" ):
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "cl" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "cl" ) )
+    _objExt = '.obj'
+    _exeExt = '.exe'
+    _depFlags = []
 else:
     Warn( "Un-handled platform '%s', defaulting compiler to gcc" % sys.platform )
+    variables["AR"] = CheckEnvironOverride( "AR", FindOptionalExecutable( "ar" ) )
+    variables["LD"] = CheckEnvironOverride( "LD", FindOptionalExecutable( "ld" ) )
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "gcc" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "g++" ) )
+    _depFlags = [ '-MMD', '-MF', '$out.d' ]
 
 variables["CFLAGS"] = CheckEnvironOverride( "CFLAGS", [] )
 variables["CXXFLAGS"] = CheckEnvironOverride( "CXXFLAGS", [] )
 variables["WARNINGS"] = CheckEnvironOverride( "WARNINGS", [] )
+variables["CWARNINGS"] = CheckEnvironOverride( "CWARNINGS", [] )
+variables["CXXWARNINGS"] = CheckEnvironOverride( "CXXWARNINGS", [] )
+variables["INCLUDE"] = CheckEnvironOverride( "INCLUDE", [] )
+variables["ARFLAGS"] = CheckEnvironOverride( "ARFLAGS", [] )
+variables["LDFLAGS"] = CheckEnvironOverride( "LDFLAGS", [] )
+variables["RPATH"] = CheckEnvironOverride( "RPATH", [] )
+
+_cppCmd = ['$CXX', '$CXXFLAGS', '$WARNINGS', '$CXXWARNINGS', '$INCLUDE']
+_ccCmd = ['$CCC', '$CFLAGS', '$WARNINGS', '$CWARNINGS', '$INCLUDE']
+if len(_depFlags) > 0:
+    _cppCmd.extend( _depFlags )
+    _ccCmd.extend( _depFlags )
+_cppCmd.extend( ['-c', '$in', '-o', '$out'] )
+_ccCmd.extend( ['-c', '$in', '-o', '$out'] )
+
+modules = [ "external_pkg" ]
+rules = {
+    'cpp': Rule( tag='cpp', cmd=_cppCmd, desc='C++ ($in)', depfile='$out.d' ),
+    'cc': Rule( tag='cc', cmd=_ccCmd, desc='C ($in)', depfile='$out.d' ),
+    'exe': Rule( tag='exe',
+                 cmd=['$LD', '$RPATH', '$LDFLAGS', '$in', '$libs', '-o', '$out'],
+                 desc='Linking ($out)' ),
+    'lib_static': Rule( tag='lib_static',
+                        cmd=['rm', '-f', '$out', ';', '$AR', '-c', '$in', '-o', '$out'],
+                        desc='Static ($out)' ),
+    'lib_shared': Rule( tag='lib_shared',
+                        cmd=['$CC', '$CFLAGS', '$WARNINGS', '$INCLUDE', '-c', '$in', '-o', '$out'],
+                        desc='Shared ($out)' )
+    }
+
+features = [ { "name": "shared", "type": "boolean", "help": "Build shared libraries", "default": True },
+             { "name": "static", "type": "boolean", "help": "Build static libraries", "default": True } ]
 
 def _SetCompiler( cc=None, cxx=None ):
     if cc is not None:
@@ -90,6 +139,10 @@ def _Warnings( *f ):
     CurDir().add_to_variable( "WARNINGS", f )
     pass
 
+def _Include( *f ):
+    CurDir().add_to_variable( "INCLUDE", f )
+    pass
+
 def _Library( *f ):
     pass
 
@@ -104,19 +157,21 @@ def _Compile( *f ):
     CurDir().add_targets( ret )
     return ret
 
-def _CPPTarget( f ):
+def _CPPTarget( f, base, ext ):
     Debug( "Processing C++ target '%s'" % f )
+    curd = CurDir()
+    out = os.path.join( curd.bin_path, base ) + _objExt
+    return Target( outfile=out, rule = rules['cpp'] )
 
-def _CTarget( f ):
+def _CTarget( f, base, ext ):
     Debug( "Processing C target '%s'" % f )
+    curd = CurDir()
+    out = os.path.join( curd.bin_path, base ) + _objExt
+    return Target( outfile=out, rule = rules['cc'] )
 
-def _NilTarget( f ):
+def _NilTarget( f, base, ext ):
     Debug( "Processing nil target '%s'" % f )
 
-modules = [ "external_pkg" ]
-rules = []
-features = [ { "name": "shared", "type": "boolean", "help": "Build shared libraries", "default": True },
-             { "name": "static", "type": "boolean", "help": "Build static libraries", "default": True } ]
 
 extension_handlers = {
     ".cpp": _CPPTarget,

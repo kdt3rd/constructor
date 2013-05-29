@@ -21,7 +21,7 @@
 #
 
 class Rule(object):
-    def __init__( self, rargs ):
+    def __init__( self, **rargs ):
         self.name = rargs['tag']
         cmd = rargs['cmd']
         if isinstance( cmd, list ):
@@ -34,13 +34,13 @@ class Rule(object):
         self.description = rargs.get( 'desc' )
         self.use_input_in_desc = rargs.get( 'use_input_in_desc' )
         self.dependency_file = rargs.get( 'depfile' )
-
+        self.check_if_changed = rargs.get( 'check_if_changed' )
         self._use_count = 0
 
-    def addUse( self ):
+    def add_use( self ):
         self._use_count = self._use_count + 1
 
-    def isUsed( self ):
+    def is_used( self ):
         return self._use_count > 0
 
 

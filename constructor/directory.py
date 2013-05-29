@@ -124,6 +124,14 @@ class Directory(Dependency):
             return self.bin_path
         return self.pardir.get_root_bin_dir()
 
+    def add_targets( self, t ):
+        if self.targets is None:
+            self.targets = []
+        if isinstance( t, list ):
+            self.targets.extend( t )
+        else:
+            self.targets.append( t )
+
     def add_sub_dir( self, name ):
         try:
             dobj = self.subdirs[name]
