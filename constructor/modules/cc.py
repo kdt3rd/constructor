@@ -148,7 +148,7 @@ def _Library( *f ):
     objs = []
     other = []
     for a in f:
-        if isinstance( a, (str, basestring) ):
+        if isinstance( a, str ):
             if name:
                 Error( "Multiple names specified creating library not allowed" )
             name = a
@@ -160,7 +160,47 @@ def _Library( *f ):
 
     pass
 
+class _ExeTargetInfo(object):
+    def __init__( self ):
+        self.name = None
+        self.objs = []
+        self.libs = []
+        self.syslibs = []
+        self.other = []
+
+    def extract( self, *f ):
+        for a in f:
+            if isinstance( a, str ):
+                if self.name:
+                    Error( "Multiple names specified creating library not allowed" )
+                self.name = a
+            elif isinstance( a, PseudoTarget ):
+                if a.target_type == "object":
+                    self.objs.append( a )
+                elif a.target_type == "lib":
+                    self.libs.append( a )
+                elif a.target_type == "syslib":
+                    self.syslibs.append( a )
+                else:
+                    self.other.append( a )
+            elif isinstance( a, list ):
+                for x in a:
+                    self.extract( x )
+            elif isinstance( a, tuple ):
+                for x in a:
+                    self.extract( x )
+
 def _Executable( *f ):
+    einfo = _ExeTargetInfo();
+    einfo.extract( f )
+
+    curd = CurDir()
+    out = os.path.join( curd.bin_path, einfo.name ) + _exeExt
+    e = AddTarget( "exe", einfo.name, outpath=out, rule=rules["exe"] )
+    for o in einfo.objs:
+        e.add_dependency( "build", o )
+    CurDir().add_targets( e )
+    #for l in einfo.libs:
     pass
 
 def _OptExecutable( *f ):

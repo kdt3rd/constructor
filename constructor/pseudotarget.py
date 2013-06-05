@@ -35,6 +35,22 @@ class PseudoTarget(Target):
         if self.target is not None:
             Error( "Attempt to store duplicate target %s : %s" % (self.target_type, self.name) )
         self.target = targ
+        if len(targ._dependencies) == 0:
+            self.target._dependencies = self._dependencies
+            self._dependencies = {}
+        elif len(self._dependencies) > 0:
+            Error( "Need to handle joining dependencies together" )
+
+    def add_dependency( self, group, dep ):
+        if self.target:
+            self.target.add_dependency( group, dep )
+        else:
+            super(PseudoTarget, self).add_dependency( group, dep )
+
+    def dependencies( self, group ):
+        if self.target:
+            return self.target.dependencies( group )
+        return super(PseudoTarget, self).dependencies( group )
 
 _symbol_table = {}
 

@@ -31,6 +31,7 @@ from ..generator import Generator
 from ..directory import Directory
 from ..utility import iterate, GetEnvironOverrides, FileOutput
 from ..dependency import Dependency, FileDependency
+from ..pseudotarget import PseudoTarget
 
 ###
 ### NB: We use the fileout class from utility to provide transparent
@@ -78,7 +79,7 @@ def _emit_variables( out, curdir ):
         out.write( _escape( k ) )
         out.write( ' =' )
         if isinstance( v, list ):
-            out.write( string.join( v ) )
+            out.write( ' '.join( v ) )
         else:
             out.write( ' ' )
             out.write( v )
@@ -86,6 +87,13 @@ def _emit_variables( out, curdir ):
     out.write( '\n' )
 
 def _emit_target( out, t ):
+    if isinstance( t, PseudoTarget ):
+        if t.target:
+            _emit_target( out, t.target )
+            return
+        else:
+            Error( "Attempt to emit un-resolved pseudo target '%s' (type: '%s')" % (t.name, t.target_type) )
+
     out.write( 'build %s: %s ' % ( t.output_file, t.rule.name ) )
     deps = t.dependencies( 'build' )
     oonly = ""

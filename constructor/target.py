@@ -26,8 +26,35 @@ from .dependency import Dependency
 class Target(Dependency):
     def __init__( self, outfile, rule = None, orderonly = False ):
         super(Target, self).__init__( orderonly )
+        self.variables = None
         self.rule = rule
         if rule:
             rule.add_use()
         self.output_file = outfile
+
+    def set_variable( self, name, val ):
+        if self.variables is None:
+            self.variables = {}
+        self.variables[name] = []
+        self.add_to_variable( name, val )
+
+    def add_to_variable( self, name, val ):
+        if self.variables is None:
+            self.variables = {}
+        if isinstance( val, tuple ):
+            for x in val:
+                self.add_to_variable( name, x )
+        elif isinstance( val, list ):
+            v = self.variables.get( name )
+            if v:
+                v.extend( val )
+            else:
+                self.variables[name] = val
+        else:
+            v = self.variables.get( name )
+            if v:
+                v.append( val )
+            else:
+                self.variables[name] = [ val ]
+
 

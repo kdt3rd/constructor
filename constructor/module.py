@@ -97,7 +97,7 @@ def ProcessFiles( *args ):
             else:
                 res.add_dependency( 'build', f )
                 ret.append( res )
-        elif isinstance( f, (str, basestring) ):
+        elif isinstance( f, str ):
             res = _handleFile( f )
             curd = CurDir()
             d = FileDependency( infile=os.path.join( curd.src_dir, f ), orderonly=False )
@@ -140,7 +140,7 @@ def EnableModule( name, packageprefix=None ):
             mods = getattr( gmod, "modules" )
             if mods is not None:
                 for m in mods:
-                    if isinstance( m, (str, basestring) ):
+                    if isinstance( m, str ):
                         EnableModule( m )
                     elif isinstance( m, list ):
                         EnableModule( m[0], m[1] )
