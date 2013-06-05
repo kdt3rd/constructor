@@ -194,7 +194,7 @@ class Driver(object):
         self.generator = options.generator
 
         if len(self.build_set) == 0:
-            Error( "Attempt to parse options triggered prior to any build configurations specified" )
+            self.build_set = { self.build: '.' }
 
         self.root_dir.set_bin_dir( os.path.abspath( os.path.join( self.build_dir, self.build_set[self.build] ) ) )
 
