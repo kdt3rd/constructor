@@ -108,7 +108,7 @@ class Driver(object):
         self.parse_options()
 
         if self.build_dir is None:
-            self.build_dir = src_root
+            self.build_dir = os.getcwd()#src_root
 
         if not isinstance( self.phases[len(self.phases) - 1], Generator ):
             Debug( "Creating generator pass for generator '%s'" % self.generator )
@@ -189,7 +189,7 @@ class Driver(object):
             self.build_dir = options.build_dir
             
         if self.build_dir is None:
-            self.build_dir = self.root_dir.src_dir
+            self.build_dir = os.getcwd()#self.root_dir.src_dir
 
         self.generator = options.generator
 
