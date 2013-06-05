@@ -31,6 +31,7 @@ from ..generator import Generator
 from ..directory import Directory
 from ..utility import iterate, GetEnvironOverrides, FileOutput
 from ..dependency import Dependency, FileDependency
+from ..target import Target
 from ..pseudotarget import PseudoTarget
 
 ###
@@ -98,11 +99,20 @@ def _emit_target( out, t ):
     deps = t.dependencies( 'build' )
     oonly = ""
     for d in deps:
+        if isinstance( d, PseudoTarget ):
+            d = d.target
+            if d is None:
+                continue
         if isinstance( d, FileDependency ):
             if d.orderonly:
                 oonly = oonly + d.filename + ' '
             else:
                 out.write( '%s ' % d.filename )
+        elif isinstance( d, Target ):
+            if d.orderonly:
+                oonly = oonly + d.output_file + ' '
+            else:
+                out.write( '%s ' % d.output_file )
     if len(oonly) > 0:
         out.write( '| %s' % oonly )
     out.write( '\n' )
