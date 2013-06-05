@@ -29,7 +29,7 @@ from constructor.dependency import Dependency, FileDependency
 from constructor.driver import CurDir
 from constructor.module import ProcessFiles
 from constructor.rule import Rule
-from constructor.target import Target
+from constructor.pseudotarget import PseudoTarget, GetTarget, AddTarget
 
 variables = {}
 
@@ -144,6 +144,20 @@ def _Include( *f ):
     pass
 
 def _Library( *f ):
+    name = None
+    objs = []
+    other = []
+    for a in f:
+        if isinstance( a, (str, basestring) ):
+            if name:
+                Error( "Multiple names specified creating library not allowed" )
+            name = a
+        elif isinstance( a, PseudoTarget ):
+            if a.target_type == "object":
+                objs.append( a )
+            else:
+                other.append( a )
+
     pass
 
 def _Executable( *f ):
@@ -161,17 +175,17 @@ def _CPPTarget( f, base, ext ):
     Debug( "Processing C++ target '%s'" % f )
     curd = CurDir()
     out = os.path.join( curd.bin_path, base ) + _objExt
-    return Target( outfile=out, rule = rules['cpp'] )
+    return AddTarget( "object", out, outpath=out, rule=rules['cpp'] )
 
 def _CTarget( f, base, ext ):
     Debug( "Processing C target '%s'" % f )
     curd = CurDir()
     out = os.path.join( curd.bin_path, base ) + _objExt
-    return Target( outfile=out, rule = rules['cc'] )
+    return AddTarget( "object", out, outpath=out, rule=rules['cc'] )
 
 def _NilTarget( f, base, ext ):
     Debug( "Processing nil target '%s'" % f )
-
+    return FileDependency( infile=f, orderonly=False )
 
 extension_handlers = {
     ".cpp": _CPPTarget,

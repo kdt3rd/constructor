@@ -30,5 +30,4 @@ class Target(Dependency):
         if rule:
             rule.add_use()
         self.output_file = outfile
-        pass
 

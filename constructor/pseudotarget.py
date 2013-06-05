@@ -21,16 +21,17 @@
 #
 
 
-from .dependency import Dependency
 from .output import Error, Debug
+from .target import Target
 
-class PseudoTarget(Dependency):
+class PseudoTarget(Target):
     def __init__( self, targtype=None, name=None, target=None ):
+        super(PseudoTarget, self).__init__( outfile=None, rule=None, orderonly=False )
         self.target = target
         self.target_type = targtype
         self.name = name
 
-    def setTarget( self, targ ):
+    def set_target( self, targ ):
         if self.target is not None:
             Error( "Attempt to store duplicate target %s : %s" % (self.target_type, self.name) )
         self.target = targ
@@ -47,8 +48,14 @@ def GetTarget( targtype, name ):
         _symbol_table[symName] = pt
     return pt
 
-def AddTarget( targtype, name, target ):
+def AddTarget( targtype, name, target = None, outpath = None, rule = None ):
+    if target is None:
+        if outpath and rule:
+            target = Target( outfile=outpath, rule=rule )
+        else:
+            Error( "No target or output / rule combination provided" )
     if target is None:
         Error( "Invalid target provided" )
     pt = GetTarget( targtype, name )
-    pt.setTarget( target )
+    pt.set_target( target )
+    return pt
