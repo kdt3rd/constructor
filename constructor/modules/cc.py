@@ -29,7 +29,7 @@ from constructor.dependency import Dependency, FileDependency
 from constructor.driver import CurDir
 from constructor.module import ProcessFiles
 from constructor.rule import Rule
-from constructor.pseudotarget import PseudoTarget, GetTarget, AddTarget
+from constructor.target import Target, GetTarget, AddTarget
 
 variables = {}
 
@@ -72,8 +72,32 @@ variables["ARFLAGS"] = CheckEnvironOverride( "ARFLAGS", [] )
 variables["LDFLAGS"] = CheckEnvironOverride( "LDFLAGS", [] )
 variables["RPATH"] = CheckEnvironOverride( "RPATH", [] )
 
+def _prependToListSkipVars( pre, out, val ):
+    if isinstance( val, list ):
+        for v in val:
+            _prependToListSkipVars( pre, out, v )
+    elif val.startswith( '$' ):
+        out.append( val )
+    else:
+        out.append( pre + val )
+
+def _TransformVariable( name, val ):
+    if not isinstance( val, list ):
+        return val
+    if len(val) == 0:
+        return val
+
+    if name == "WARNINGS" or name == "CWARNINGS" or name == "CXXWARNINGS":
+        nv = []
+        _prependToListSkipVars( '-W', nv, val )
+        Debug( "Tranform '%s': %s  -> %s" % (name, val, nv) )
+        return nv
+    return val
+
+variable_transformer = _TransformVariable
+
 _cppCmd = ['$CXX', '$CXXFLAGS', '$WARNINGS', '$CXXWARNINGS', '$INCLUDE']
-_ccCmd = ['$CCC', '$CFLAGS', '$WARNINGS', '$CWARNINGS', '$INCLUDE']
+_ccCmd = ['$CC', '$CFLAGS', '$WARNINGS', '$CWARNINGS', '$INCLUDE']
 if len(_depFlags) > 0:
     _cppCmd.extend( _depFlags )
     _ccCmd.extend( _depFlags )
@@ -84,9 +108,12 @@ modules = [ "external_pkg" ]
 rules = {
     'cpp': Rule( tag='cpp', cmd=_cppCmd, desc='C++ ($in)', depfile='$out.d' ),
     'cc': Rule( tag='cc', cmd=_ccCmd, desc='C ($in)', depfile='$out.d' ),
-    'exe': Rule( tag='exe',
-                 cmd=['$LD', '$RPATH', '$LDFLAGS', '$in', '$libs', '-o', '$out'],
-                 desc='Linking ($out)' ),
+    'c_exe': Rule( tag='c_exe',
+                 cmd=['$CC', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
+                 desc='EXE ($out)' ),
+    'cxx_exe': Rule( tag='cxx_exe',
+                 cmd=['$CXX', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
+                 desc='EXE C++ ($out)' ),
     'lib_static': Rule( tag='lib_static',
                         cmd=['rm', '-f', '$out', ';', '$AR', '-c', '$in', '-o', '$out'],
                         desc='Static ($out)' ),
@@ -152,8 +179,8 @@ def _Library( *f ):
             if name:
                 Error( "Multiple names specified creating library not allowed" )
             name = a
-        elif isinstance( a, PseudoTarget ):
-            if a.target_type == "object":
+        elif isinstance( a, Target ):
+            if a.type == "object":
                 objs.append( a )
             else:
                 other.append( a )
@@ -167,6 +194,26 @@ class _ExeTargetInfo(object):
         self.libs = []
         self.syslibs = []
         self.other = []
+        self.uses_cxx = False
+
+    def check_for_cxx( self, a ):
+        if self.uses_cxx:
+            return
+
+        if isinstance( a, Target ):
+            if a.rule is rules['cpp']:
+                self.uses_cxx = True
+
+        if a.dependencies:
+            for d in a.dependencies:
+                self.check_for_cxx( d )
+                if self.uses_cxx:
+                    break
+        if a.implicit_dependencies:
+            for d in a.implicit_dependencies:
+                self.check_for_cxx( d )
+                if self.uses_cxx:
+                    break
 
     def extract( self, *f ):
         for a in f:
@@ -174,21 +221,24 @@ class _ExeTargetInfo(object):
                 if self.name:
                     Error( "Multiple names specified creating library not allowed" )
                 self.name = a
-            elif isinstance( a, PseudoTarget ):
-                if a.target_type == "object":
+            elif isinstance( a, Target ):
+                if a.type == "object":
                     self.objs.append( a )
-                elif a.target_type == "lib":
+                elif a.type == "lib":
                     self.libs.append( a )
-                elif a.target_type == "syslib":
+                elif a.type == "syslib":
                     self.syslibs.append( a )
                 else:
                     self.other.append( a )
+                self.check_for_cxx( a )
             elif isinstance( a, list ):
                 for x in a:
                     self.extract( x )
             elif isinstance( a, tuple ):
                 for x in a:
                     self.extract( x )
+            elif isinstance( a, Dependency ):
+                self.check_for_cxx( a )
 
 def _Executable( *f ):
     einfo = _ExeTargetInfo();
@@ -196,10 +246,18 @@ def _Executable( *f ):
 
     curd = CurDir()
     out = os.path.join( curd.bin_path, einfo.name ) + _exeExt
-    e = AddTarget( "exe", einfo.name, outpath=out, rule=rules["exe"] )
+    if einfo.uses_cxx:
+        e = AddTarget( "exe", out, outpath=out, rule=rules["cxx_exe"] )
+    else:
+        e = AddTarget( "exe", out, outpath=out, rule=rules["c_exe"] )
     for o in einfo.objs:
-        e.add_dependency( "build", o )
-    CurDir().add_targets( e )
+        e.add_dependency( o )
+    shorte = AddTarget( "exe", einfo.name )
+    shorte.add_dependency( e )
+
+    GetTarget( "all", "all" ).add_dependency( shorte )
+
+    CurDir().add_targets( e, shorte )
     #for l in einfo.libs:
     pass
 

@@ -28,8 +28,9 @@ import constructor.generators
 
 class Generator(Phase):
     _generators = {}
-    def __init__( self, name ):
+    def __init__( self, name, flatten ):
         super( Generator, self ).__init__( name )
+        self.flatten = flatten
 
 def AddGeneratorClass( name, classRef ):
     g = Generator._generators.get( name )

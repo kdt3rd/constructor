@@ -23,38 +23,47 @@
 from .output import Debug, Error
 
 class Dependency(object):
-    """Base class for all things that represent a dependency tree"""
+    """Base class for all things that represent a dependency tree.
+       There are 3 types of dependencies stored in here:
+       - explicit dependencies, these will appear on command lines
+       - implicit dependencies, which will be used to indicate that
+         even though a dependency is not explicitly used, it triggers
+         the object to be out of date
+       - ordering dependencies, which just causes dependencies to be built
+         prior to the specified entry
+    """
 
-    def __init__( self, orderonly ):
-        self._dependencies = {}
-        self.orderonly = orderonly
+    def __init__( self ):
+        self.dependencies = None
+        self.order_only_dependencies = None
+        self.implicit_dependencies = None
 
-    def add_dependency( self, group, dep ):
+    def _add_to_ref( self, name, dep ):
         if not isinstance( dep, Dependency ):
             Error( "Attempt to add dependency that is not a subclass of Dependency" )
-
-        try:
-            deps = self._dependencies[group]
-        except KeyError:
-            deps = []
-            self._dependencies[group] = deps
-
-        found = False
-        for d in deps:
-            if d is dep:
-                found = True
-                break
-        if not found:
+        deps = getattr( self, name )
+        if deps is None:
+            setattr( self, name, [ dep ] )
+        else:
+            found = False
+            for d in deps:
+                if d is dep:
+                    found = True
+                    break
             deps.append( dep )
 
-    def dependencies( self, group ):
-        if group in self._dependencies:
-            return self._dependencies[group]
-        return []
+    def add_dependency( self, dep ):
+        self._add_to_ref( 'dependencies', dep )
+
+    def add_implicit_dependency( self, dep ):
+        self._add_to_ref( 'implicit_dependencies', dep )
             
+    def add_order_dependency( self, dep ):
+        self._add_to_ref( 'order_only_dependencies', dep )
+
 class FileDependency(Dependency):
     """Simple sub-class to represent a direct file in a dependency tree"""
-    def __init__( self, infile, orderonly ):
-        super(FileDependency, self).__init__( orderonly )
+    def __init__( self, infile ):
+        super(FileDependency, self).__init__()
         self.filename = infile
 

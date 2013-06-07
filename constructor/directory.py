@@ -37,13 +37,15 @@ def SetCurDir( d ):
 
 class Directory(Dependency):
     def __init__( self, path, relpath, binpath, pardir = None, globs = None ):
-        super(Directory, self).__init__( False )
+        super(Directory, self).__init__()
         self.pardir = pardir
         self.globs = globs
         self._cur_namespace = None
         self.src_dir = path
         self.rel_src_dir = relpath
         self.bin_path = binpath
+        # synonym function to handle plurality
+        self.add_target = self.add_targets
         # Stuff that the user really turns on / triggers via directives
         self.subdirs = {}
         self.targets = None
@@ -67,6 +69,20 @@ class Directory(Dependency):
                         driver.add_feature( f["name"], f["type"], f["help"], f["default"] )
         for sn, sd in iterate( self.subdirs ):
             sd.add_module_features( driver )
+
+    def get_used_module_rules( self, recurse ):
+        rl = []
+        if self.modules is not None:
+            for n, m in iterate( self.modules ):
+                if m.rules is not None:
+                    for tag, rule in iterate( m.rules ):
+                        if rule.is_used():
+                            rl.append( rule )
+        if recurse:
+            for sn, sd in iterate( self.subdirs ):
+                subrl = sd.get_used_module_rules( True )
+                rl.extend( subrl )
+        return rl
 
     def set_variable( self, varname, f ):
         if self.variables is None:
@@ -93,6 +109,14 @@ class Directory(Dependency):
             else:
                 for x in f:
                     v.append( x )
+
+    def transform_variable( self, name, val ):
+        if self.modules is not None:
+            for n, m in iterate( self.modules ):
+                val = m.transform_variable( name, val )
+        if self.pardir is not None:
+            val = self.pardir.transform_variable( name, val )
+        return val
 
     def set_globals( self, globs ):
         self.globs = globs
@@ -124,13 +148,15 @@ class Directory(Dependency):
             return self.bin_path
         return self.pardir.get_root_bin_dir()
 
-    def add_targets( self, t ):
+    def add_targets( self, *targs ):
         if self.targets is None:
             self.targets = []
-        if isinstance( t, list ):
-            self.targets.extend( t )
-        else:
-            self.targets.append( t )
+
+        for t in targs:
+            if isinstance( t, list ):
+                self.targets.extend( t )
+            else:
+                self.targets.append( t )
 
     def add_sub_dir( self, name ):
         try:

@@ -22,15 +22,19 @@
 
 
 from .dependency import Dependency
+from .output import Debug
+
 
 class Target(Dependency):
-    def __init__( self, outfile, rule = None, orderonly = False ):
-        super(Target, self).__init__( orderonly )
+    def __init__( self, targtype, shortname, outfile = None, rule = None ):
+        super(Target, self).__init__()
+        self.type = targtype
+        self.name = shortname
         self.variables = None
         self.rule = rule
         if rule:
             rule.add_use()
-        self.output_file = outfile
+        self.filename = outfile
 
     def set_variable( self, name, val ):
         if self.variables is None:
@@ -58,3 +62,33 @@ class Target(Dependency):
                 self.variables[name] = [ val ]
 
 
+###
+### Have a global symbol table of targets so we can
+### enable short names if the user wants to find targets
+### by name, potentially out of order of creation
+###
+
+_symbol_table = {}
+
+def GetTarget( targtype, name ):
+    global _symbol_table
+    symName = targtype + ":" + name
+    pt = _symbol_table.get( symName )
+    if pt is None:
+        Debug( "Creating pseudo target %s" % symName )
+        pt = Target( targtype=targtype, shortname=name )
+        _symbol_table[symName] = pt
+    else:
+        Debug( "Retrieved pseudo target %s" % symName )
+    return pt
+
+def AddTarget( targtype, name, target = None, outpath = None, rule = None ):
+    if target is None:
+        target = GetTarget( targtype, name )
+
+    target.filename = outpath
+    target.rule = rule
+    if rule:
+        rule.add_use()
+
+    return target

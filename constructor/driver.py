@@ -29,7 +29,7 @@ from .phase import Phase, DirParsePhase
 from .directory import Directory, CurDir, SetCurDir
 from .generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
 from .rule import Rule
-from .target import Target
+from .target import Target, GetTarget
 from .module import EnableModule, ProcessFiles, Module
 
 class Driver(object):
@@ -45,7 +45,7 @@ class Driver(object):
         self.build = None
         self.build_dir = None
         self.build_set = {}
-
+        self.flatten = False
         self.generator = defgenerator
 
         self.phases = [ DirParsePhase( "config", "config", True, lambda p, c, g, l: c.add_to_globals( p, g, l ) ),
@@ -69,6 +69,9 @@ class Driver(object):
                                  type="string",
                                  help='Allows one to specify the generator type',
                                  default=self.generator )
+        self.parser.add_option( '--flatten',
+                                 help='Flattens all sub-directories to one build file',
+                                 action="store_true", dest="flatten" )
         self.parser.add_option( '--verbose',
                                  help='Enables verbose output',
                                  action="store_true", dest="verbose" )
@@ -112,7 +115,10 @@ class Driver(object):
 
         if not isinstance( self.phases[len(self.phases) - 1], Generator ):
             Debug( "Creating generator pass for generator '%s'" % self.generator )
-            self.phases.append( GetGeneratorClass( self.generator )() )
+            self.phases.append( GetGeneratorClass( self.generator )( self.flatten ) )
+
+        allt = GetTarget( "all", "all" )
+        self.root_dir.add_target( allt )
 
         for p in self.phases[1:]:
             self.cur_phase = p
@@ -187,7 +193,10 @@ class Driver(object):
 
         if options.build_dir is not None and len(options.build_dir) > 0:
             self.build_dir = options.build_dir
-            
+
+        if options.flatten:
+            self.flatten = True
+
         if self.build_dir is None:
             self.build_dir = os.getcwd()#self.root_dir.src_dir
 

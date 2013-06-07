@@ -78,7 +78,7 @@ class DirParsePhase(Phase):
             localspace = {}
             Debug( "Parsing file '%s'" % fn )
             with open( fn, "r" ) as f:
-                curdir.add_dependency( "config", FileDependency( fn, False ) )
+                curdir.add_implicit_dependency( FileDependency( fn ) )
                 PushDebugContext( os.path.join( curdir.rel_src_dir, filename ) )
                 exec( compile( f.read() + "\n", filename, 'exec' ), namespace, localspace )
             if self.post_proc:

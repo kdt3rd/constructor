@@ -117,12 +117,6 @@ def _HaveExternal( name ):
         return True
     return False
 
-# no submodules
-modules = None
-rules = None
-features = None
-variables = None
-extension_handlers = None
 functions_by_phase = { "config":
                        {
                            "AddExternalResolver": _AddExternalResolver,

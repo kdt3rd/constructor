@@ -31,22 +31,36 @@ _extension_handlers = {}
 
 class Module(object):
     """Class encapsulating a module, which defines how certain types of code are compiled, or how other things are processed"""
-    def __init__( self, name, rules = None, features = None, variables = None, extensions = None, funcs = None ):
-        global _extension_handlers
+    def __init__( self, name, gmod ):
         self.name = name
-        self.rules = rules
-        self.features = features
-        self.variables = variables
-        self.extensions = extensions
-        self.provided_functions = funcs
-        if extensions is not None:
-            for k, v in iterate( extensions ):
-                k = k.lower()
-                curh = _extension_handlers.get( k )
-                if curh is None:
-                    _extension_handlers[k] = self
-                else:
-                    Error( "Modules '%s' and '%s' have conflicting/ambiguous handlers for extension '%s'" % ( name, curh.name, k ) )
+        self.rules = None
+        self.features = None
+        self.variables = None
+        self.extensions = None
+        self.provided_functions = None
+        self.variable_transform = None
+        if hasattr( gmod, 'rules' ):
+            self.rules = getattr( gmod, 'rules' )
+        if hasattr( gmod, 'features' ):
+            self.features = getattr( gmod, 'features' )
+        if hasattr( gmod, 'variables' ):
+            self.variables = getattr( gmod, 'variables' )
+        if hasattr( gmod, 'extension_handlers' ):
+            extensions = getattr( gmod, 'extension_handlers' )
+            self.extensions = extensions
+            global _extension_handlers
+            if extensions is not None:
+                for k, v in iterate( extensions ):
+                    k = k.lower()
+                    curh = _extension_handlers.get( k )
+                    if curh is None:
+                        _extension_handlers[k] = self
+                    elif curh is not self:
+                        Error( "Modules '%s' and '%s' have conflicting/ambiguous handlers for extension '%s'" % ( name, curh.name, k ) )
+        if hasattr( gmod, 'functions_by_phase' ):
+            self.provided_functions = getattr( gmod, 'functions_by_phase' )
+        if hasattr( gmod, 'variable_transformer' ):
+            self.variable_transform = getattr( gmod, 'variable_transformer' )
 
     def add_globals( self, globs, phase ):
         if self.provided_functions is not None:
@@ -61,6 +75,11 @@ class Module(object):
         if self.variables:
             for k, v in iterate( self.variables ):
                 curd.set_variable( k, v )
+
+    def transform_variable( self, name, val ):
+        if self.variable_transform:
+            return self.variable_transform( name, val )
+        return val
 
 def _handleFile( f ):
     global _extension_handlers
@@ -89,24 +108,24 @@ def ProcessFiles( *args ):
     ret = []
     for f in args:
         if isinstance( f, Target ):
-            res = _handleFile( f.output_file )
+            res = _handleFile( f.filename )
             if isinstance( res, list ):
                 for r in res:
-                    r.add_dependency( 'build', f )
+                    r.add_dependency( f )
                 ret.extend( res )
             else:
-                res.add_dependency( 'build', f )
+                res.add_dependency( f )
                 ret.append( res )
         elif isinstance( f, str ):
             res = _handleFile( f )
             curd = CurDir()
-            d = FileDependency( infile=os.path.join( curd.src_dir, f ), orderonly=False )
+            d = FileDependency( infile=os.path.join( curd.src_dir, f ) )
             if isinstance( res, list ):
                 for r in res:
-                    r.add_dependency( 'build', d )
+                    r.add_dependency( d )
                 ret.extend( res )
             else:
-                res.add_dependency( 'build', d )
+                res.add_dependency( d )
                 ret.append( res )
         elif isinstance( f, list ):
             ret.extend( ProcessFiles( *f ) )
@@ -137,21 +156,18 @@ def EnableModule( name, packageprefix=None ):
             except:
                 FatalException( "Unable to load module '%s'" % name )
 
-            mods = getattr( gmod, "modules" )
-            if mods is not None:
-                for m in mods:
-                    if isinstance( m, str ):
-                        EnableModule( m )
-                    elif isinstance( m, list ):
-                        EnableModule( m[0], m[1] )
-                    else:
-                        Error( "Invalid dependent module specification: %s, need string or 2-element array" % m )
+            if hasattr( gmod, 'modules' ):
+                mods = getattr( gmod, 'modules' )
+                if mods is not None:
+                    for m in mods:
+                        if isinstance( m, str ):
+                            EnableModule( m )
+                        elif isinstance( m, list ):
+                            EnableModule( m[0], m[1] )
+                        else:
+                            Error( "Invalid dependent module specification: %s, need string or 2-element array" % m )
 
-            newmod = Module( name = name, rules = getattr( gmod, "rules" ),
-                             features = getattr( gmod, "features" ),
-                             variables = getattr( gmod, "variables" ),
-                             extensions = getattr( gmod, "extension_handlers" ),
-                             funcs = getattr( gmod, "functions_by_phase" ) )
+            newmod = Module( name, gmod )
             _modules[name] = newmod
         finally:
             _loading_modules.pop()
