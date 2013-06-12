@@ -26,7 +26,7 @@ import subprocess
 from constructor.utility import FindOptionalExecutable, CheckEnvironOverride
 from constructor.output import Info, Debug, Error, Warn
 from constructor.dependency import Dependency, FileDependency
-from constructor.driver import CurDir
+from constructor.driver import CurDir, Feature
 from constructor.module import ProcessFiles
 from constructor.rule import Rule
 from constructor.target import Target, GetTarget, AddTarget
@@ -35,6 +35,9 @@ variables = {}
 
 _objExt = '.o'
 _exeExt = ''
+_libPrefix = 'lib'
+_staticLibSuffix = '.a'
+_sharedLibSuffix = '.so'
 
 if sys.platform.startswith( "linux" ):
     variables["AR"] = CheckEnvironOverride( "AR", FindOptionalExecutable( "ar" ) )
@@ -48,11 +51,15 @@ elif sys.platform.startswith( "darwin" ):
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "clang" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "clang++" ) )
     _depFlags = [ '-MMD', '-MF', '$out.d' ]
+    _sharedLibSuffix = '.dylib'
 elif sys.platform.startswith( "win" ):
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "cl" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "cl" ) )
     _objExt = '.obj'
     _exeExt = '.exe'
+    _libPrefix = ''
+    _staticLibSuffix = '.lib'
+    _sharedLibSuffix = '.dll'
     _depFlags = []
 else:
     Warn( "Un-handled platform '%s', defaulting compiler to gcc" % sys.platform )
@@ -119,11 +126,17 @@ rules = {
                         desc='Static ($out)' ),
     'lib_shared': Rule( tag='lib_shared',
                         cmd=['$CC', '$CFLAGS', '$WARNINGS', '$INCLUDE', '-c', '$in', '-o', '$out'],
+                        desc='Shared ($out)' ),
+    'cxx_lib_shared': Rule( tag='lib_shared',
+                        cmd=['$CC', '$CFLAGS', '$WARNINGS', '$INCLUDE', '-c', '$in', '-o', '$out'],
                         desc='Shared ($out)' )
     }
 
-features = [ { "name": "shared", "type": "boolean", "help": "Build shared libraries", "default": True },
-             { "name": "static", "type": "boolean", "help": "Build static libraries", "default": True } ]
+_defBuildShared = True
+_defBuildStatic = True
+
+features = [ { "name": "shared", "type": "boolean", "help": "Build shared libraries", "default": _defBuildShared },
+             { "name": "static", "type": "boolean", "help": "Build static libraries", "default": _defBuildStatic } ]
 
 def _SetCompiler( cc=None, cxx=None ):
     if cc is not None:
@@ -137,8 +150,6 @@ def _SetCompiler( cc=None, cxx=None ):
         else:
             CurDir().set_variable( "CXX", FindExecutable( cxx ) )
 
-_defBuildShared = True
-_defBuildStatic = True
 def _SetDefaultLibraryStyle( style ):
     global _defBuildShared
     global _defBuildStatic
@@ -170,24 +181,7 @@ def _Include( *f ):
     CurDir().add_to_variable( "INCLUDE", f )
     pass
 
-def _Library( *f ):
-    name = None
-    objs = []
-    other = []
-    for a in f:
-        if isinstance( a, str ):
-            if name:
-                Error( "Multiple names specified creating library not allowed" )
-            name = a
-        elif isinstance( a, Target ):
-            if a.type == "object":
-                objs.append( a )
-            else:
-                other.append( a )
-
-    pass
-
-class _ExeTargetInfo(object):
+class _TargetInfo(object):
     def __init__( self ):
         self.name = None
         self.objs = []
@@ -240,8 +234,29 @@ class _ExeTargetInfo(object):
             elif isinstance( a, Dependency ):
                 self.check_for_cxx( a )
 
+def _Library( *f ):
+    linfo = _TargetInfo()
+    linfo.extract( f )
+    curd = CurDir()
+    if Feature( "static" ):
+        libname = _libPrefix + linfo.name + _staticLibSuffix
+        out = os.path.join( curd.bin_path, libname )
+        l = AddTarget( "lib", out, outpath=out, rule=rules["lib_static"]
+        for o in linfo.objs:
+            l.add_dependency( o )
+        for dl in linfo.libs:
+            l.add_implicit_dependency( dl )
+        shortl = AddTarget( "lib", einfo.name )
+        shortl.add_dependency( l )
+        curd.add_targets( l, shortl )
+        GetTarget( "all", "all" ).add_dependency( shortl )
+    if Feature( "shared" ):
+        libname = _libPrefix + linfo.name + _sharedLibSuffix
+        Info( "Need to add .so versioning..." )
+    pass
+
 def _Executable( *f ):
-    einfo = _ExeTargetInfo();
+    einfo = _TargetInfo()
     einfo.extract( f )
 
     curd = CurDir()
@@ -252,13 +267,14 @@ def _Executable( *f ):
         e = AddTarget( "exe", out, outpath=out, rule=rules["c_exe"] )
     for o in einfo.objs:
         e.add_dependency( o )
+    for l in einfo.libs:
+        e.add_implicit_dependency( l )
     shorte = AddTarget( "exe", einfo.name )
     shorte.add_dependency( e )
 
     GetTarget( "all", "all" ).add_dependency( shorte )
-
     CurDir().add_targets( e, shorte )
-    #for l in einfo.libs:
+
     pass
 
 def _OptExecutable( *f ):
