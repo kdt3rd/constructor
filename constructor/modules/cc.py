@@ -75,7 +75,7 @@ variables["WARNINGS"] = CheckEnvironOverride( "WARNINGS", [] )
 variables["CWARNINGS"] = CheckEnvironOverride( "CWARNINGS", [] )
 variables["CXXWARNINGS"] = CheckEnvironOverride( "CXXWARNINGS", [] )
 variables["INCLUDE"] = CheckEnvironOverride( "INCLUDE", [] )
-variables["ARFLAGS"] = CheckEnvironOverride( "ARFLAGS", [] )
+variables["ARFLAGS"] = CheckEnvironOverride( "ARFLAGS", ['cur'] )
 variables["LDFLAGS"] = CheckEnvironOverride( "LDFLAGS", [] )
 variables["RPATH"] = CheckEnvironOverride( "RPATH", [] )
 
@@ -122,7 +122,7 @@ rules = {
                  cmd=['$CXX', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
                  desc='EXE C++ ($out)' ),
     'lib_static': Rule( tag='lib_static',
-                        cmd=['rm', '-f', '$out', ';', '$AR', '-c', '$in', '-o', '$out'],
+                        cmd=['rm', '-f', '$out', ';', '$AR', '$ARFLAGS', '$out', '$in'],
                         desc='Static ($out)' ),
     'lib_shared': Rule( tag='lib_shared',
                         cmd=['$CC', '$CFLAGS', '$WARNINGS', '$INCLUDE', '-c', '$in', '-o', '$out'],
@@ -241,12 +241,12 @@ def _Library( *f ):
     if Feature( "static" ):
         libname = _libPrefix + linfo.name + _staticLibSuffix
         out = os.path.join( curd.bin_path, libname )
-        l = AddTarget( "lib", out, outpath=out, rule=rules["lib_static"]
+        l = AddTarget( "lib", out, outpath=out, rule=rules["lib_static"] )
         for o in linfo.objs:
             l.add_dependency( o )
         for dl in linfo.libs:
             l.add_implicit_dependency( dl )
-        shortl = AddTarget( "lib", einfo.name )
+        shortl = AddTarget( "lib", linfo.name )
         shortl.add_dependency( l )
         curd.add_targets( l, shortl )
         GetTarget( "all", "all" ).add_dependency( shortl )
