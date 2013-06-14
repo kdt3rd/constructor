@@ -127,6 +127,7 @@ class NinjaWriter(FileOutput):
 
     def emit_targets( self, curdir ):
         if curdir.targets:
+            curdir.targets.sort()
             for t in curdir.targets:
                 if isinstance( t, list ):
                     for x in t:

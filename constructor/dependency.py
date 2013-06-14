@@ -52,6 +52,14 @@ class Dependency(object):
                     break
             deps.append( dep )
 
+    def _check_dep( self, other, dep ):
+        if dep:
+            for d in dep:
+                if d is other:
+                    return True
+                if d.has_dependency( other ):
+                    return True
+
     def add_dependency( self, dep ):
         self._add_to_ref( 'dependencies', dep )
 
@@ -60,6 +68,19 @@ class Dependency(object):
             
     def add_order_dependency( self, dep ):
         self._add_to_ref( 'order_only_dependencies', dep )
+
+    def has_dependency( self, other ):
+        if self._check_dep( other, self.dependencies ):
+            return True
+        if self._check_dep( other, self.implicit_dependencies ):
+            return True
+        if self._check_dep( other, self.order_only_dependencies ):
+            return True
+
+    def __lt__( self, other ):
+        return other.has_dependency( self )
+    def __gt__( self, other ):
+        return self.has_dependency( other )
 
 class FileDependency(Dependency):
     """Simple sub-class to represent a direct file in a dependency tree"""
