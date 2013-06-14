@@ -198,7 +198,7 @@ class Driver(object):
             self.flatten = True
 
         if self.build_dir is None:
-            self.build_dir = os.getcwd()#self.root_dir.src_dir
+            self.build_dir = os.getcwd()#self.root_dir.src_path
 
         self.generator = options.generator
 

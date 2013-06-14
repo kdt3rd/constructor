@@ -25,17 +25,16 @@ import sys
 import subprocess
 from constructor.utility import FindOptionalExecutable
 from constructor.output import Info, Debug, Error
-from constructor.dependency import Dependency
+from constructor.target import Target
 from constructor.driver import CurDir
 
-class _ExternalPackage(Dependency):
-    def __init__( self, name, cflags, iflags, lflags, ver ):
-        super(_ExternalPackage, self).__init__( False )
-        self.name = name
-        self.cflags = cflags.strip()
-        self.iflags = iflags.strip()
-        self.lflags = lflags.strip()
-        self.version = ver.strip()
+class _ExternalPackage(Target):
+    def __init__( self, name, cflags = None, iflags = None, lflags = None, ver = None ):
+        super(_ExternalPackage, self).__init__( 'syslib', name )
+        self.cflags = cflags
+        self.iflags = iflags
+        self.lflags = lflags
+        self.version = ver
 
 # pkg-config may exist even under windows
 _pkgconfig = FindOptionalExecutable( "pkg-config" )
@@ -50,6 +49,19 @@ def _FindExternalLibrary( name, version=None ):
     global _pkgconfig
     global _externPackages
     global _externResolvers
+    if sys.platform.startswith( 'darwin' ):
+        possible = [ os.path.join( os.path.sep, 'System', 'Library', 'Frameworks', name + '.framework' ),
+                     os.path.join( os.path.sep, 'Library', 'Frameworks', name + '.framework' )
+                   ]
+        for frm in possible:
+            Info( "Checking '%s' for an apple framework" % frm )
+            if os.path.exists( frm ):
+                e = _ExternalPackage( name=name,
+                                      iflags=[ '-I', os.path.join( frm, 'Headers' ) ],
+                                      lflags=[ '-framework', name ] )
+                _externPackages[name] = e
+                return e
+
     if _pkgconfig is not None:
         try:
             lib = name
@@ -59,11 +71,15 @@ def _FindExternalLibrary( name, version=None ):
             Debug( "Running pkg-config with library name/version '%s'" % lib )
             # universal_newlines opens it as a text stream instead of (encoded)
             # byte stream...
-            ver = subprocess.check_output( [_pkgconfig, '--modversion', lib], universal_newlines=True )
-            cflags = subprocess.check_output( [_pkgconfig, '--cflags-only-other', lib], universal_newlines=True )
-            iflags = subprocess.check_output( [_pkgconfig, '--cflags-only-I', lib], universal_newlines=True )
-            lflags = subprocess.check_output( [_pkgconfig, '--libs', lib], universal_newlines=True )
-            e = _ExternalPackage( name=name, cflags=cflags, iflags=iflags, lflags=lflags, ver=ver )
+            if sys.platform == "win32" or sys.platform == "win64":
+                raise NotImplementedError
+            devnull = open('/dev/null', 'w')
+            ver = subprocess.check_output( [_pkgconfig, '--modversion', lib], universal_newlines=True, stderr=devnull )
+            cflags = subprocess.check_output( [_pkgconfig, '--cflags-only-other', lib], universal_newlines=True, stderr=devnull )
+            iflags = subprocess.check_output( [_pkgconfig, '--cflags-only-I', lib], universal_newlines=True, stderr=devnull )
+            lflags = subprocess.check_output( [_pkgconfig, '--libs', lib], universal_newlines=True, stderr=devnull )
+            close( devnull )
+            e = _ExternalPackage( name=name, cflags=cflags.strip().split(), iflags=iflags.strip().split(), lflags=lflags.strip().split(), ver=ver.strip() )
             _externPackages[name] = e
             return e
         except Exception as e:
@@ -85,28 +101,19 @@ def _FindExternalLibrary( name, version=None ):
     if sys.platform == "win32" or sys.platform == "win64":
         raise NotImplementedError
 
-    libso = os.path.join( 'usr', 'local', 'lib', 'lib' + name + '.so' )
-    libstat = os.path.join( 'usr', 'local', 'lib', 'lib' + name + '.a' )
+    libso = os.path.join( os.path.sep, 'usr', 'local', 'lib', 'lib' + name + '.so' )
+    libstat = os.path.join( os.path.sep, 'usr', 'local', 'lib', 'lib' + name + '.a' )
     if os.path.exists( libso ) or os.path.exists( libstat ):
-        e = _ExternalPackage( name=name, iflags="-I /usr/local/include", lflags="-L /usr/local/lib -l" + name )
+        e = _ExternalPackage( name=name, iflags=[ '-I', '/usr/local/include'], lflags=['-L', '/usr/local/lib', '-l'+name ] )
         _externPackages[name] = e
         return e
 
-    libso = os.path.join( 'usr', 'lib', 'lib' + name + '.so' )
-    libstat = os.path.join( 'usr', 'lib', 'lib' + name + '.a' )
+    libso = os.path.join( os.path.sep, 'usr', 'lib', 'lib' + name + '.so' )
+    libstat = os.path.join( os.path.sep, 'usr', 'lib', 'lib' + name + '.a' )
     if os.path.exists( libso ) or os.path.exists( libstat ):
-        e = _ExternalPackage( name=name, lflags="-l" + name )
+        e = _ExternalPackage( name=name, lflags=[ '-l' + name ] )
         _externPackages[name] = e
         return e
-
-    if sys.platform.startswith( 'darwin' ):
-        Error( "Verify Framework Check" )
-        frm = os.path.join( 'Library', 'Frameworks', name )
-        if os.path.exists( frm ):
-            e = _ExternalPackage( name=name,
-                                  lflags="-framework " + name )
-            _externPackages[name] = e
-            return e
 
     # Nothing found
     return None

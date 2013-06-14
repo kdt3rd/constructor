@@ -73,13 +73,13 @@ class DirParsePhase(Phase):
             SetCurDir( curdir )
             global _constructor_extension
             filename = self.file_root + _constructor_extension
-            fn = os.path.join( curdir.src_dir, filename )
+            fn = os.path.join( curdir.src_path, filename )
             namespace = curdir.get_globals( self.name )
             localspace = {}
             Debug( "Parsing file '%s'" % fn )
             with open( fn, "r" ) as f:
                 curdir.add_implicit_dependency( FileDependency( fn ) )
-                PushDebugContext( os.path.join( curdir.rel_src_dir, filename ) )
+                PushDebugContext( os.path.join( curdir.rel_src_path, filename ) )
                 exec( compile( f.read() + "\n", filename, 'exec' ), namespace, localspace )
             if self.post_proc:
                 Debug( "Running post process after file '%s'" % fn )

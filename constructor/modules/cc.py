@@ -116,10 +116,10 @@ rules = {
     'cpp': Rule( tag='cpp', cmd=_cppCmd, desc='C++ ($in)', depfile='$out.d' ),
     'cc': Rule( tag='cc', cmd=_ccCmd, desc='C ($in)', depfile='$out.d' ),
     'c_exe': Rule( tag='c_exe',
-                 cmd=['$CC', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
+                 cmd=['$CC', '$CFLAGS', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
                  desc='EXE ($out)' ),
     'cxx_exe': Rule( tag='cxx_exe',
-                 cmd=['$CXX', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
+                 cmd=['$CXX', '$CXXFLAGS', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
                  desc='EXE C++ ($out)' ),
     'lib_static': Rule( tag='lib_static',
                         cmd=['rm', '-f', '$out', ';', '$AR', '$ARFLAGS', '$out', '$in'],
@@ -241,14 +241,36 @@ def _Library( *f ):
     if Feature( "static" ):
         libname = _libPrefix + linfo.name + _staticLibSuffix
         out = os.path.join( curd.bin_path, libname )
-        l = AddTarget( "lib", out, outpath=out, rule=rules["lib_static"] )
+        l = AddTarget( curd, "lib", out, outpath=out, rule=rules["lib_static"] )
+        targcflags = []
+        targiflags = []
+        for dl in linfo.libs:
+            targiflags.append( '-I' )
+            targiflags.append( dl.src_dir.src_path )
+            targiflags.append( '-I' )
+            targiflags.append( dl.src_dir.bin_path )
+        for dl in linfo.syslibs:
+            if dl.cflags:
+                targcflags.extend( dl.cflags )
+            if dl.iflags:
+                targiflags.extend( dl.iflags )
         for o in linfo.objs:
             l.add_dependency( o )
+            if len(targcflags) > 0:
+                if linfo.uses_cxx:
+                    o.add_to_variable( 'CXXFLAGS', targcflags )
+                else:
+                    o.add_to_variable( 'CFLAGS', targcflags )
+            if len(targiflags) > 0:
+                o.add_to_variable( 'INCLUDE', targiflags )
         for dl in linfo.libs:
             l.add_implicit_dependency( dl )
-        shortl = AddTarget( "lib", linfo.name )
+            l.add_to_variable( 'LDFLAGS', [ '-L', dl.src_dir.bin_path, '-l'+dl.name ] )
+        for dl in linfo.syslibs:
+            if dl.lflags:
+                l.add_to_variable( 'LDFLAGS', dl.lflags )
+        shortl = AddTarget( curd, "lib", linfo.name )
         shortl.add_dependency( l )
-        curd.add_targets( l, shortl )
         GetTarget( "all", "all" ).add_dependency( shortl )
     if Feature( "shared" ):
         libname = _libPrefix + linfo.name + _sharedLibSuffix
@@ -262,40 +284,66 @@ def _Executable( *f ):
     curd = CurDir()
     out = os.path.join( curd.bin_path, einfo.name ) + _exeExt
     if einfo.uses_cxx:
-        e = AddTarget( "exe", out, outpath=out, rule=rules["cxx_exe"] )
+        e = AddTarget( curd, "exe", out, outpath=out, rule=rules["cxx_exe"] )
     else:
-        e = AddTarget( "exe", out, outpath=out, rule=rules["c_exe"] )
+        e = AddTarget( curd, "exe", out, outpath=out, rule=rules["c_exe"] )
+    targcflags = []
+    targiflags = []
+    for dl in einfo.libs:
+        targiflags.append( '-I' )
+        targiflags.append( dl.src_dir.src_path )
+        targiflags.append( '-I' )
+        targiflags.append( dl.src_dir.bin_path )
+    for dl in einfo.syslibs:
+        if dl.cflags:
+            targcflags.extend( dl.cflags )
+        if dl.iflags:
+            targiflags.extend( dl.iflags )
     for o in einfo.objs:
         e.add_dependency( o )
-    for l in einfo.libs:
-        e.add_implicit_dependency( l )
-    shorte = AddTarget( "exe", einfo.name )
+        if len(targcflags) > 0:
+            if linfo.uses_cxx:
+                o.add_to_variable( 'CXXFLAGS', targcflags )
+            else:
+                o.add_to_variable( 'CFLAGS', targcflags )
+        if len(targiflags) > 0:
+            o.add_to_variable( 'INCLUDE', targiflags )
+    for dl in einfo.libs:
+        e.add_implicit_dependency( dl )
+        e.add_to_variable( 'LDFLAGS', [ '-L', dl.src_dir.bin_path, '-l'+dl.name ] )
+    for dl in einfo.syslibs:
+        if dl.cflags:
+            if einfo.uses_cxx:
+                e.add_to_variable( 'CXXFLAGS', dl.cflags )
+            else:
+                e.add_to_variable( 'CFLAGS', dl.cflags )
+        if dl.iflags:
+            e.add_to_variable( 'INCLUDE', dl.iflags )
+        if dl.lflags:
+            e.add_to_variable( 'LDFLAGS', dl.lflags )
+    shorte = AddTarget( curd, "exe", einfo.name )
     shorte.add_dependency( e )
 
     GetTarget( "all", "all" ).add_dependency( shorte )
-    CurDir().add_targets( e, shorte )
-
     pass
 
 def _OptExecutable( *f ):
     pass
 
 def _Compile( *f ):
-    ret = ProcessFiles( f )
-    CurDir().add_targets( ret )
-    return ret
+    return ProcessFiles( f )
 
 def _CPPTarget( f, base, ext ):
     Debug( "Processing C++ target '%s'" % f )
     curd = CurDir()
     out = os.path.join( curd.bin_path, base ) + _objExt
-    return AddTarget( "object", out, outpath=out, rule=rules['cpp'] )
+    return AddTarget( curd, "object", out, outpath=out, rule=rules['cpp'] )
 
 def _CTarget( f, base, ext ):
     Debug( "Processing C target '%s'" % f )
     curd = CurDir()
     out = os.path.join( curd.bin_path, base ) + _objExt
-    return AddTarget( "object", out, outpath=out, rule=rules['cc'] )
+    return AddTarget( curd, "object", out, outpath=out, rule=rules['cc'] )
 
 def _NilTarget( f, base, ext ):
     Debug( "Processing nil target '%s'" % f )

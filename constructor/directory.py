@@ -41,8 +41,8 @@ class Directory(Dependency):
         self.pardir = pardir
         self.globs = globs
         self._cur_namespace = None
-        self.src_dir = path
-        self.rel_src_dir = relpath
+        self.src_path = path
+        self.rel_src_path = relpath
         self.bin_path = binpath
         # synonym function to handle plurality
         self.add_target = self.add_targets
@@ -138,8 +138,8 @@ class Directory(Dependency):
 
     def set_bin_dir( self, path ):
         self.bin_path = path
-        if len(self.rel_src_dir) > 0:
-            self.bin_path = os.path.join( path, self.rel_src_dir )
+        if len(self.rel_src_path) > 0:
+            self.bin_path = os.path.join( path, self.rel_src_path )
         for sn, sd in iterate( self.subdirs ):
             sd.set_bin_dir( path )
 
@@ -162,13 +162,13 @@ class Directory(Dependency):
         try:
             dobj = self.subdirs[name]
         except KeyError as e:
-            newd = self.rel_src_dir
+            newd = self.rel_src_path
             if len(newd) > 0:
                 newd = os.path.join( newd, name )
             else:
                 newd = name
 
-            dobj = Directory( os.path.join( self.src_dir, name ),
+            dobj = Directory( os.path.join( self.src_path, name ),
                               newd,
                               os.path.join( self.bin_path, name ),
                               self )

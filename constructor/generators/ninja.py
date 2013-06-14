@@ -94,7 +94,7 @@ class NinjaWriter(FileOutput):
                 dname = d.name
             self.write( '%s ' % dname )
         
-    def emit_target( self, t ):
+    def emit_target( self, t, curdir ):
         outDeps = True
 
         if t.filename:
@@ -112,15 +112,27 @@ class NinjaWriter(FileOutput):
             self.emit_deplist( ' | ', t.implicit_dependencies )
             self.emit_deplist( ' || ', t.order_only_dependencies )
             self.write( '\n' )
+        if t.variables:
+            for k, v in iterate( t.variables ):
+                self.write( '  ' )
+                self.write( _escape( k ) )
+                self.write( ' =' )
+                xx = curdir.transform_variable( k, v )
+                if isinstance( xx, list ):
+                    self.write( ' '.join( xx ) )
+                else:
+                    self.write( ' ' )
+                    self.write( xx )
+                self.write( '\n' )
 
     def emit_targets( self, curdir ):
         if curdir.targets:
             for t in curdir.targets:
                 if isinstance( t, list ):
                     for x in t:
-                        self.emit_target( x )
+                        self.emit_target( x, curdir )
                 else:
-                    self.emit_target( t )
+                    self.emit_target( t, curdir )
 
     def emit_unix_style_rebuild( self, curdir, fn, cf ):
         self.write( '\n\nrule regen_config\n' )
@@ -153,16 +165,16 @@ def _emit_dir( curdir, cf=None, flatten=False ):
     if curdir.targets is None and len(curdir.subdirs) == 0:
         return None
     ( out, fn ) = _create_file( curdir, flatten )
-    Debug( "Emitting rules for '%s'" % curdir.rel_src_dir )
+    Debug( "Emitting rules for '%s'" % curdir.rel_src_path )
     out.emit_rules( curdir.get_used_module_rules( False ) )
-    Debug( "Emitting variables for '%s'" % curdir.rel_src_dir )
+    Debug( "Emitting variables for '%s'" % curdir.rel_src_path )
     out.emit_variables( curdir )
-    Debug( "Emitting subdirs for '%s'" % curdir.rel_src_dir )
+    Debug( "Emitting subdirs for '%s'" % curdir.rel_src_path )
     for sn, sd in iterate( curdir.subdirs ):
         sfn = _emit_dir( sd )
         if sfn:
             out.write( 'subninja %s\n' % _escape_path( sfn ) )
-    Debug( "Emitting targets for '%s'" % curdir.rel_src_dir )
+    Debug( "Emitting targets for '%s'" % curdir.rel_src_path )
     out.emit_targets( curdir )
     if cf:
         # top level, add the rule to rebuild the ninja files
