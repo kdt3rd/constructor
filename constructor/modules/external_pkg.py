@@ -74,11 +74,15 @@ def _FindExternalLibrary( name, version=None ):
             if sys.platform == "win32" or sys.platform == "win64":
                 raise NotImplementedError
             devnull = open('/dev/null', 'w')
-            ver = subprocess.check_output( [_pkgconfig, '--modversion', lib], universal_newlines=True, stderr=devnull )
-            cflags = subprocess.check_output( [_pkgconfig, '--cflags-only-other', lib], universal_newlines=True, stderr=devnull )
-            iflags = subprocess.check_output( [_pkgconfig, '--cflags-only-I', lib], universal_newlines=True, stderr=devnull )
-            lflags = subprocess.check_output( [_pkgconfig, '--libs', lib], universal_newlines=True, stderr=devnull )
-            close( devnull )
+            def runPkgConfig( outflag ):
+                args = [_pkgconfig, outflag, lib]
+                proc = subprocess.Popen( args, stdout=subprocess.PIPE, stderr=devnull, universal_newlines=True )
+                return proc.stdout.read()
+            ver = runPkgConfig( '--modversion' )
+            cflags = runPkgConfig( '--cflags-only-other' )
+            iflags = runPkgConfig( '--cflags-only-I' )
+            lflags = runPkgConfig( '--libs' )
+            devnull.close()
             e = _ExternalPackage( name=name, cflags=cflags.strip().split(), iflags=iflags.strip().split(), lflags=lflags.strip().split(), ver=ver.strip() )
             _externPackages[name] = e
             return e
