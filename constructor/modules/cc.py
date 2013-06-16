@@ -30,6 +30,7 @@ from constructor.driver import CurDir, Feature
 from constructor.module import ProcessFiles
 from constructor.rule import Rule
 from constructor.target import Target, GetTarget, AddTarget
+from constructor.version import Version
 
 variables = {}
 
@@ -149,6 +150,19 @@ def _SetCompiler( cc=None, cxx=None ):
             Info( "Compiler '%s' overridden with environment flag to '%s'" % (cc, os.environ.get( "CC" )) )
         else:
             CurDir().set_variable( "CXX", FindExecutable( cxx ) )
+
+def _GetCompilerVersion():
+    comp = CurDir().get_variable( "CC" )
+    if comp and len(comp) > 0:
+        if isinstance(comp, list):
+            comp = comp[0]
+        if comp.find( 'gcc' ):
+            regex='\(GCC\)\s+(\d+\.\d+\.\d+)'
+        if comp.find( 'clang' ):
+            regex='version\s+(\d+\.\d+)\s+'
+        return Version( binary=comp, regex=regex )
+    else:
+        Error( "Unable to find compiler" )
 
 def _SetDefaultLibraryStyle( style ):
     global _defBuildShared
@@ -359,6 +373,7 @@ functions_by_phase = {
     "config":
     {
         "SetCompiler": _SetCompiler,
+        "GetCompilerVersion": _GetCompilerVersion,
         "SetDefaultLibraryStyle": _SetDefaultLibraryStyle,
         "CFlags": _CFlags,
         "CXXFlags": _CXXFlags,
@@ -366,6 +381,7 @@ functions_by_phase = {
     },
     "build":
     {
+        "GetCompilerVersion": _GetCompilerVersion,
         "Library": _Library,
         "Executable": _Executable,
         "OptExecutable": _OptExecutable,
