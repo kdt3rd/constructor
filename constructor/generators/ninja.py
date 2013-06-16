@@ -29,9 +29,10 @@ import sys
 from ..output import Info, Debug, Error
 from ..generator import Generator
 from ..directory import Directory
-from ..utility import iterate, GetEnvironOverrides, FileOutput
+from ..utility import iterate, GetEnvironOverrides, FileOutput, FindExecutable
 from ..dependency import Dependency, FileDependency
 from ..target import Target
+from ..version import Version
 
 ###
 ### NB: We use the fileout class from utility to provide transparent
@@ -49,10 +50,13 @@ class NinjaWriter(FileOutput):
     def __init__( self, fn ):
         super(NinjaWriter, self).__init__( fn )
 
-    def emit_rules( self, rules ):
+    def emit_rules( self, rules, version=None ):
         if rules is None:
             return
 
+        newdeps = False
+        if version and version >= "1.3":
+            newdeps = True
         for rule in rules:
             self.write( 'rule %s\n' % rule.name )
             self.write( '  command = %s\n' % rule.command )
@@ -60,6 +64,10 @@ class NinjaWriter(FileOutput):
                 self.write( '  description = %s\n' % rule.description )
             if rule.dependency_file:
                 self.write( '  depfile = %s\n' % rule.dependency_file )
+                if newdeps:
+                    self.write( '  deps = gcc\n' )
+                    if sys.platform.startswith( "win" ):
+                        Error( "Need to add appropriate check whether to emit deps = msvc instead" )
             if rule.check_if_changed:
                 self.write( '  restat = 1\n' )
             self.write( '\n' )
@@ -162,17 +170,21 @@ def _create_file( curdir, flatten ):
     out = NinjaWriter( fn )
     return out, fn
 
-def _emit_dir( curdir, cf=None, flatten=False ):
+def _emit_dir( curdir, cf=None, flatten=False, version=None ):
+    if flatten:
+        Debug( "Generating a flattened build file" )
+    else:
+        Debug( "Generating a build tree" )
     if curdir.targets is None and len(curdir.subdirs) == 0:
         return None
     ( out, fn ) = _create_file( curdir, flatten )
     Debug( "Emitting rules for '%s'" % curdir.rel_src_path )
-    out.emit_rules( curdir.get_used_module_rules( False ) )
+    out.emit_rules( curdir.get_used_module_rules( False ), version )
     Debug( "Emitting variables for '%s'" % curdir.rel_src_path )
     out.emit_variables( curdir )
     Debug( "Emitting subdirs for '%s'" % curdir.rel_src_path )
     for sn, sd in iterate( curdir.subdirs ):
-        sfn = _emit_dir( sd )
+        sfn = _emit_dir( sd, version=version )
         if sfn:
             out.write( 'subninja %s\n' % _escape_path( sfn ) )
     Debug( "Emitting targets for '%s'" % curdir.rel_src_path )
@@ -187,6 +199,11 @@ def _emit_dir( curdir, cf=None, flatten=False ):
 class Ninja(Generator):
     def __init__( self, flatten ):
         super( Ninja, self ).__init__( "ninja", flatten )
+        try:
+            ninja = FindExecutable( "ninja" )
+        except:
+            FatalException( "ninja generator instantiated, but unable to find ninja executable" )
+        self.version = Version( ninja )
 
     def process_dir( self, curdir ):
         config_file_list = []
@@ -202,9 +219,5 @@ class Ninja(Generator):
         for cf in config_file_list:
             Info( "Build depends on: %s" % cf )
 
-        if self.flatten:
-            Debug( "Generating a flattened build file" )
-        else:
-            Debug( "Generating a build tree" )
-            _emit_dir( curdir, config_file_list )
+        _emit_dir( curdir, config_file_list, self.flatten, self.version )
 
