@@ -79,8 +79,16 @@ class Dependency(object):
 
     def __lt__( self, other ):
         return other.has_dependency( self )
-    def __gt__( self, other ):
-        return self.has_dependency( other )
+    def __eq__(self, other):
+        return not self<other and not other<self
+    def __ne__(self, other):
+        return self<other or other<self
+    def __gt__(self, other):
+        return other<self
+    def __ge__(self, other):
+        return not self<other
+    def __le__(self, other):
+        return not other<self
 
 class FileDependency(Dependency):
     """Simple sub-class to represent a direct file in a dependency tree"""
