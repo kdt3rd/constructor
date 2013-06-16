@@ -84,12 +84,29 @@ class Directory(Dependency):
                 rl.extend( subrl )
         return rl
 
+    def get_variable( self, varname, expand=True ):
+        if self.variables:
+            lu = self.variables.get( varname )
+            if expand:
+                recurval = '$' + varname
+                if lu and self.pardir and recurval in lu:
+                    parlu = self.pardir.get_variable( varname, expand )
+                    if parlu:
+                        for x in range( len(lu) ):
+                            if lu[x] == recurval:
+                                lu[x:x+1] = parlu
+        if lu:
+            return lu
+        if self.pardir:
+            return self.pardir.get_variable( varname, expand )
+        return None
+
     def set_variable( self, varname, f ):
         if self.variables is None:
             self.variables = { varname: f }
         else:
             self.variables[varname] = f
-                
+
     def add_to_variable( self, varname, f ):
         if not isinstance( f, list ):
             if isinstance( f, tuple ):
