@@ -21,8 +21,9 @@
 #
 
 from .output import Debug, Error
+from .cobject import CObject
 
-class Dependency(object):
+class Dependency(CObject):
     """Base class for all things that represent a dependency tree.
        There are 3 types of dependencies stored in here:
        - explicit dependencies, these will appear on command lines
@@ -33,7 +34,8 @@ class Dependency(object):
          prior to the specified entry
     """
 
-    def __init__( self ):
+    def __init__( self, objtype = None ):
+        super(Dependency, self).__init__( objtype )
         self.dependencies = None
         self.order_only_dependencies = None
         self.implicit_dependencies = None

@@ -27,8 +27,7 @@ from .output import Debug, Error
 
 class Target(Dependency):
     def __init__( self, targtype, shortname, outfile = None, rule = None, srcdir = None ):
-        super(Target, self).__init__()
-        self.type = targtype
+        super(Target, self).__init__( objtype=targtype )
         self.name = shortname
         self.variables = None
         self.rule = rule

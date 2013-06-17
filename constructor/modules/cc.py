@@ -31,6 +31,7 @@ from constructor.module import ProcessFiles
 from constructor.rule import Rule
 from constructor.target import Target, GetTarget, AddTarget
 from constructor.version import Version
+from constructor.cobject import ExtractObjects
 
 variables = {}
 
@@ -195,147 +196,151 @@ def _Include( *f ):
     CurDir().add_to_variable( "INCLUDE", f )
     pass
 
-class _TargetInfo(object):
-    def __init__( self ):
-        self.name = None
-        self.objs = []
-        self.libs = []
-        self.syslibs = []
-        self.other = []
-        self.uses_cxx = False
-
-    def check_for_cxx( self, a ):
-        if self.uses_cxx:
-            return
-
-        if isinstance( a, Target ):
-            if a.rule is rules['cpp']:
-                self.uses_cxx = True
-
+def _check_for_cxx( a ):
+    if isinstance( a, Target ):
+        if a.rule is rules['cpp']:
+            return True
         if a.dependencies:
             for d in a.dependencies:
-                self.check_for_cxx( d )
-                if self.uses_cxx:
-                    break
+                if _check_for_cxx( d ):
+                    return True
         if a.implicit_dependencies:
             for d in a.implicit_dependencies:
-                self.check_for_cxx( d )
-                if self.uses_cxx:
-                    break
-
-    def extract( self, *f ):
-        for a in f:
-            if isinstance( a, str ):
-                if self.name:
-                    Error( "Multiple names specified creating library not allowed" )
-                self.name = a
-            elif isinstance( a, Target ):
-                if a.type == "object":
-                    self.objs.append( a )
-                elif a.type == "lib":
-                    self.libs.append( a )
-                elif a.type == "syslib":
-                    self.syslibs.append( a )
-                else:
-                    self.other.append( a )
-                self.check_for_cxx( a )
-            elif isinstance( a, list ):
-                for x in a:
-                    self.extract( x )
-            elif isinstance( a, tuple ):
-                for x in a:
-                    self.extract( x )
-            elif isinstance( a, Dependency ):
-                self.check_for_cxx( a )
+                if _check_for_cxx( d ):
+                    return True
+    return False
 
 def _Library( *f ):
-    linfo = _TargetInfo()
-    linfo.extract( f )
+    linfo = ExtractObjects( f )
+    try:
+        name = linfo["str"]
+        if len(name) > 1:
+            Error( "Only one name allowed for Library" )
+        name = name[0]
+    except KeyError:
+        Error( "No name specified for Library" )
+
+    objs = linfo.get( "object" )
+    if objs is None:
+        Error( "No object files / compiled source specified to create library" )
+    uses_cxx = False
+    for o in objs:
+        if _check_for_cxx( o ):
+            uses_cxx = True
+            break
+
+    libs = linfo.get( "lib" )
+    syslibs = linfo.get( "syslib" )
+
     curd = CurDir()
     if Feature( "static" ):
-        libname = _libPrefix + linfo.name + _staticLibSuffix
+        libname = _libPrefix + name + _staticLibSuffix
         out = os.path.join( curd.bin_path, libname )
         l = AddTarget( curd, "lib", out, outpath=out, rule=rules["lib_static"] )
         targcflags = []
         targiflags = []
-        for dl in linfo.libs:
-            targiflags.append( '-I' )
-            targiflags.append( dl.src_dir.src_path )
-            targiflags.append( '-I' )
-            targiflags.append( dl.src_dir.bin_path )
-        for dl in linfo.syslibs:
-            if dl.cflags:
-                targcflags.extend( dl.cflags )
-            if dl.iflags:
-                targiflags.extend( dl.iflags )
-        for o in linfo.objs:
+        if libs:
+            for dl in libs:
+                targiflags.append( '-I' )
+                targiflags.append( dl.src_dir.src_path )
+                targiflags.append( '-I' )
+                targiflags.append( dl.src_dir.bin_path )
+                l.add_implicit_dependency( dl )
+                l.add_to_variable( 'LDFLAGS', [ '-L', dl.src_dir.bin_path, '-l'+dl.name ] )
+
+        if syslibs:
+            for dl in syslibs:
+                if dl.cflags:
+                    targcflags.extend( dl.cflags )
+                if dl.iflags:
+                    targiflags.extend( dl.iflags )
+
+        for o in objs:
             l.add_dependency( o )
             if len(targcflags) > 0:
-                if linfo.uses_cxx:
+                if uses_cxx:
                     o.add_to_variable( 'CXXFLAGS', targcflags )
                 else:
                     o.add_to_variable( 'CFLAGS', targcflags )
             if len(targiflags) > 0:
                 o.add_to_variable( 'INCLUDE', targiflags )
-        for dl in linfo.libs:
-            l.add_implicit_dependency( dl )
-            l.add_to_variable( 'LDFLAGS', [ '-L', dl.src_dir.bin_path, '-l'+dl.name ] )
-        for dl in linfo.syslibs:
-            if dl.lflags:
-                l.add_to_variable( 'LDFLAGS', dl.lflags )
-        shortl = AddTarget( curd, "lib", linfo.name )
+
+        shortl = AddTarget( curd, "lib", name )
         shortl.add_dependency( l )
         GetTarget( "all", "all" ).add_dependency( shortl )
     if Feature( "shared" ):
-        libname = _libPrefix + linfo.name + _sharedLibSuffix
+        libname = _libPrefix + name + _sharedLibSuffix
         Info( "Need to add .so versioning..." )
     pass
 
 def _Executable( *f ):
-    einfo = _TargetInfo()
-    einfo.extract( f )
+    einfo = ExtractObjects( f )
+    try:
+        name = einfo["str"]
+        if len(name) > 1:
+            Error( "Only one name allowed for Executable" )
+        name = name[0]
+    except KeyError:
+        Error( "No name specified for Executable" )
 
     curd = CurDir()
-    out = os.path.join( curd.bin_path, einfo.name ) + _exeExt
-    if einfo.uses_cxx:
+    out = os.path.join( curd.bin_path, name ) + _exeExt
+    objs = einfo.get( "object" )
+    if objs is None:
+        Error( "No object files / compiled source specified to create executable" )
+    uses_cxx = False
+    for o in objs:
+        if _check_for_cxx( o ):
+            uses_cxx = True
+            break
+
+    if uses_cxx:
         e = AddTarget( curd, "exe", out, outpath=out, rule=rules["cxx_exe"] )
     else:
         e = AddTarget( curd, "exe", out, outpath=out, rule=rules["c_exe"] )
+
     targcflags = []
     targiflags = []
-    for dl in einfo.libs:
-        targiflags.append( '-I' )
-        targiflags.append( dl.src_dir.src_path )
-        targiflags.append( '-I' )
-        targiflags.append( dl.src_dir.bin_path )
-    for dl in einfo.syslibs:
-        if dl.cflags:
-            targcflags.extend( dl.cflags )
-        if dl.iflags:
-            targiflags.extend( dl.iflags )
-    for o in einfo.objs:
+    libs = einfo.get( "lib" )
+    if libs:
+        for dl in libs:
+            targiflags.append( '-I' )
+            targiflags.append( dl.src_dir.src_path )
+            targiflags.append( '-I' )
+            targiflags.append( dl.src_dir.bin_path )
+            e.add_implicit_dependency( dl )
+            e.add_to_variable( 'LDFLAGS', [ '-L', dl.src_dir.bin_path, '-l'+dl.name ] )
+    else:
+        Debug( "Executable '%s' has no internal libs" % name )
+
+    syslibs = einfo.get( "syslib" )
+    if syslibs:
+        for dl in syslibs:
+            if dl.cflags:
+                targcflags.extend( dl.cflags )
+                if uses_cxx:
+                    e.add_to_variable( 'CXXFLAGS', dl.cflags )
+                else:
+                    e.add_to_variable( 'CFLAGS', dl.cflags )
+            if dl.iflags:
+                targiflags.extend( dl.iflags )
+                e.add_to_variable( 'INCLUDE', dl.iflags )
+            if dl.lflags:
+                e.add_to_variable( 'LDFLAGS', dl.lflags )
+    else:
+        Debug( "Executable '%s' has no syslibs" % name )
+
+    for o in objs:
         e.add_dependency( o )
         if len(targcflags) > 0:
-            if linfo.uses_cxx:
+            if uses_cxx:
                 o.add_to_variable( 'CXXFLAGS', targcflags )
             else:
                 o.add_to_variable( 'CFLAGS', targcflags )
         if len(targiflags) > 0:
             o.add_to_variable( 'INCLUDE', targiflags )
-    for dl in einfo.libs:
-        e.add_implicit_dependency( dl )
-        e.add_to_variable( 'LDFLAGS', [ '-L', dl.src_dir.bin_path, '-l'+dl.name ] )
-    for dl in einfo.syslibs:
-        if dl.cflags:
-            if einfo.uses_cxx:
-                e.add_to_variable( 'CXXFLAGS', dl.cflags )
-            else:
-                e.add_to_variable( 'CFLAGS', dl.cflags )
-        if dl.iflags:
-            e.add_to_variable( 'INCLUDE', dl.iflags )
-        if dl.lflags:
-            e.add_to_variable( 'LDFLAGS', dl.lflags )
-    shorte = AddTarget( curd, "exe", einfo.name )
+
+    shorte = AddTarget( curd, "exe", name )
     shorte.add_dependency( e )
 
     GetTarget( "all", "all" ).add_dependency( shorte )

@@ -1,3 +1,4 @@
+#
 # Copyright (c) 2013 Kimball Thurston
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -19,15 +20,36 @@
 # OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from constructor.output import SetDebug, SetVerbose, IsVerbose, PushDebugContext, PopDebugContext, Debug, Info, Warn, Error, FatalException
-from constructor.utility import *
-from constructor.dependency import *
-from constructor.phase import SetConstructorExtension, Phase, DirParsePhase
-from constructor.generator import Generator, AddGeneratorClass, LoadGenerator, GetGeneratorClass
-from constructor.rule import Rule
-from constructor.target import Target, GetTarget, AddTarget
-from constructor.module import EnableModule, ProcessFiles, Module
-from constructor.cobject import ExtractObjects
+from .output import Debug, Error
 
-from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, CurDir, Building
+class CObject(object):
+    def __init__( self, objtype ):
+        self.type = objtype
 
+def ExtractObjects( *arbitrary_list ):
+    """ Returns a dictionary of lists"""
+    retval = {}
+    def _get_or_add_key( a, name ):
+        if name is None:
+            _get_or_add_key( a, "unknown" )
+            return
+
+        xxx = retval.get( name )
+        if xxx is None:
+            retval[name] = [ a ]
+        else:
+            xxx.append( a )
+
+    def _recursor( *f ):
+        for a in f:
+            if isinstance( a, str ):
+                _get_or_add_key( a, "str" )
+            elif isinstance( a, CObject ):
+                Debug( "Adding object of type '%s' to extraction" % a.type )
+                _get_or_add_key( a, a.type )
+            elif isinstance( a, (list,tuple) ):
+                for x in a:
+                    _recursor( x )
+
+    _recursor( arbitrary_list )
+    return retval

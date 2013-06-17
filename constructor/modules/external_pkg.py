@@ -27,10 +27,12 @@ from constructor.utility import FindOptionalExecutable
 from constructor.output import Info, Debug, Error
 from constructor.target import Target
 from constructor.driver import CurDir
+from constructor.cobject import CObject
 
-class _ExternalPackage(Target):
+class _ExternalPackage(CObject):
     def __init__( self, name, cflags = None, iflags = None, lflags = None, ver = None ):
-        super(_ExternalPackage, self).__init__( 'syslib', name )
+        super(_ExternalPackage, self).__init__( 'syslib' )
+        self.name = name
         self.cflags = cflags
         self.iflags = iflags
         self.lflags = lflags
