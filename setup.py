@@ -23,12 +23,12 @@
 
 from distutils.core import setup
 
-setup( name='Constructor'
+setup( name='Constructor',
        version='1.0',
        description='Construction Utils for a simpler build configuration',
        author='Kimball Thurston',
        url='https://github.com/kdt3rd/constructor',
-       packages=['constructor'],
+       packages=['constructor', 'constructor.generators', 'constructor.modules'],
        scripts=['scripts/constructor']
        )
 
