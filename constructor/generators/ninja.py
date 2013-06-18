@@ -56,7 +56,8 @@ class NinjaWriter(FileOutput):
 
         newdeps = False
         if version and version >= "1.3":
-            newdeps = True
+            if version != "git":
+                newdeps = True
         for rule in rules:
             self.write( 'rule %s\n' % rule.name )
             self.write( '  command = %s\n' % rule.command )
