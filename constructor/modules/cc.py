@@ -371,8 +371,47 @@ def _OptExecutable( *f ):
 def _Compile( *f ):
     cinfo = ExtractObjects( f )
     plainsrcs = cinfo.get( "str" )
+    if plainsrcs:
+        objs = ProcessFiles( plainsrcs )
+    else:
+        objs = []
 
-    objs = ProcessFiles( cinfo["str"] )
+    gensrc = cinfo.get( "source" )
+    if gensrc:
+        objs.extend( ProcessFiles( gensrc ) )
+
+    targcflags = []
+    targiflags = []
+    libs = cinfo.get( "lib" )
+    if libs:
+        for dl in libs:
+            targiflags.append( "-I" )
+            targiflags.append( dl.src_dir.src_path )
+            targiflags.append( "-I" )
+            targiflags.append( dl.src_dir.bin_path )
+
+    syslibs = cinfo.get( "syslib" )
+    if syslibs:
+        for dl in syslibs:
+            if dl.cflags:
+                targcflags.extend( dl.cflags )
+            if dl.iflags:
+                targiflags.extend( dl.iflags )
+
+    for o in objs:
+        if len(targcflags) > 0:
+            if _check_for_cxx( o ):
+                e.add_to_variable( "CXXFLAGS", targcflags )
+            else:
+                e.add_to_variable( "CFLAGS", targcflags )
+        if len(targiflags) > 0:
+            e.add_to_variable( targiflags )
+
+    fixedobjs = cinfo.get( "object" )
+    if fixedobjs:
+        objs.extend( fixedobjs )
+    
+    return objs
 
 def _CPPTarget( f, base, ext ):
     Debug( "Processing C++ target '%s'" % f )
@@ -399,7 +438,7 @@ extension_handlers = {
     ".cc": _CPPTarget,
     ".C": _CPPTarget,
     ".c": _CTarget,
-    ".o": _NilTarget,
+    _objExt: _ObjTarget,
     ".h": _HeaderTarget,
 }
 
