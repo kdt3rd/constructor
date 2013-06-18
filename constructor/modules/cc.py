@@ -35,33 +35,34 @@ from constructor.cobject import ExtractObjects
 
 variables = {}
 
-_objExt = '.o'
-_exeExt = ''
-_libPrefix = 'lib'
-_staticLibSuffix = '.a'
-_sharedLibSuffix = '.so'
-
+_objExt = ".o"
+_exeExt = ""
+_libPrefix = "lib"
+_staticLibSuffix = ".a"
+_sharedLibSuffix = ".so"
+_sharedFlag = "-shared"
 if sys.platform.startswith( "linux" ):
     variables["AR"] = CheckEnvironOverride( "AR", FindOptionalExecutable( "ar" ) )
     variables["LD"] = CheckEnvironOverride( "LD", FindOptionalExecutable( "ld" ) )
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "gcc" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "g++" ) )
-    _depFlags = [ '-MMD', '-MF', '$out.d' ]
+    _depFlags = [ "-MMD", "-MF", "$out.d" ]
 elif sys.platform.startswith( "darwin" ):
     variables["AR"] = CheckEnvironOverride( "AR", FindOptionalExecutable( "ar" ) )
     variables["LD"] = CheckEnvironOverride( "LD", FindOptionalExecutable( "ld" ) )
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "clang" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "clang++" ) )
-    _depFlags = [ '-MMD', '-MF', '$out.d' ]
-    _sharedLibSuffix = '.dylib'
+    _depFlags = [ "-MMD", "-MF", "$out.d" ]
+    _sharedLibSuffix = ".dylib"
+    _sharedFlag = "-dynamiclib"
 elif sys.platform.startswith( "win" ):
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "cl" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "cl" ) )
-    _objExt = '.obj'
-    _exeExt = '.exe'
-    _libPrefix = ''
-    _staticLibSuffix = '.lib'
-    _sharedLibSuffix = '.dll'
+    _objExt = ".obj"
+    _exeExt = ".exe"
+    _libPrefix = ""
+    _staticLibSuffix = ".lib"
+    _sharedLibSuffix = ".dll"
     _depFlags = []
 else:
     Warn( "Un-handled platform '%s', defaulting compiler to gcc" % sys.platform )
@@ -69,7 +70,7 @@ else:
     variables["LD"] = CheckEnvironOverride( "LD", FindOptionalExecutable( "ld" ) )
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "gcc" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "g++" ) )
-    _depFlags = [ '-MMD', '-MF', '$out.d' ]
+    _depFlags = [ "-MMD", "-MF", "$out.d" ]
 
 variables["CFLAGS"] = CheckEnvironOverride( "CFLAGS", [] )
 variables["CXXFLAGS"] = CheckEnvironOverride( "CXXFLAGS", [] )
@@ -77,7 +78,7 @@ variables["WARNINGS"] = CheckEnvironOverride( "WARNINGS", [] )
 variables["CWARNINGS"] = CheckEnvironOverride( "CWARNINGS", [] )
 variables["CXXWARNINGS"] = CheckEnvironOverride( "CXXWARNINGS", [] )
 variables["INCLUDE"] = CheckEnvironOverride( "INCLUDE", [] )
-variables["ARFLAGS"] = CheckEnvironOverride( "ARFLAGS", ['cur'] )
+variables["ARFLAGS"] = CheckEnvironOverride( "ARFLAGS", ["cur"] )
 variables["LDFLAGS"] = CheckEnvironOverride( "LDFLAGS", [] )
 variables["RPATH"] = CheckEnvironOverride( "RPATH", [] )
 
@@ -85,7 +86,7 @@ def _prependToListSkipVars( pre, out, val ):
     if isinstance( val, list ):
         for v in val:
             _prependToListSkipVars( pre, out, v )
-    elif val.startswith( '$' ):
+    elif val.startswith( "$" ):
         out.append( val )
     else:
         out.append( pre + val )
@@ -98,40 +99,40 @@ def _TransformVariable( name, val ):
 
     if name == "WARNINGS" or name == "CWARNINGS" or name == "CXXWARNINGS":
         nv = []
-        _prependToListSkipVars( '-W', nv, val )
+        _prependToListSkipVars( "-W", nv, val )
         Debug( "Tranform '%s': %s  -> %s" % (name, val, nv) )
         return nv
     return val
 
 variable_transformer = _TransformVariable
 
-_cppCmd = ['$CXX', '$CXXFLAGS', '$WARNINGS', '$CXXWARNINGS', '$INCLUDE']
-_ccCmd = ['$CC', '$CFLAGS', '$WARNINGS', '$CWARNINGS', '$INCLUDE']
+_cppCmd = ["$CXX", "$CXXFLAGS", "$WARNINGS", "$CXXWARNINGS", "$INCLUDE"]
+_ccCmd = ["$CC", "$CFLAGS", "$WARNINGS", "$CWARNINGS", "$INCLUDE"]
 if len(_depFlags) > 0:
     _cppCmd.extend( _depFlags )
     _ccCmd.extend( _depFlags )
-_cppCmd.extend( ['-c', '$in', '-o', '$out'] )
-_ccCmd.extend( ['-c', '$in', '-o', '$out'] )
+_cppCmd.extend( ["-c", "$in", "-o", "$out"] )
+_ccCmd.extend( ["-c", "$in", "-o", "$out"] )
 
 modules = [ "external_pkg" ]
 rules = {
-    'cpp': Rule( tag='cpp', cmd=_cppCmd, desc='C++ ($in)', depfile='$out.d' ),
-    'cc': Rule( tag='cc', cmd=_ccCmd, desc='C ($in)', depfile='$out.d' ),
-    'c_exe': Rule( tag='c_exe',
-                 cmd=['$CC', '$CFLAGS', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
-                 desc='EXE ($out)' ),
-    'cxx_exe': Rule( tag='cxx_exe',
-                 cmd=['$CXX', '$CXXFLAGS', '$RPATH', '$LDFLAGS', '-o', '$out', '$in', '$libs'],
-                 desc='EXE C++ ($out)' ),
-    'lib_static': Rule( tag='lib_static',
-                        cmd=['rm', '-f', '$out', ';', '$AR', '$ARFLAGS', '$out', '$in'],
-                        desc='Static ($out)' ),
-    'lib_shared': Rule( tag='lib_shared',
-                        cmd=['$CC', '$CFLAGS', '$WARNINGS', '$INCLUDE', '-c', '$in', '-o', '$out'],
-                        desc='Shared ($out)' ),
-    'cxx_lib_shared': Rule( tag='lib_shared',
-                        cmd=['$CC', '$CFLAGS', '$WARNINGS', '$INCLUDE', '-c', '$in', '-o', '$out'],
-                        desc='Shared ($out)' )
+    "cpp": Rule( tag="cpp", cmd=_cppCmd, desc="C++ ($in)", depfile="$out.d" ),
+    "cc": Rule( tag="cc", cmd=_ccCmd, desc="C ($in)", depfile="$out.d" ),
+    "c_exe": Rule( tag="c_exe",
+                 cmd=["$CC", "$CFLAGS", "$RPATH", "$LDFLAGS", "-o", "$out", "$in", "$libs"],
+                 desc="EXE ($out)" ),
+    "cxx_exe": Rule( tag="cxx_exe",
+                 cmd=["$CXX", "$CXXFLAGS", "$RPATH", "$LDFLAGS", "-o", "$out", "$in", "$libs"],
+                 desc="EXE C++ ($out)" ),
+    "lib_static": Rule( tag="lib_static",
+                        cmd=["rm", "-f", "$out", ";", "$AR", "$ARFLAGS", "$out", "$in"],
+                        desc="Static ($out)" ),
+    "lib_shared": Rule( tag="lib_shared",
+                        cmd=["$CC", "$CFLAGS", "$WARNINGS", "$INCLUDE", _sharedFlag, "-o", "$out", "$in", "$libs"],
+                        desc="Shared ($out)" ),
+    "cxx_lib_shared": Rule( tag="lib_shared",
+                        cmd=["$CXX", "$CFLAGS", "$WARNINGS", "$INCLUDE", _sharedFlag, "-o", "$out", "$in", "$libs"],
+                        desc="Shared ($out)" )
     }
 
 _defBuildShared = True
@@ -157,10 +158,10 @@ def _GetCompilerVersion():
     if comp and len(comp) > 0:
         if isinstance(comp, list):
             comp = comp[0]
-        if comp.find( 'gcc' ):
-            regex='\(GCC\)\s+(\d+\.\d+\.\d+)'
-        if comp.find( 'clang' ):
-            regex='version\s+(\d+\.\d+)\s+'
+        if comp.find( "gcc" ):
+            regex="\(GCC\)\s+(\d+\.\d+\.\d+)"
+        if comp.find( "clang" ):
+            regex="version\s+(\d+\.\d+)\s+"
         return Version( binary=comp, regex=regex )
     else:
         Error( "Unable to find compiler" )
@@ -198,7 +199,7 @@ def _Include( *f ):
 
 def _check_for_cxx( a ):
     if isinstance( a, Target ):
-        if a.rule is rules['cpp']:
+        if a.rule is rules["cpp"]:
             return True
         if a.dependencies:
             for d in a.dependencies:
@@ -241,12 +242,12 @@ def _Library( *f ):
         targiflags = []
         if libs:
             for dl in libs:
-                targiflags.append( '-I' )
+                targiflags.append( "-I" )
                 targiflags.append( dl.src_dir.src_path )
-                targiflags.append( '-I' )
+                targiflags.append( "-I" )
                 targiflags.append( dl.src_dir.bin_path )
                 l.add_implicit_dependency( dl )
-                l.add_to_variable( 'LDFLAGS', [ '-L', dl.src_dir.bin_path, '-l'+dl.name ] )
+                l.add_chained_usage( dl )
 
         if syslibs:
             for dl in syslibs:
@@ -254,23 +255,41 @@ def _Library( *f ):
                     targcflags.extend( dl.cflags )
                 if dl.iflags:
                     targiflags.extend( dl.iflags )
+                l.add_chained_usage( dl )
 
         for o in objs:
             l.add_dependency( o )
             if len(targcflags) > 0:
                 if uses_cxx:
-                    o.add_to_variable( 'CXXFLAGS', targcflags )
+                    o.add_to_variable( "CXXFLAGS", targcflags )
                 else:
-                    o.add_to_variable( 'CFLAGS', targcflags )
+                    o.add_to_variable( "CFLAGS", targcflags )
             if len(targiflags) > 0:
-                o.add_to_variable( 'INCLUDE', targiflags )
+                o.add_to_variable( "INCLUDE", targiflags )
 
-        shortl = AddTarget( curd, "lib", name )
+        shortl = AddTarget( curd, "lib", libname )
         shortl.add_dependency( l )
         GetTarget( "all", "all" ).add_dependency( shortl )
     if Feature( "shared" ):
         libname = _libPrefix + name + _sharedLibSuffix
-        Info( "Need to add .so versioning..." )
+        Info( "Need to add .so versioning ala -Wl,-soname=libfoo.so.1 ..." )
+        out = os.path.join( curd.bin_path, libname )
+        uses_cxx = False
+        for o in objs:
+            if _check_for_cxx( o ):
+                uses_cxx = True
+                break
+        if uses_cxx:
+            rule = rules["cxx_lib_shared"]
+        else:
+            rule = rules["lib_shared"]
+
+        l = AddTarget( curd, "lib", out, outpath=out, rule=rule )
+        for o in objs:
+            l.add_dependency( o )
+
+        shortl = AddTarget( curd, "lib", libname )
+        shortl.add_dependency( l )
     pass
 
 def _Executable( *f ):
@@ -304,12 +323,12 @@ def _Executable( *f ):
     libs = einfo.get( "lib" )
     if libs:
         for dl in libs:
-            targiflags.append( '-I' )
+            targiflags.append( "-I" )
             targiflags.append( dl.src_dir.src_path )
-            targiflags.append( '-I' )
+            targiflags.append( "-I" )
             targiflags.append( dl.src_dir.bin_path )
             e.add_implicit_dependency( dl )
-            e.add_to_variable( 'LDFLAGS', [ '-L', dl.src_dir.bin_path, '-l'+dl.name ] )
+            e.add_to_variable( "libs", [ "-L", dl.src_dir.bin_path, "-l"+dl.name ] )
     else:
         Debug( "Executable '%s' has no internal libs" % name )
 
@@ -319,14 +338,14 @@ def _Executable( *f ):
             if dl.cflags:
                 targcflags.extend( dl.cflags )
                 if uses_cxx:
-                    e.add_to_variable( 'CXXFLAGS', dl.cflags )
+                    e.add_to_variable( "CXXFLAGS", dl.cflags )
                 else:
-                    e.add_to_variable( 'CFLAGS', dl.cflags )
+                    e.add_to_variable( "CFLAGS", dl.cflags )
             if dl.iflags:
                 targiflags.extend( dl.iflags )
-                e.add_to_variable( 'INCLUDE', dl.iflags )
+                e.add_to_variable( "INCLUDE", dl.iflags )
             if dl.lflags:
-                e.add_to_variable( 'LDFLAGS', dl.lflags )
+                e.add_to_variable( "libs", dl.lflags )
     else:
         Debug( "Executable '%s' has no syslibs" % name )
 
@@ -334,11 +353,11 @@ def _Executable( *f ):
         e.add_dependency( o )
         if len(targcflags) > 0:
             if uses_cxx:
-                o.add_to_variable( 'CXXFLAGS', targcflags )
+                o.add_to_variable( "CXXFLAGS", targcflags )
             else:
-                o.add_to_variable( 'CFLAGS', targcflags )
+                o.add_to_variable( "CFLAGS", targcflags )
         if len(targiflags) > 0:
-            o.add_to_variable( 'INCLUDE', targiflags )
+            o.add_to_variable( "INCLUDE", targiflags )
 
     shorte = AddTarget( curd, "exe", name )
     shorte.add_dependency( e )
@@ -350,28 +369,38 @@ def _OptExecutable( *f ):
     pass
 
 def _Compile( *f ):
-    return ProcessFiles( f )
+    cinfo = ExtractObjects( f )
+    plainsrcs = cinfo.get( "str" )
+
+    objs = ProcessFiles( cinfo["str"] )
 
 def _CPPTarget( f, base, ext ):
     Debug( "Processing C++ target '%s'" % f )
     curd = CurDir()
     out = os.path.join( curd.bin_path, base ) + _objExt
-    return AddTarget( curd, "object", out, outpath=out, rule=rules['cpp'] )
+    return AddTarget( curd, "object", out, outpath=out, rule=rules["cpp"] )
 
 def _CTarget( f, base, ext ):
     Debug( "Processing C target '%s'" % f )
     curd = CurDir()
     out = os.path.join( curd.bin_path, base ) + _objExt
-    return AddTarget( curd, "object", out, outpath=out, rule=rules['cc'] )
+    return AddTarget( curd, "object", out, outpath=out, rule=rules["cc"] )
 
-def _NilTarget( f, base, ext ):
-    Debug( "Processing nil target '%s'" % f )
-    return FileDependency( infile=f, orderonly=False )
+def _ObjTarget( f, base, ext ):
+    Debug( "Processing no-op pass through target '%s'" % f )
+    return FileDependency( infile=f, objtype="object" )
+
+def _HeaderTarget( f, base, ext ):
+    Debug( "Processing no-op pass through target '%s'" % f )
+    return FileDependency( infile=f, objtype="header" )
 
 extension_handlers = {
     ".cpp": _CPPTarget,
+    ".cc": _CPPTarget,
+    ".C": _CPPTarget,
     ".c": _CTarget,
     ".o": _NilTarget,
+    ".h": _HeaderTarget,
 }
 
 functions_by_phase = {

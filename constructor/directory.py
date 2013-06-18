@@ -92,7 +92,7 @@ class Directory(Dependency):
                 if lu and self.pardir and recurval in lu:
                     parlu = self.pardir.get_variable( varname, expand )
                     if parlu:
-                        for x in range( len(lu) ):
+                        for x in range( 0, len(lu) ):
                             if lu[x] == recurval:
                                 lu[x:x+1] = parlu
         if lu:

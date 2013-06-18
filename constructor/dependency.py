@@ -94,7 +94,7 @@ class Dependency(CObject):
 
 class FileDependency(Dependency):
     """Simple sub-class to represent a direct file in a dependency tree"""
-    def __init__( self, infile ):
+    def __init__( self, infile, objtype = None ):
         super(FileDependency, self).__init__()
         self.filename = infile
 

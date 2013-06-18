@@ -59,7 +59,7 @@ class Version(object):
             xxx = str(other)
             ver = xxx.split( self.separator )
         ml = len(self.split_ver)
-        for x in range( len(ver) ):
+        for x in range( 0, len(ver) ):
             if ml <= x:
                 return True
             if self.split_ver[x] < ver[x]:

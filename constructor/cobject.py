@@ -23,8 +23,38 @@
 from .output import Debug, Error
 
 class CObject(object):
+    """ Base class for things passed through the various functions.
+    This is mostly just a typing thing to be able to extract items and
+    organize them by type, but also provides a central class to add
+    and pass usage metadata along with."""
+
     def __init__( self, objtype ):
         self.type = objtype
+        self.chained_usage = None
+
+    def add_chained_usage( x ):
+        if self.chained_usage is None:
+            self.chained_usage = []
+        if isinstance( x, (list, tuple) ):
+            for i in x:
+                self.add_chained_usage( i )
+        else:
+            if not isinstance( a, CObject ):
+                Error( "Attempt to chain usage of a non-CObject item" )
+            self.chained_usage.append( x )
+
+    def extract_chained_usage( retval ):
+        if self.chained_usage:
+            for i in self.chained_usage:
+                xxx = retval.get( i.type )
+                if xxx is None:
+                    retval[i.type] = [ i ]
+                else:
+                    for a in range( 0, len(xxx) ):
+                        if xxx[a] is i:
+                            del xxx[a]
+                    xxx.append( i )
+                i.extract_chained_usage( retval )
 
 def ExtractObjects( *arbitrary_list ):
     """ Returns a dictionary of lists"""
