@@ -31,14 +31,14 @@ class Version(object):
             self.version = version
         else:
             proc = subprocess.Popen( [binary, verarg], stdout=subprocess.PIPE, universal_newlines=True )
-            ver = proc.stdout.read()
+            ver = proc.stdout.read().strip()
             if regex:
                 m = re.search( regex, ver )
                 if not m:
                     Error( "Version output did not match requested regex '%s':\n%s" % ( regex, ver ) )
                 ver = m.group( 1 )
             self.version = ver
-        self.split_ver = ver.split( separator )
+        self.split_ver = self.version.split( separator )
         self.separator = separator
 
     def __repr__( self ):
@@ -68,12 +68,22 @@ class Version(object):
                 return False
         return False
     def __eq__(self, other):
+        if not isinstance( other, Version ):
+            other = Version( version=other, separator=self.separator )
         return not self<other and not other<self
     def __ne__(self, other):
+        if not isinstance( other, Version ):
+            other = Version( version=other, separator=self.separator )
         return self<other or other<self
     def __gt__(self, other):
+        if not isinstance( other, Version ):
+            other = Version( version=other, separator=self.separator )
         return other<self
     def __ge__(self, other):
+        if not isinstance( other, Version ):
+            other = Version( version=other, separator=self.separator )
         return not self<other
     def __le__(self, other):
+        if not isinstance( other, Version ):
+            other = Version( version=other, separator=self.separator )
         return not other<self
