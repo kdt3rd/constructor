@@ -130,7 +130,7 @@ rules = {
     "lib_shared": Rule( tag="lib_shared",
                         cmd=["$CC", "$CFLAGS", "$WARNINGS", "$INCLUDE", _sharedFlag, "-o", "$out", "$in", "$libs"],
                         desc="Shared ($out)" ),
-    "cxx_lib_shared": Rule( tag="lib_shared",
+    "cxx_lib_shared": Rule( tag="cxx_lib_shared",
                         cmd=["$CXX", "$CFLAGS", "$WARNINGS", "$INCLUDE", _sharedFlag, "-o", "$out", "$in", "$libs"],
                         desc="Shared ($out)" )
     }
@@ -211,6 +211,16 @@ def _check_for_cxx( a ):
                     return True
     return False
 
+def _extract_lib_name( f ):
+    (head, tail) = os.path.split( f )
+    if tail.startswith( _libPrefix ):
+        tail = tail[len(_libPrefix):]
+    if tail.endswith( _staticLibSuffix ):
+        tail = tail[:-len(_staticLibSuffix)]
+    if tail.endswith( _sharedLibSuffix ):
+        tail = tail[:-len(_sharedLibSuffix)]
+    return tail
+
 def _Library( *f ):
     linfo = ExtractObjects( f )
     try:
@@ -224,16 +234,21 @@ def _Library( *f ):
     objs = linfo.get( "object" )
     if objs is None:
         Error( "No object files / compiled source specified to create library" )
+
+    for o in objs:
+        o.extract_chained_usage( linfo )
+
+    libs = linfo.get( "lib" )
+    syslibs = linfo.get( "syslib" )
     uses_cxx = False
     for o in objs:
         if _check_for_cxx( o ):
             uses_cxx = True
+            Info( "Library has C++ targets" )
             break
 
-    libs = linfo.get( "lib" )
-    syslibs = linfo.get( "syslib" )
-
     curd = CurDir()
+
     if Feature( "static" ):
         libname = _libPrefix + name + _staticLibSuffix
         out = os.path.join( curd.bin_path, libname )
@@ -244,18 +259,10 @@ def _Library( *f ):
                 l.add_chained_usage( dl )
 
         if syslibs:
-            for dl in syslibs:
-                l.add_chained_usage( dl )
+            l.add_chained_usage( syslibs )
 
         for o in objs:
             l.add_dependency( o )
-            if len(targcflags) > 0:
-                if uses_cxx:
-                    o.add_to_variable( "CXXFLAGS", targcflags )
-                else:
-                    o.add_to_variable( "CFLAGS", targcflags )
-            if len(targiflags) > 0:
-                o.add_to_variable( "INCLUDE", targiflags )
 
         shortl = AddTarget( curd, "lib", libname )
         shortl.add_dependency( l )
@@ -264,33 +271,31 @@ def _Library( *f ):
         libname = _libPrefix + name + _sharedLibSuffix
         Info( "Need to add .so versioning ala -Wl,-soname=libfoo.so.1 ..." )
         out = os.path.join( curd.bin_path, libname )
-        uses_cxx = False
-        for o in objs:
-            if _check_for_cxx( o ):
-                uses_cxx = True
-                break
         if uses_cxx:
-            rule = rules["cxx_lib_shared"]
+            l = AddTarget( curd, "lib", out, outpath=out, rule=rules["cxx_lib_shared"] )
         else:
-            rule = rules["lib_shared"]
+            l = AddTarget( curd, "lib", out, outpath=out, rule=rules["lib_shared"] )
 
-        l = AddTarget( curd, "lib", out, outpath=out, rule=rule )
         for o in objs:
             l.add_dependency( o )
 
         if libs:
             for dl in libs:
                 l.add_implicit_dependency( dl )
-                l.add_to_variable( "libs", ("-L", dl.src_dir.bin_path, "-l" + dl.name) )
+                l.add_to_variable( "libs", ("-L", dl.src_dir.bin_path, "-l" + _extract_lib_name( dl.name ) ) )
+                l.add_chained_usage( dl )
 
         if syslibs:
             for dl in syslibs:
                 if dl.lflags:
                     l.add_to_variable( "libs", dl.lflags )
+                l.add_chained_usage( dl )
 
         shortl = AddTarget( curd, "lib", libname )
         shortl.add_dependency( l )
-    pass
+        GetTarget( "all", "all" ).add_dependency( shortl )
+
+    return l
 
 def _Executable( *f ):
     einfo = ExtractObjects( f )
@@ -309,6 +314,7 @@ def _Executable( *f ):
         Error( "No object files / compiled source specified to create executable" )
     uses_cxx = False
     for o in objs:
+        o.extract_chained_usage( einfo )
         if _check_for_cxx( o ):
             uses_cxx = True
             break
@@ -318,17 +324,11 @@ def _Executable( *f ):
     else:
         e = AddTarget( curd, "exe", out, outpath=out, rule=rules["c_exe"] )
 
-    targcflags = []
-    targiflags = []
     libs = einfo.get( "lib" )
     if libs:
         for dl in libs:
-            targiflags.append( "-I" )
-            targiflags.append( dl.src_dir.src_path )
-            targiflags.append( "-I" )
-            targiflags.append( dl.src_dir.bin_path )
             e.add_implicit_dependency( dl )
-            e.add_to_variable( "libs", [ "-L", dl.src_dir.bin_path, "-l"+dl.name ] )
+            e.add_to_variable( "libs", [ "-L", dl.src_dir.bin_path, "-l" + _extract_lib_name( dl.name ) ] )
     else:
         Debug( "Executable '%s' has no internal libs" % name )
 
@@ -336,7 +336,6 @@ def _Executable( *f ):
     if syslibs:
         for dl in syslibs:
             if dl.cflags:
-                targcflags.extend( dl.cflags )
                 if uses_cxx:
                     e.add_to_variable( "CXXFLAGS", dl.cflags )
                 else:
@@ -351,13 +350,6 @@ def _Executable( *f ):
 
     for o in objs:
         e.add_dependency( o )
-        if len(targcflags) > 0:
-            if uses_cxx:
-                o.add_to_variable( "CXXFLAGS", targcflags )
-            else:
-                o.add_to_variable( "CFLAGS", targcflags )
-        if len(targiflags) > 0:
-            o.add_to_variable( "INCLUDE", targiflags )
 
     shorte = AddTarget( curd, "exe", name )
     shorte.add_dependency( e )
@@ -401,11 +393,15 @@ def _Compile( *f ):
     for o in objs:
         if len(targcflags) > 0:
             if _check_for_cxx( o ):
-                e.add_to_variable( "CXXFLAGS", targcflags )
+                o.add_to_variable( "CXXFLAGS", targcflags )
             else:
-                e.add_to_variable( "CFLAGS", targcflags )
+                o.add_to_variable( "CFLAGS", targcflags )
         if len(targiflags) > 0:
-            e.add_to_variable( targiflags )
+            o.add_to_variable( "INCLUDE", targiflags )
+        if libs:
+            o.add_chained_usage( libs )
+        if syslibs:
+            o.add_chained_usage( syslibs )
 
     fixedobjs = cinfo.get( "object" )
     if fixedobjs:
