@@ -119,7 +119,11 @@ def ProcessFiles( *args ):
         elif isinstance( f, str ):
             res = _handleFile( f )
             curd = CurDir()
-            d = FileDependency( infile=os.path.join( curd.src_path, f ) )
+            if os.path.isabs( f ):
+                fullpath = f
+            else:
+                fullpath = os.path.join( curd.src_path, f )
+            d = FileDependency( infile=fullpath )
             if isinstance( res, list ):
                 for r in res:
                     r.add_dependency( d )

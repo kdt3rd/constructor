@@ -238,23 +238,13 @@ def _Library( *f ):
         libname = _libPrefix + name + _staticLibSuffix
         out = os.path.join( curd.bin_path, libname )
         l = AddTarget( curd, "lib", out, outpath=out, rule=rules["lib_static"] )
-        targcflags = []
-        targiflags = []
         if libs:
             for dl in libs:
-                targiflags.append( "-I" )
-                targiflags.append( dl.src_dir.src_path )
-                targiflags.append( "-I" )
-                targiflags.append( dl.src_dir.bin_path )
                 l.add_implicit_dependency( dl )
                 l.add_chained_usage( dl )
 
         if syslibs:
             for dl in syslibs:
-                if dl.cflags:
-                    targcflags.extend( dl.cflags )
-                if dl.iflags:
-                    targiflags.extend( dl.iflags )
                 l.add_chained_usage( dl )
 
         for o in objs:
@@ -287,6 +277,16 @@ def _Library( *f ):
         l = AddTarget( curd, "lib", out, outpath=out, rule=rule )
         for o in objs:
             l.add_dependency( o )
+
+        if libs:
+            for dl in libs:
+                l.add_implicit_dependency( dl )
+                l.add_to_variable( "libs", ("-L", dl.src_dir.bin_path, "-l" + dl.name) )
+
+        if syslibs:
+            for dl in syslibs:
+                if dl.lflags:
+                    l.add_to_variable( "libs", dl.lflags )
 
         shortl = AddTarget( curd, "lib", libname )
         shortl.add_dependency( l )
@@ -416,12 +416,25 @@ def _Compile( *f ):
 def _CPPTarget( f, base, ext ):
     Debug( "Processing C++ target '%s'" % f )
     curd = CurDir()
-    out = os.path.join( curd.bin_path, base ) + _objExt
+    if os.path.isabs( f ):
+        if f.startswith( curd.bin_path ):
+            out = base + _objExt
+        else:
+            Error( "Unable to handle absolute paths '%s' in CPP Target" % f )
+    else:
+        out = os.path.join( curd.bin_path, base ) + _objExt
     return AddTarget( curd, "object", out, outpath=out, rule=rules["cpp"] )
 
 def _CTarget( f, base, ext ):
     Debug( "Processing C target '%s'" % f )
     curd = CurDir()
+    if os.path.isabs( f ):
+        if f.startswith( curd.bin_path ):
+            out = base + _objExt
+        else:
+            Error( "Unable to handle absolute paths '%s' in C Target" % f )
+    else:
+        out = os.path.join( curd.bin_path, base ) + _objExt
     out = os.path.join( curd.bin_path, base ) + _objExt
     return AddTarget( curd, "object", out, outpath=out, rule=rules["cc"] )
 
