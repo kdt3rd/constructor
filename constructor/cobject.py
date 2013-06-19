@@ -32,18 +32,18 @@ class CObject(object):
         self.type = objtype
         self.chained_usage = None
 
-    def add_chained_usage( x ):
+    def add_chained_usage( self, x ):
         if self.chained_usage is None:
             self.chained_usage = []
         if isinstance( x, (list, tuple) ):
             for i in x:
                 self.add_chained_usage( i )
         else:
-            if not isinstance( a, CObject ):
+            if not isinstance( x, CObject ):
                 Error( "Attempt to chain usage of a non-CObject item" )
             self.chained_usage.append( x )
 
-    def extract_chained_usage( retval ):
+    def extract_chained_usage( self, retval ):
         if self.chained_usage:
             for i in self.chained_usage:
                 xxx = retval.get( i.type )
