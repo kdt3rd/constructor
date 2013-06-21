@@ -26,7 +26,7 @@ from .output import Debug, Error
 
 
 class Target(Dependency):
-    def __init__( self, targtype, shortname, outfile = None, rule = None, srcdir = None ):
+    def __init__( self, targtype, shortname, outputs = None, rule = None, srcdir = None ):
         super(Target, self).__init__( objtype=targtype )
         self.name = shortname
         self.variables = None
@@ -34,7 +34,7 @@ class Target(Dependency):
         self.src_dir = srcdir
         if rule:
             rule.add_use()
-        self.filename = outfile
+        self.outputs = outputs
 
     def set_variable( self, name, val ):
         if self.variables is None:
@@ -86,11 +86,11 @@ def GetTarget( targtype, name, curdir = None ):
         curdir.add_target( pt )
     return pt
 
-def AddTarget( curdir, targtype, name, target = None, outpath = None, rule = None ):
+def AddTarget( curdir, targtype, name, target = None, outputs = None, rule = None ):
     if target is None:
         target = GetTarget( targtype, name, curdir )
 
-    target.filename = outpath
+    target.outputs = outputs
     target.rule = rule
     if rule:
         rule.add_use()

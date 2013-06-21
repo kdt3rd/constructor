@@ -252,7 +252,7 @@ def _Library( *f ):
     if Feature( "static" ):
         libname = _libPrefix + name + _staticLibSuffix
         out = os.path.join( curd.bin_path, libname )
-        l = AddTarget( curd, "lib", out, outpath=out, rule=rules["lib_static"] )
+        l = AddTarget( curd, "lib", out, outputs=out, rule=rules["lib_static"] )
         if libs:
             for dl in libs:
                 l.add_implicit_dependency( dl )
@@ -272,9 +272,9 @@ def _Library( *f ):
         Info( "Need to add .so versioning ala -Wl,-soname=libfoo.so.1 ..." )
         out = os.path.join( curd.bin_path, libname )
         if uses_cxx:
-            l = AddTarget( curd, "lib", out, outpath=out, rule=rules["cxx_lib_shared"] )
+            l = AddTarget( curd, "lib", out, outputs=out, rule=rules["cxx_lib_shared"] )
         else:
-            l = AddTarget( curd, "lib", out, outpath=out, rule=rules["lib_shared"] )
+            l = AddTarget( curd, "lib", out, outputs=out, rule=rules["lib_shared"] )
 
         for o in objs:
             l.add_dependency( o )
@@ -320,9 +320,9 @@ def _Executable( *f ):
             break
 
     if uses_cxx:
-        e = AddTarget( curd, "exe", out, outpath=out, rule=rules["cxx_exe"] )
+        e = AddTarget( curd, "exe", out, outputs=out, rule=rules["cxx_exe"] )
     else:
-        e = AddTarget( curd, "exe", out, outpath=out, rule=rules["c_exe"] )
+        e = AddTarget( curd, "exe", out, outputs=out, rule=rules["c_exe"] )
 
     libs = einfo.get( "lib" )
     if libs:
@@ -419,7 +419,7 @@ def _CPPTarget( f, base, ext ):
             Error( "Unable to handle absolute paths '%s' in CPP Target" % f )
     else:
         out = os.path.join( curd.bin_path, base ) + _objExt
-    return AddTarget( curd, "object", out, outpath=out, rule=rules["cpp"] )
+    return AddTarget( curd, "object", out, outputs=out, rule=rules["cpp"] )
 
 def _CTarget( f, base, ext ):
     Debug( "Processing C target '%s'" % f )
@@ -432,7 +432,7 @@ def _CTarget( f, base, ext ):
     else:
         out = os.path.join( curd.bin_path, base ) + _objExt
     out = os.path.join( curd.bin_path, base ) + _objExt
-    return AddTarget( curd, "object", out, outpath=out, rule=rules["cc"] )
+    return AddTarget( curd, "object", out, outputs=out, rule=rules["cc"] )
 
 def _ObjTarget( f, base, ext ):
     Debug( "Processing no-op pass through target '%s'" % f )

@@ -108,14 +108,25 @@ def ProcessFiles( *args ):
     ret = []
     for f in args:
         if isinstance( f, Target ):
-            res = _handleFile( f.filename )
-            if isinstance( res, list ):
-                for r in res:
-                    r.add_dependency( f )
-                ret.extend( res )
+            if isinstance( f.outputs, list ):
+                for filename in f.outputs:
+                    res = _handleFile( filename )
+                    if isinstance( res, list ):
+                        for r in res:
+                            r.add_dependency( f )
+                        ret.extend( res )
+                    else:
+                        res.add_dependency( f )
+                        ret.append( res )
             else:
-                res.add_dependency( f )
-                ret.append( res )
+                res = _handleFile( f.outputs )
+                if isinstance( res, list ):
+                    for r in res:
+                        r.add_dependency( f )
+                    ret.extend( res )
+                else:
+                    res.add_dependency( f )
+                    ret.append( res )
         elif isinstance( f, str ):
             res = _handleFile( f )
             curd = CurDir()

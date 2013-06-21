@@ -106,11 +106,17 @@ class NinjaWriter(FileOutput):
     def emit_target( self, t, curdir ):
         outDeps = True
 
-        if t.filename:
+        if t.outputs:
             if t.rule is None:
                 Error( "Target '%s' (type '%s') specifies an output file, but has no rule" % (t.name, t.type) )
 
-            self.write( 'build %s: %s' % ( t.filename, t.rule.name ) )
+            if isinstance( t.outputs, list ):
+                self.write( 'build' )
+                for filename in t.outputs:
+                    self.write( ' ' + filename )
+                self.write( ': ' + t.rule.name )
+            else:
+                self.write( 'build %s: %s' % ( t.outputs, t.rule.name ) )
         elif t.dependencies and len(t.dependencies) > 0:
             self.write( 'build %s: phony ' % t.name )
         else:
@@ -191,6 +197,7 @@ def _emit_dir( curdir, cf=None, flatten=False, version=None ):
     Debug( "Emitting targets for '%s'" % curdir.rel_src_path )
     out.emit_targets( curdir )
     if cf:
+        out.write( '\ndefault all\n' )
         # top level, add the rule to rebuild the ninja files
         if sys.platform == 'win32':
             raise NotImplementedError
