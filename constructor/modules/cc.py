@@ -341,7 +341,6 @@ def _Executable( *f ):
                 else:
                     e.add_to_variable( "CFLAGS", dl.cflags )
             if dl.iflags:
-                targiflags.extend( dl.iflags )
                 e.add_to_variable( "INCLUDE", dl.iflags )
             if dl.lflags:
                 e.add_to_variable( "libs", dl.lflags )
