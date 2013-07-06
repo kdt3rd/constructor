@@ -50,9 +50,7 @@ class CObject(object):
                 if xxx is None:
                     retval[i.type] = [ i ]
                 else:
-                    for a in range( 0, len(xxx) ):
-                        if xxx[a] is i:
-                            del xxx[a]
+                    xxx[:] = [v for v in xxx if v is not i]
                     xxx.append( i )
                 i.extract_chained_usage( retval )
 
