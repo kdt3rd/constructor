@@ -56,8 +56,8 @@ def _FindExternalLibrary( name, version=None ):
                      os.path.join( os.path.sep, 'Library', 'Frameworks', name + '.framework' )
                    ]
         for frm in possible:
-            Info( "Checking '%s' for an apple framework" % frm )
             if os.path.exists( frm ):
+                Debug( "Found Apple Framework '%s' in %s" % ( name, frm ) )
                 e = _ExternalPackage( name=name,
                                       iflags=[ '-I', os.path.join( frm, 'Headers' ) ],
                                       lflags=[ '-framework', name ] )
