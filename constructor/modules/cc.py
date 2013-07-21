@@ -211,6 +211,15 @@ def _Include( *f ):
     curd.add_to_variable( "INCLUDE", p )
     pass
 
+def _UseCXX11():
+    if CurDir().get_variable( "CC" ).find( "clang" ):
+        if sys.platform.startswith( "darwin" ):
+            _CXXFlags( "--std=c++11", "--stdlib=libc++" )
+        else:
+            _CXXFlags( "--std=c++11" )
+    else:
+        _CXXFlags( "--std=c++0x" )
+
 def _check_for_cxx( a ):
     if isinstance( a, Target ):
         if a.rule is rules["cpp"]:
@@ -473,6 +482,7 @@ functions_by_phase = {
         "CFlags": _CFlags,
         "CXXFlags": _CXXFlags,
         "Warnings": _Warnings,
+        "UseCXX11": _UseCXX11,
     },
     "build":
     {
@@ -485,5 +495,6 @@ functions_by_phase = {
         "CXXFlags": _CXXFlags,
         "Warnings": _Warnings,
         "Include": _Include,
+        "UseCXX11": _UseCXX11,
     }
 }
