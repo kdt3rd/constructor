@@ -225,7 +225,7 @@ class Ninja(Generator):
                     config_file_list.append( d.filename )
         _traverse_config_files( curdir.implicit_dependencies )
         for cf in config_file_list:
-            Info( "Build depends on: %s" % cf )
+            Debug( "Build depends on: %s" % cf )
 
         _emit_dir( curdir, config_file_list, self.flatten, self.version )
 
