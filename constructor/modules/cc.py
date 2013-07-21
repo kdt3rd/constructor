@@ -131,7 +131,7 @@ rules = {
                         cmd=["$CC", "$CFLAGS", "$WARNINGS", "$INCLUDE", _sharedFlag, "-o", "$out", "$in", "$libs"],
                         desc="Shared ($out)" ),
     "cxx_lib_shared": Rule( tag="cxx_lib_shared",
-                        cmd=["$CXX", "$CFLAGS", "$WARNINGS", "$INCLUDE", _sharedFlag, "-o", "$out", "$in", "$libs"],
+                        cmd=["$CXX", "$CXXFLAGS", "$WARNINGS", "$INCLUDE", _sharedFlag, "-o", "$out", "$in", "$libs"],
                         desc="Shared ($out)" )
     }
 
