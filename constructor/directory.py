@@ -23,7 +23,7 @@
 import os
 import errno
 from .dependency import Dependency
-from .output import Info, Debug
+from .output import Info, Debug, Error
 from .utility import iterate
 
 _curdir = None
@@ -34,6 +34,18 @@ def CurDir():
 def SetCurDir( d ):
     global _curdir
     _curdir = d
+
+def CurBinaryPath():
+    global _curdir
+    if _curdir:
+        return _curdir.bin_path
+    Error( "Binary Path not yet configured" )
+
+def CurFullSourcePath():
+    return CurDir().src_path
+
+def CurRelativeSourcePath():
+    return CurDir().rel_src_path
 
 class Directory(Dependency):
     def __init__( self, path, relpath, binpath, pardir = None, globs = None ):

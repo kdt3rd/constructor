@@ -28,6 +28,7 @@ from constructor.rule import Rule
 from constructor.target import Target, GetTarget, AddTarget
 from constructor.module import EnableModule, ProcessFiles, Module
 from constructor.cobject import ExtractObjects
+from constructor.directory import CurBinaryPath, CurFullSourcePath, CurRelativeSourcePath, CurDir
 
-from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, CurDir, Building
+from constructor.driver import Driver, DefineFeature, Feature, BuildConfig, AddPhase, SubDir, Building
 
