@@ -88,8 +88,10 @@ def _prependToListSkipVars( pre, out, val ):
             _prependToListSkipVars( pre, out, v )
     elif val.startswith( "$" ):
         out.append( val )
-    else:
+    elif not val.startswith( pre ):
         out.append( pre + val )
+    else:
+        out.append( val )
 
 def _TransformVariable( name, val ):
     if not isinstance( val, list ):
@@ -100,6 +102,11 @@ def _TransformVariable( name, val ):
     if name == "WARNINGS" or name == "CWARNINGS" or name == "CXXWARNINGS":
         nv = []
         _prependToListSkipVars( "-W", nv, val )
+        Debug( "Tranform '%s': %s  -> %s" % (name, val, nv) )
+        return nv
+    if name == "INCLUDE":
+        nv = []
+        _prependToListSkipVars( "-I", nv, val )
         Debug( "Tranform '%s': %s  -> %s" % (name, val, nv) )
         return nv
     return val
@@ -194,7 +201,14 @@ def _Warnings( *f ):
     pass
 
 def _Include( *f ):
-    CurDir().add_to_variable( "INCLUDE", f )
+    curd = CurDir()
+    p = []
+    for i in f:
+        if os.path.isabs( i ):
+            p.append( i )
+        else:
+            p.append( os.path.join( curd.src_path, i ) )
+    curd.add_to_variable( "INCLUDE", p )
     pass
 
 def _check_for_cxx( a ):
@@ -470,5 +484,6 @@ functions_by_phase = {
         "CFlags": _CFlags,
         "CXXFlags": _CXXFlags,
         "Warnings": _Warnings,
+        "Include": _Include,
     }
 }
