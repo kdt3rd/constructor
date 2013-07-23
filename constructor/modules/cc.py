@@ -26,7 +26,7 @@ import subprocess
 from constructor.utility import FindOptionalExecutable, CheckEnvironOverride
 from constructor.output import Info, Debug, Error, Warn
 from constructor.dependency import Dependency, FileDependency
-from constructor.driver import CurDir, Feature
+from constructor.driver import CurDir, Feature, RootTarget
 from constructor.module import ProcessFiles
 from constructor.rule import Rule
 from constructor.target import Target, GetTarget, AddTarget
@@ -289,7 +289,9 @@ def _Library( *f ):
 
         shortl = AddTarget( curd, "lib", libname )
         shortl.add_dependency( l )
-        GetTarget( "all", "all" ).add_dependency( shortl )
+        RootTarget( "all", "all" ).add_dependency( shortl )
+        shortl = AddTarget( curd, "lib", name )
+        shortl.add_dependency( l )
     if Feature( "shared" ):
         libname = _libPrefix + name + _sharedLibSuffix
         Info( "Need to add .so versioning ala -Wl,-soname=libfoo.so.1 ..." )
@@ -316,11 +318,13 @@ def _Library( *f ):
 
         shortl = AddTarget( curd, "lib", libname )
         shortl.add_dependency( l )
-        GetTarget( "all", "all" ).add_dependency( shortl )
+        RootTarget( "all", "all" ).add_dependency( shortl )
+        shortl = AddTarget( curd, "lib", name )
+        shortl.add_dependency( l )
 
     return l
 
-def _Executable( *f ):
+def _OptExecutable( *f ):
     einfo = ExtractObjects( f )
     try:
         name = einfo["str"]
@@ -375,12 +379,12 @@ def _Executable( *f ):
 
     shorte = AddTarget( curd, "exe", name )
     shorte.add_dependency( e )
+    return shorte
 
-    GetTarget( "all", "all" ).add_dependency( shorte )
-    pass
-
-def _OptExecutable( *f ):
-    pass
+def _Executable( *f ):
+    shorte = _OptExecutable( f )
+    RootTarget( "all", "all" ).add_dependency( shorte )
+    return shorte
 
 def _Compile( *f ):
     cinfo = ExtractObjects( f )
