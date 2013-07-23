@@ -117,8 +117,7 @@ class Driver(object):
             Debug( "Creating generator pass for generator '%s'" % self.generator )
             self.phases.append( GetGeneratorClass( self.generator )( self.flatten ) )
 
-        allt = GetTarget( "all", "all" )
-        self.root_dir.add_target( allt )
+        RootTarget( "all", "all" )
 
         for p in self.phases[1:]:
             self.cur_phase = p
@@ -254,6 +253,11 @@ def SubDir( name ):
 def Building( b ):
     Driver._singleton.parse_options()
     return Driver._singleton.build == b
+
+def RootTarget( targtype, name ):
+    t = GetTarget( targtype, name )
+    Driver._singleton.root_dir.add_target( t )
+    return t
 
 if __name__ == "__main__":
     Driver().process()
