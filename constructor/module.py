@@ -66,6 +66,9 @@ class Module(object):
         if self.provided_functions is not None:
             pfuncs = self.provided_functions.get( phase )
             if pfuncs is not None:
+                for fn, fp in iterate( pfuncs ):
+                    fglobs = getattr( fp, "func_globals" )
+                    fglobs.update( globs )
                 globs.update( pfuncs )
 
     def dispatch_handler( self, f, base, ext ):
@@ -156,6 +159,7 @@ def EnableModule( name, packageprefix=None ):
     global _modules
     global _loading_modules
     newmod = _modules.get( name )
+    curdir = CurDir()
     if newmod is None:
         if name in _loading_modules:
             Error( "Dependency cycle in modules found, please re-factor modules. module chain: %s" % _loading_modules )
@@ -176,8 +180,10 @@ def EnableModule( name, packageprefix=None ):
                 if mods is not None:
                     for m in mods:
                         if isinstance( m, str ):
+                            Debug( "Enabling module '%s' for %s" % (m, name) )
                             EnableModule( m )
                         elif isinstance( m, list ):
+                            Debug( "Enabling module '%s.%s'" % (m[1], m[0]) )
                             EnableModule( m[0], m[1] )
                         else:
                             Error( "Invalid dependent module specification: %s, need string or 2-element array" % m )
@@ -186,7 +192,6 @@ def EnableModule( name, packageprefix=None ):
             _modules[name] = newmod
         finally:
             _loading_modules.pop()
-    curdir = CurDir()
     curdir.enable_module( newmod )
 
 
