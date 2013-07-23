@@ -47,11 +47,7 @@ class Dependency(CObject):
         if deps is None:
             setattr( self, name, [ dep ] )
         else:
-            found = False
-            for d in deps:
-                if d is dep:
-                    found = True
-                    break
+            deps[:] = [d for d in deps if d is not dep]
             deps.append( dep )
 
     def _check_dep( self, other, dep ):
