@@ -183,8 +183,11 @@ class Directory(Dependency):
 
         for t in targs:
             if isinstance( t, list ):
-                self.targets.extend( t )
+                for x in t:
+                    self.targets[:] = [y for y in self.targets if y is not x]
+                    self.targets.append( x )
             else:
+                self.targets[:] = [x for x in self.targets if x is not t]
                 self.targets.append( t )
 
     def add_sub_dir( self, name ):
