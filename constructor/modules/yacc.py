@@ -40,11 +40,11 @@ rules = {}
 
 if _bison:
     _bisonCmd = [ _bison, "-y", "-d", "--file-prefix", "$file_prefix", "--name-prefix", "$sym_prefix", "$in" ]
-    rules["bison"]  Rule( tag="bison", cmd=_bisonCmd, desc = "BISON ($in)" )
+    rules["bison"] = Rule( tag="bison", cmd=_bisonCmd, desc = "BISON ($in)" )
 if _byacc:
     # bison generates re-entrant code, ask byacc to as well
     _byaccCmd = [ _byacc, "-P", "-b", "$file_prefix", "-p", "$sym_prefix", "-d", "$in" ]
-    rules["byacc"]  Rule( tag="byacc", cmd=_byaccCmd, desc = "BYACC ($in)" )
+    rules["byacc"] = Rule( tag="byacc", cmd=_byaccCmd, desc = "BYACC ($in)" )
 
 if len(rules) == 0:
     Error( "No suitable (modern) bison or byacc could be located" )
