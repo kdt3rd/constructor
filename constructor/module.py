@@ -67,8 +67,9 @@ class Module(object):
             pfuncs = self.provided_functions.get( phase )
             if pfuncs is not None:
                 for fn, fp in iterate( pfuncs ):
-                    fglobs = getattr( fp, "func_globals" )
-                    fglobs.update( globs )
+                    if hasattr( fp, "func_globals" ):
+                        fglobs = getattr( fp, "func_globals" )
+                        fglobs.update( globs )
                 globs.update( pfuncs )
 
     def dispatch_handler( self, f, base, ext ):

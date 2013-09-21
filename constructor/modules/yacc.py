@@ -80,7 +80,7 @@ def _YACCXX( name, filename ):
 functions_by_phase = {
     "build":
     {
-        "YACC": _YACC
+        "YACC": _YACC,
         "YACCXX": _YACCXX
     }
 }

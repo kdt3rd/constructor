@@ -79,15 +79,23 @@ def _FindExternalLibrary( name, version=None ):
             def runPkgConfig( outflag ):
                 args = [_pkgconfig, outflag, lib]
                 proc = subprocess.Popen( args, stdout=subprocess.PIPE, stderr=devnull, universal_newlines=True )
-                return proc.stdout.read()
+                retval = proc.stdout.read()
+                proc.wait()
+                if proc.returncode == 0:
+                    return retval
+                raise KeyError( "Error running pkg-config, package '%s' not in pkg-config or doesn't exist?" % (lib) )
             ver = runPkgConfig( '--modversion' )
             cflags = runPkgConfig( '--cflags-only-other' )
             iflags = runPkgConfig( '--cflags-only-I' )
             lflags = runPkgConfig( '--libs' )
+            Debug( "Found pkg-config version '%s'" % ver )
             devnull.close()
             e = _ExternalPackage( name=name, cflags=cflags.strip().split(), iflags=iflags.strip().split(), lflags=lflags.strip().split(), ver=ver.strip() )
             _externPackages[name] = e
             return e
+        except KeyError as e:
+            Debug( "pkg-config returned an error: %s" % str(e) )
+            pass
         except Exception as e:
             Info( "pkg-config returned an error: %s" % str(e) )
             pass

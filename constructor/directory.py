@@ -97,6 +97,7 @@ class Directory(Dependency):
         return rl
 
     def get_variable( self, varname, expand=True ):
+        lu = None
         if self.variables:
             lu = self.variables.get( varname )
             if expand:
@@ -129,15 +130,26 @@ class Directory(Dependency):
             else:
                 f = [ f ]
 
-        if self.variables is None:
-            self.variables = { varname: f }
-        else:
-            v = self.variables.get( varname )
-            if v is None:
-                self.variables[varname] = f
+        if self.pardir:
+            if self.variables is None:
+                self.variables = { varname: "$" + varname }
             else:
+                v = self.variables.get( varname )
+                if v is None:
+                    v = [ "$" + varname ]
+                    self.variables[varname] = v
                 for x in f:
                     v.append( x )
+        else:
+            if self.variables is None:
+                self.variables = { varname: f }
+            else:
+                v = self.variables.get( varname )
+                if v is None:
+                    self.variables[varname] = f
+                else:
+                    for x in f:
+                        v.append( x )
 
     def transform_variable( self, name, val ):
         if self.modules is not None:

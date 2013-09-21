@@ -41,12 +41,14 @@ _libPrefix = "lib"
 _staticLibSuffix = ".a"
 _sharedLibSuffix = ".so"
 _sharedFlag = "-shared"
+_sharedCCFlags = None
 if sys.platform.startswith( "linux" ):
     variables["AR"] = CheckEnvironOverride( "AR", FindOptionalExecutable( "ar" ) )
     variables["LD"] = CheckEnvironOverride( "LD", FindOptionalExecutable( "ld" ) )
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "gcc" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "g++" ) )
     _depFlags = [ "-MMD", "-MF", "$out.d" ]
+    _sharedCCFlags = "-fPIC"
 elif sys.platform.startswith( "darwin" ):
     variables["AR"] = CheckEnvironOverride( "AR", FindOptionalExecutable( "ar" ) )
     variables["LD"] = CheckEnvironOverride( "LD", FindOptionalExecutable( "ld" ) )
@@ -55,6 +57,7 @@ elif sys.platform.startswith( "darwin" ):
     _depFlags = [ "-MMD", "-MF", "$out.d" ]
     _sharedLibSuffix = ".dylib"
     _sharedFlag = "-dynamiclib"
+    _sharedCCFlags = "-fPIC"
 elif sys.platform.startswith( "win" ):
     variables["CC"] = CheckEnvironOverride( "CC", FindOptionalExecutable( "cl" ) )
     variables["CXX"] = CheckEnvironOverride( "CXX", FindOptionalExecutable( "cl" ) )
@@ -218,7 +221,11 @@ def _UseCXX11():
         else:
             _CXXFlags( "--std=c++11" )
     else:
-        _CXXFlags( "--std=c++0x" )
+        ver = _GetCompilerVersion()
+        if ver >= "4.8.0":
+            _CXXFlags( "--std=c++11" )
+        else:
+            _CXXFlags( "--std=c++0x" )
 
 def _check_for_cxx( a ):
     if isinstance( a, Target ):
@@ -304,6 +311,9 @@ def _Library( *f ):
         for o in objs:
             l.add_dependency( o )
 
+        if _sharedCCFlags:
+            _CFlags( _sharedCCFlags )
+            _CXXFlags( _sharedCCFlags )
         if libs:
             for dl in libs:
                 l.add_implicit_dependency( dl )
