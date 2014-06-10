@@ -366,6 +366,9 @@ def _OptExecutable( *f ):
         for dl in libs:
             e.add_implicit_dependency( dl )
             e.add_to_variable( "libs", [ "-L", dl.src_dir.bin_path, "-l" + _extract_lib_name( dl.name ) ] )
+            e.add_chained_usage( dl )
+            if dl.src_dir is not None and dl.src_dir is not curd:
+                e.add_to_variable( "INCLUDE", dl.src_dir.src_path );
     else:
         Debug( "Executable '%s' has no internal libs" % name )
 
