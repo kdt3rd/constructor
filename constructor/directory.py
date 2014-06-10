@@ -220,7 +220,7 @@ class Directory(Dependency):
             if self.bin_path:
                 dobj.set_bin_dir( self.get_root_bin_dir() )
 
-            self.add_dependency( dobj )
+            self.add_implicit_dependency( dobj )
             self.subdirs[name] = dobj
 
         return dobj
