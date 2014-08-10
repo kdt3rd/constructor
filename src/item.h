@@ -1,5 +1,3 @@
-// item.h -*- C++ -*-
-
 //
 // Copyright (c) 2014 Kimball Thurston
 //
@@ -57,13 +55,31 @@ public:
 	void add_dependency( DependencyType dt, const std::string &otherObj );
 	inline void add_dependency( DependencyType dt, const item &otherObj );
 
+	/// (recursively) check if this item has a dependency on
+	/// the other passed in
+	bool has_dependency( const item &other ) const;
+
+	/// for a chain dependency,
+	/// Recursively traverses the chain dependencies and
+	/// constructs a list of them. if an item has 2 chain dependencies
+	/// and both depend on a 3rd item, that 3rd item will appear
+	/// later than any of the items that depend on it
+	///
+	/// for all other dependency types,
+	/// returns the list of items that this item has that dependency type on
+	std::vector<const item *> extract_dependencies( DependencyType dt ) const;
+
+	std::vector<const item *> extract_explicit_dependencies( void ) const;
 	inline bool has_unresolved_dependencies( void ) const;
-	void update_dependency( const std::string &name, ID id );
+	void update_dependency( const std::string &name, ID otherID );
 
 	/// Will throw if unable to resolve all dependencies from all live items -
 	/// should only be called once prior to generating the build files
 	static void check_dependencies( void );
+
 private:
+	void recurse_chain( std::vector<const item *> &chain ) const;
+	void add_chain_dependent( std::vector<const item *> &chain, ID otherID ) const;
 	ID myID;
 	std::string myName;
 

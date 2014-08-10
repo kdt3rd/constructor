@@ -23,6 +23,7 @@
 //
 
 #include "item.h"
+#include <algorithm>
 
 
 ////////////////////////////////////////
@@ -115,6 +116,10 @@ item::~item( void )
 void
 item::add_dependency( DependencyType dt, ID otherObj )
 {
+	item *i = retrieveItem( otherObj );
+	if ( i && i->has_dependency( *this ) )
+		throw std::runtime_error( "Attempt to create a circular dependency between '" + name() + "' and '" + i->name() + "'" );
+
 	auto cur = myDependencies.find( otherObj );
 	if ( cur == myDependencies.end() )
 	{
@@ -155,14 +160,97 @@ item::add_dependency( DependencyType dt, const std::string &otherObj )
 ////////////////////////////////////////
 
 
+bool
+item::has_dependency( const item &other ) const
+{
+	if ( myDependencies.find( other.id() ) != myDependencies.end() )
+		return true;
+
+	for ( auto &unres: myUnresolvedDependencies )
+	{
+		if ( unres.second == other.name() )
+			return true;
+	}
+
+	for ( auto &dep: myDependencies )
+	{
+		item *i = retrieveItem( dep.first );
+		if ( i )
+		{
+			if ( i->has_dependency( other ) )
+				return true;
+		}
+	}
+
+	return false;
+}
+
+
+////////////////////////////////////////
+
+
+std::vector<const item *>
+item::extract_dependencies( DependencyType dt ) const
+{
+	std::vector<const item *> retval;
+
+	if ( dt == DependencyType::CHAIN )
+	{
+		recurse_chain( retval );
+
+		if ( ! retval.empty() )
+		{
+			// go through in reverse order and remove any duplicates
+			// that follow
+			std::reverse( std::begin( retval ), std::end( retval ) );
+
+			size_t i = 0;
+			while ( i != retval.size() )
+			{
+				for ( size_t j = i + 1; j < retval.size(); ++j )
+				{
+					if ( retval[i] == retval[j] )
+					{
+						retval.erase( retval.begin() + j );
+						j = i;
+					}
+				}
+				++i;
+			}
+			std::reverse( std::begin( retval ), std::end( retval ) );
+		}
+	}
+	else
+	{
+		for ( auto &dep: myDependencies )
+		{
+			if ( dep.second != dt )
+				continue;
+
+			const item *newItem = retrieveItem( dep.first );
+			if ( ! newItem )
+				throw std::logic_error( "Unknown item ID traversing dependents" );
+
+			retval.push_back( newItem );
+		}
+	}
+	
+
+	return retval;
+}
+
+
+////////////////////////////////////////
+
+
 void
-item::update_dependency( const std::string &name, ID id )
+item::update_dependency( const std::string &name, ID otherID )
 {
 	for ( auto x = myUnresolvedDependencies.begin(); x != myUnresolvedDependencies.end(); ++x )
 	{
 		if ( (*x).second == name )
 		{
-			add_dependency( (*x).first, id );
+			add_dependency( (*x).first, otherID );
 			myUnresolvedDependencies.erase( x );
 			return;
 		}
@@ -183,3 +271,39 @@ item::check_dependencies( void )
 			throw std::runtime_error( "Object '" + x->second->name() + "' has unresolved dependencies" );
 	}
 }
+
+
+////////////////////////////////////////
+
+
+void
+item::recurse_chain( std::vector<const item *> &chain ) const
+{
+	for ( auto &dep: myDependencies )
+	{
+		if ( dep.second != DependencyType::CHAIN )
+			continue;
+
+		add_chain_dependent( chain, dep.first );
+	}
+}
+
+
+////////////////////////////////////////
+
+
+void
+item::add_chain_dependent( std::vector<const item *> &chain, ID otherID ) const
+{
+	const item *newItem = retrieveItem( otherID );
+	if ( ! newItem )
+		throw std::logic_error( "Unknown item ID traversing chain dependents" );
+
+	chain.push_back( newItem );
+	newItem->recurse_chain( chain );
+}
+
+
+////////////////////////////////////////
+
+

@@ -2,24 +2,25 @@
 .DEFAULT: all
 .ONESHELL:
 
-.phony: clean all
+.phony: clean all constructor
 
 OUTPUT:= Build
 
-SRC:= $(OUTPUT)/item.o $(OUTPUT)/main.o
+SRC:= item.cpp main.cpp variable.cpp
 
-CXXFLAGS := --std=c++11 -Wall
+SRC:=$(addprefix $(OUTPUT)/,$(SRC))
+
+CXXFLAGS := --std=c++11 -Wall -Os
 
 all: constructor
 
-$(OUTPUT)/item.o: src/item.cpp | $(OUTPUT)
-	g++ $(CXXFLAGS) -c -MMD -MF $(OUTPUT)/item.dep -o $@ $<
+constructor: $(OUTPUT)/constructor
 
-$(OUTPUT)/main.o: src/main.cpp | $(OUTPUT)
-	g++ $(CXXFLAGS) -c -MMD -MF $(OUTPUT)/main.dep -o $@ $<
+$(OUTPUT)/%.o: src/%.cpp | $(OUTPUT)
+	@g++ $(CXXFLAGS) -c -MMD -MF $(OUTPUT)/$*.dep -o $@ $<
 
-constructor: $(SRC) | $(OUTPUT)
-	g++ $(CXXFLAGS) -o $(OUTPUT)/constructor $^
+$(OUTPUT)/constructor: $(SRC:.cpp=.o)
+	@g++ $(CXXFLAGS) -o $(OUTPUT)/constructor $^
 
 $(OUTPUT):
 	mkdir $(OUTPUT)
@@ -27,5 +28,4 @@ $(OUTPUT):
 clean:
 	rm -rf $(OUTPUT)
 
--include $(OUTPUT)/item.dep
--include $(OUTPUT)/main.dep
+-include $(SRC:.o=.dep)
