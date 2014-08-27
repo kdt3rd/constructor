@@ -31,6 +31,7 @@
 #include <functional>
 #include <utility>
 #include <vector>
+#include <memory>
 #include "LuaFunction.h"
 
 

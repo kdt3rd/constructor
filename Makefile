@@ -8,9 +8,9 @@ OUTPUT:= Build
 
 #SRC:= item.cpp main.cpp variable.cpp
 SRC:= main.cpp \
-	item.cpp \
+	Item.cpp \
 	Scope.cpp \
-	variable.cpp \
+	Variable.cpp \
 	LuaEngine.cpp \
 	StrUtil.cpp \
 	OSUtil.cpp \
