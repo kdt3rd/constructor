@@ -22,7 +22,7 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#include "item.h"
+#include "Item.h"
 #include "LuaEngine.h"
 #include <stdexcept>
 #include <iostream>

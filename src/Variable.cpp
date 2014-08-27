@@ -20,7 +20,7 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#include "variable.h"
+#include "Variable.h"
 #include <stdexcept>
 #include <algorithm>
 #include <cstdlib>

@@ -22,7 +22,7 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#include "item.h"
+#include "Item.h"
 #include <algorithm>
 #include "Scope.h"
 
