@@ -25,6 +25,9 @@
 #include <cstdint>
 #include <vector>
 #include <map>
+#include <string>
+#include <memory>
+
 
 enum class DependencyType : uint8_t
 {
@@ -34,7 +37,8 @@ enum class DependencyType : uint8_t
 	ORDER
 };
 	
-		
+class scope;		
+
 /// @brief base class for everything else in the system
 ///
 /// In a build system, there are either targets
@@ -44,8 +48,8 @@ public:
 	typedef uint64_t ID;
 	static const ID UNKNOWN = static_cast<uint64_t>(-1);
 
-	item( const std::string &name );
-	item( std::string &&name );
+	item( const std::shared_ptr<scope> &s, const std::string &name );
+	item( const std::shared_ptr<scope> &s, std::string &&name );
 	virtual ~item( void );
 
 	inline ID id( void ) const;

@@ -22,45 +22,30 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
+#include <vector>
 
+#include "item.h"
 #include "variable.h"
 
 
 ////////////////////////////////////////
 
 
-///
-/// @brief Class scope provides an abstraction around a collection of items.
-///
-/// This is probably most commonly a directory (or sub-directory). It
-/// can have it's own unique config / toolsets / whatever as well as
-/// "global" variables.  Variables can be inherited from a parent
-/// scope or not.
-///
-class scope 
+class tool : public item
 {
 public:
-	scope( std::shared_ptr<scope> parent );
-	~scope( void );
+	tool( std::string name );
+	virtual ~tool( void );
 
-	inline std::shared_ptr<scope> parent_scope( void ) const;
-	std::shared_ptr<scope> new_sub_scope( void );
+	const std::string &executable( void ) const;
 
-	inline void inherit( bool yesno );
-	inline bool inherit( void ) const;
+	bool enable_implicit_dependencies( void ) const;
+	std::string implicit_dependency_filename( const std::string &srcFile ) const;
+	std::vector<std::string> implicit_dependency_options( const std::string &srcfile ) const;
+	
+	const std::vector<std::string> &file_extensions( void ) const;
+	const std::vector<variable> &variables( void ) const;
 
-	variable_set &vars( void );
-	const variable_set &vars( void ) const;
-
-private:
-	std::weak_ptr<scope> myParent;
-	variable_set myVariables;
-	bool myInheritParentScope = false;
+	const rule &rule( void ) const;
 };
-
-
-////////////////////////////////////////
-
-

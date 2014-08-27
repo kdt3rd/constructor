@@ -77,7 +77,7 @@ def _FindExternalLibrary( name, version=None ):
                 raise NotImplementedError
             devnull = open('/dev/null', 'w')
             def runPkgConfig( outflag ):
-                args = [_pkgconfig, outflag, lib]
+                args = [_pkgconfig, '--static', outflag, lib]
                 proc = subprocess.Popen( args, stdout=subprocess.PIPE, stderr=devnull, universal_newlines=True )
                 retval = proc.stdout.read()
                 proc.wait()

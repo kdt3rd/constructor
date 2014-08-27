@@ -23,6 +23,12 @@
 //
 
 #include "item.h"
+#include "LuaEngine.h"
+#include <stdexcept>
+#include <iostream>
+#include "OSUtil.h"
+#include "FileUtil.h"
+#include "PackageConfig.h"
 
 
 ////////////////////////////////////////
@@ -31,6 +37,32 @@
 int
 main( int argc, char *argv[] )
 {
+	try
+	{
+		OS::registerFunctions();
+		File::registerFunctions();
+		PackageConfig::registerFunctions();
+
+		std::string subdir;
+		if ( argc > 1 )
+			subdir = argv[1];
+
+		File::startParsing( subdir );
+
+//		item::check_dependencies();
+		
+	}
+	catch ( std::exception &e )
+	{
+		std::cerr << "ERROR: " << e.what() << std::endl;
+		return -1;
+	}
+	catch ( ... )
+	{
+		std::cerr << "Unhandled exception" << std::endl;
+		return -1;
+	}
+
 	return 0;
 }
 

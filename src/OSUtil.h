@@ -22,45 +22,24 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
 
-#include "variable.h"
-
 
 ////////////////////////////////////////
 
 
-///
-/// @brief Class scope provides an abstraction around a collection of items.
-///
-/// This is probably most commonly a directory (or sub-directory). It
-/// can have it's own unique config / toolsets / whatever as well as
-/// "global" variables.  Variables can be inherited from a parent
-/// scope or not.
-///
-class scope 
+namespace OS
 {
-public:
-	scope( std::shared_ptr<scope> parent );
-	~scope( void );
 
-	inline std::shared_ptr<scope> parent_scope( void ) const;
-	std::shared_ptr<scope> new_sub_scope( void );
+const std::string &system( void );
+const std::string &node( void );
+const std::string &release( void );
+const std::string &version( void );
+const std::string &machine( void );
 
-	inline void inherit( bool yesno );
-	inline bool inherit( void ) const;
+bool is64bit( void );
 
-	variable_set &vars( void );
-	const variable_set &vars( void ) const;
+void registerFunctions( void );
 
-private:
-	std::weak_ptr<scope> myParent;
-	variable_set myVariables;
-	bool myInheritParentScope = false;
-};
-
-
-////////////////////////////////////////
-
+} // namespace src
 

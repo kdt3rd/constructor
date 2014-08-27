@@ -24,6 +24,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 
 ////////////////////////////////////////
@@ -51,25 +52,53 @@ public:
 	void reset( std::vector<std::string> v );
 
 	std::string value( void ) const;
+
 	// if any of the values in the variable don't begin
 	// with the provided prefix, it is preprended to that
 	// value.
-	std::string prepended_value( const std::string &prefix ) const;
+	std::string prepended_value( const std::string &prefix );
 
 	inline const std::vector<std::string> &values( void ) const;
+
 private:
+	std::string replace_vars( const std::string &v );
+
 	std::string myName;
-	std::vector<std::string> myValues;
+	std::vector<variable_item> myValues;
+	bool myInherit = false;
 };
 
 
-////////////////////////////////////////
+typedef std::map<std::string, variable> variable_set;
+
+
+////////////////////////////////////////////////////////////////////////////////
 
 
 inline const std::string &
 variable::name( void ) const
 {
 	return myName;
+}
+
+
+////////////////////////////////////////
+
+
+inline void
+variable::inherit( bool yesno )
+{
+	myInherit = yesno;
+}
+
+
+////////////////////////////////////////
+
+
+inline bool
+variable::inherit( void ) const
+{
+	return myInherit;
 }
 
 

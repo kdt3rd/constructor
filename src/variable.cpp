@@ -118,16 +118,22 @@ variable::reset( std::vector<std::string> v )
 
 
 std::string
-variable::value( void ) const
+variable::value( const deref_func &deref ) const
 {
 	std::string ret;
+	if ( myInherit )
+		ret = deref( *this );
+
 	for ( const auto &i: myValues )
 	{
-		if ( i.empty() )
+		if ( i.val.empty() )
 			continue;
 		if ( ! ret.empty() )
 			ret.push_back( ' ' );
-		ret.append( i );
+		if ( i.is_variable )
+			ret.append( deref( i.val ) );
+		else
+			ret.append( i.val );
 	}
 
 	return std::move( ret );
@@ -149,10 +155,17 @@ variable::prepended_value( const std::string &prefix ) const
 		if ( ! ret.empty() )
 			ret.push_back( ' ' );
 
-		if ( i.find( prefix ) != 0 )
-			ret.append( prefix );
+		if ( i.is_variable )
+		{
+			ret.append( deref( i.val ) );
+		}
+		else
+		{
+			if ( i.find( prefix ) != 0 )
+				ret.append( prefix );
 
-		ret.append( i );
+			ret.append( i );
+		}
 	}
 
 	return std::move( ret );

@@ -22,45 +22,30 @@
 
 #pragma once
 
-#include <memory>
+#include <cctype>
 #include <string>
-
-#include "variable.h"
+#include <vector>
+#include <map>
+#include <functional>
 
 
 ////////////////////////////////////////
 
 
-///
-/// @brief Class scope provides an abstraction around a collection of items.
-///
-/// This is probably most commonly a directory (or sub-directory). It
-/// can have it's own unique config / toolsets / whatever as well as
-/// "global" variables.  Variables can be inherited from a parent
-/// scope or not.
-///
-class scope 
+namespace String
 {
-public:
-	scope( std::shared_ptr<scope> parent );
-	~scope( void );
 
-	inline std::shared_ptr<scope> parent_scope( void ) const;
-	std::shared_ptr<scope> new_sub_scope( void );
+void split_append( std::vector<std::string> &l, const std::string &s, const char sep );
+std::vector<std::string> split( const std::string &s, const char sep );
+std::vector<std::string> split_space_or_sep( const std::string &s, const char sep );
+void strip( std::string &s );
 
-	inline void inherit( bool yesno );
-	inline bool inherit( void ) const;
+int versionCompare( const std::string &a, const std::string &b );
 
-	variable_set &vars( void );
-	const variable_set &vars( void ) const;
+void substituteVariables( std::string &a, bool requireCurly, const std::map<std::string, std::string> &varTable );
+void substituteVariables( std::string &a, bool requireCurly,
+						  const std::function<const std::string &(const std::string&)> &varLookup );
 
-private:
-	std::weak_ptr<scope> myParent;
-	variable_set myVariables;
-	bool myInheritParentScope = false;
-};
-
-
-////////////////////////////////////////
+} // namespace String
 
 

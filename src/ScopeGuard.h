@@ -22,45 +22,47 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
-#include "variable.h"
+#include <functional>
 
 
 ////////////////////////////////////////
 
 
-///
-/// @brief Class scope provides an abstraction around a collection of items.
-///
-/// This is probably most commonly a directory (or sub-directory). It
-/// can have it's own unique config / toolsets / whatever as well as
-/// "global" variables.  Variables can be inherited from a parent
-/// scope or not.
-///
-class scope 
+class ScopeGuard
 {
 public:
-	scope( std::shared_ptr<scope> parent );
-	~scope( void );
+	inline ScopeGuard( void ) {}
+	inline ScopeGuard( const std::function<void()> &f ) : myF( f ) {}
+	inline ScopeGuard( std::function<void()> &&f ) : myF( std::move( f ) ) {}
+	template <typename Lambda>
+	inline ScopeGuard( Lambda &&f ) : myF( std::forward( f ) ) {}
+	inline ScopeGuard( ScopeGuard &&o ) noexcept { myF.swap( o.myF ); }
+	
+	inline ~ScopeGuard( void )
+	{
+		if ( myF )
+			myF();
+	}
 
-	inline std::shared_ptr<scope> parent_scope( void ) const;
-	std::shared_ptr<scope> new_sub_scope( void );
+	inline ScopeGuard &operator=( ScopeGuard &&o ) noexcept
+	{
+		if ( myF )
+			myF();
+		myF = std::move( o.myF );
+		o.myF = nullptr;
+		return *this;
+	}
 
-	inline void inherit( bool yesno );
-	inline bool inherit( void ) const;
-
-	variable_set &vars( void );
-	const variable_set &vars( void ) const;
-
+	inline void release( void ) noexcept { myF = nullptr; }
 private:
-	std::weak_ptr<scope> myParent;
-	variable_set myVariables;
-	bool myInheritParentScope = false;
+	ScopeGuard( const ScopeGuard & ) = delete;
+	ScopeGuard &operator=( const ScopeGuard & ) = delete;
+
+	std::function<void()> myF;
 };
 
+#define CONCATENATE_DIRECT( s1, s2 ) s1##s2
+#define CONCATENATE( s1, s2 ) CONCATENATE_DIRECT( s1, s2 )
+#define ANONYMOUS_VAR( str ) CONCATENATE( str, __LINE__ )
 
-////////////////////////////////////////
-
-
+#define ON_EXIT [[gnu::unused]] auto ANONYMOUS_VAR( exitGuard ) = [&]() 
