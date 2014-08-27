@@ -24,6 +24,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "variable.h"
 
@@ -32,33 +33,69 @@
 
 
 ///
-/// @brief Class scope provides an abstraction around a collection of items.
+/// @brief Class Scope provides an abstraction around a collection of items.
 ///
 /// This is probably most commonly a directory (or sub-directory). It
 /// can have it's own unique config / toolsets / whatever as well as
 /// "global" variables.  Variables can be inherited from a parent
 /// scope or not.
 ///
-class scope 
+class Scope : public std::enable_shared_from_this<Scope>
 {
 public:
-	scope( std::shared_ptr<scope> parent );
-	~scope( void );
+	Scope( std::shared_ptr<Scope> parent );
+	~Scope( void );
 
-	inline std::shared_ptr<scope> parent_scope( void ) const;
-	std::shared_ptr<scope> new_sub_scope( void );
+	inline std::shared_ptr<Scope> parent_scope( void ) const;
+	std::shared_ptr<Scope> new_sub_scope( void );
+	inline const std::vector< std::shared_ptr<Scope> > &sub_scopes( void ) const;
 
 	inline void inherit( bool yesno );
 	inline bool inherit( void ) const;
 
-	variable_set &vars( void );
-	const variable_set &vars( void ) const;
+	inline variable_set &vars( void );
+	inline const variable_set &vars( void ) const;
+
+	static std::shared_ptr<Scope> rootScope( void );
+	static std::shared_ptr<Scope> currentScope( void );
+	static void pushScope( const std::shared_ptr<Scope> &scope );
+	static void popScope( void );
 
 private:
-	std::weak_ptr<scope> myParent;
+	std::weak_ptr<Scope> myParent;
 	variable_set myVariables;
 	bool myInheritParentScope = false;
+	std::vector< std::shared_ptr<Scope> > mySubScopes;
 };
+
+
+////////////////////////////////////////
+
+
+inline const std::vector< std::shared_ptr<Scope> > &Scope::sub_scopes( void ) const
+{
+	return mySubScopes;
+}
+
+
+////////////////////////////////////////
+
+
+inline void Scope::inherit( bool yesno ) { myInheritParentScope = yesno; }
+inline bool Scope::inherit( void ) const { return myInheritParentScope; }
+
+
+////////////////////////////////////////
+
+
+inline std::shared_ptr<Scope> Scope::parent_scope( void ) const { return myParent.lock(); }
+
+
+////////////////////////////////////////
+
+
+inline variable_set &Scope::vars( void ) { return myVariables; }
+inline const variable_set &Scope::vars( void ) const { return myVariables; }
 
 
 ////////////////////////////////////////

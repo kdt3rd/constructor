@@ -32,11 +32,11 @@
 ////////////////////////////////////////
 
 
-class tool : public item
+class Tool : public Item
 {
 public:
-	tool( std::string name );
-	virtual ~tool( void );
+	Tool( std::string name );
+	virtual ~Tool( void );
 
 	const std::string &executable( void ) const;
 
@@ -45,7 +45,7 @@ public:
 	std::vector<std::string> implicit_dependency_options( const std::string &srcfile ) const;
 	
 	const std::vector<std::string> &file_extensions( void ) const;
-	const std::vector<variable> &variables( void ) const;
+	const std::vector<Variable> &variables( void ) const;
 
-	const rule &rule( void ) const;
+	const Rule &rule( void ) const;
 };

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2014 Kimball Thurston
+// Copyright (c) 2013 Kimball Thurston
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the "Software"),
@@ -22,34 +22,36 @@
 
 #pragma once
 
-#include <string>
+#include "item.h"
 
 
 ////////////////////////////////////////
 
 
-namespace OS
+class Rule : public Item
 {
+public:
+	Rule( std::string tag, std::string desc );
+	virtual ~Rule( void );
 
-const std::string &system( void );
-const std::string &node( void );
-const std::string &release( void );
-const std::string &version( void );
-const std::string &machine( void );
+	void command( const std::string &c );
+	void command( const std::vector<std::string> &c );
 
-bool is64bit( void );
+	std::string command( void ) const;
+	inline const std::string &description( void ) const;
 
-void registerFunctions( void );
+private:
+	std::string myDesc;
+	std::vector<std::string> myCommand;
+};
 
-inline constexpr char pathSeparator( void ) 
+
+////////////////////////////////////////
+
+
+inline const std::string &
+Rule::description( void ) const 
 {
-#ifdef WIN32
-	return ';';
-#else
-	return ':';
-#endif
+	return myDesc;
 }
-
-
-} // namespace src
 

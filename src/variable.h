@@ -56,7 +56,7 @@ public:
 	// if any of the values in the variable don't begin
 	// with the provided prefix, it is preprended to that
 	// value.
-	std::string prepended_value( const std::string &prefix );
+	std::string prepended_value( const std::string &prefix ) const;
 
 	inline const std::vector<std::string> &values( void ) const;
 
@@ -64,7 +64,7 @@ private:
 	std::string replace_vars( const std::string &v );
 
 	std::string myName;
-	std::vector<variable_item> myValues;
+	std::vector<std::string> myValues;
 	bool myInherit = false;
 };
 

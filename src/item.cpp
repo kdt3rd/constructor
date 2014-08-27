@@ -1,4 +1,4 @@
-// item.cpp -*- C++ -*-
+// Item.cpp -*- C++ -*-
 
 //
 // Copyright (c) 2014 Kimball Thurston
@@ -24,19 +24,20 @@
 
 #include "item.h"
 #include <algorithm>
+#include "Scope.h"
 
 
 ////////////////////////////////////////
 
 namespace {
 
-static item::ID theLastID = 1;
-static std::map<std::string, item *> theItemsByName;
-static std::map<item::ID, item *> theItemsByID;
-static std::map<std::string, std::vector<item *>> theUnresolvedBackPointers;
+static Item::ID theLastID = 1;
+static std::map<std::string, Item *> theItemsByName;
+static std::map<Item::ID, Item *> theItemsByID;
+static std::map<std::string, std::vector<Item *>> theUnresolvedBackPointers;
 
 static inline void
-registerItem( item *i )
+registerItem( Item *i )
 {
 	theItemsByName[i->name()] = i;
 	theItemsByID[i->id()] = i;
@@ -49,7 +50,7 @@ registerItem( item *i )
 }
 
 static inline void
-unregisterItem( item *i )
+unregisterItem( Item *i )
 {
 	auto x = theItemsByName.find( i->name() );
 	if ( x != theItemsByName.end() )
@@ -60,17 +61,17 @@ unregisterItem( item *i )
 		theItemsByID.erase( y );
 }
 
-static inline item::ID
+static inline Item::ID
 findItem( const std::string &name )
 {
 	auto x = theItemsByName.find( name );
 	if ( x != theItemsByName.end() )
 		return x->second->id();
-	return item::UNKNOWN;
+	return Item::UNKNOWN;
 }
 
-static inline item *
-retrieveItem( item::ID i )
+static inline Item *
+retrieveItem( Item::ID i )
 {
 	auto y = theItemsByID.find( i );
 	if ( y != theItemsByID.end() )
@@ -84,8 +85,8 @@ retrieveItem( item::ID i )
 ////////////////////////////////////////
 
 
-item::item( const std::string &name )
-		: myID( theLastID++ ), myName( name )
+Item::Item( const std::string &name )
+		: myID( theLastID++ ), myName( name ), myScope( Scope::currentScope() )
 {
 	registerItem( this );
 }
@@ -94,8 +95,8 @@ item::item( const std::string &name )
 ////////////////////////////////////////
 
 
-item::item( std::string &&name )
-		: myID( theLastID++ ), myName( std::move( name ) )
+Item::Item( std::string &&name )
+		: myID( theLastID++ ), myName( std::move( name ) ), myScope( Scope::currentScope() )
 {
 	registerItem( this );
 }
@@ -104,7 +105,7 @@ item::item( std::string &&name )
 ////////////////////////////////////////
 
 
-item::~item( void )
+Item::~Item( void )
 {
 	unregisterItem( this );
 }
@@ -114,9 +115,9 @@ item::~item( void )
 
 
 void
-item::add_dependency( DependencyType dt, ID otherObj )
+Item::add_dependency( DependencyType dt, ID otherObj )
 {
-	item *i = retrieveItem( otherObj );
+	Item *i = retrieveItem( otherObj );
 	if ( i && i->has_dependency( *this ) )
 		throw std::runtime_error( "Attempt to create a circular dependency between '" + name() + "' and '" + i->name() + "'" );
 
@@ -134,7 +135,7 @@ item::add_dependency( DependencyType dt, ID otherObj )
 
 
 void
-item::add_dependency( DependencyType dt, const std::string &otherObj )
+Item::add_dependency( DependencyType dt, const std::string &otherObj )
 {
 	ID o = findItem( otherObj );
 	if ( o == UNKNOWN )
@@ -161,7 +162,7 @@ item::add_dependency( DependencyType dt, const std::string &otherObj )
 
 
 bool
-item::has_dependency( const item &other ) const
+Item::has_dependency( const Item &other ) const
 {
 	if ( myDependencies.find( other.id() ) != myDependencies.end() )
 		return true;
@@ -174,7 +175,7 @@ item::has_dependency( const item &other ) const
 
 	for ( auto &dep: myDependencies )
 	{
-		item *i = retrieveItem( dep.first );
+		Item *i = retrieveItem( dep.first );
 		if ( i )
 		{
 			if ( i->has_dependency( other ) )
@@ -189,10 +190,10 @@ item::has_dependency( const item &other ) const
 ////////////////////////////////////////
 
 
-std::vector<const item *>
-item::extract_dependencies( DependencyType dt ) const
+std::vector<const Item *>
+Item::extract_dependencies( DependencyType dt ) const
 {
-	std::vector<const item *> retval;
+	std::vector<const Item *> retval;
 
 	if ( dt == DependencyType::CHAIN )
 	{
@@ -227,7 +228,7 @@ item::extract_dependencies( DependencyType dt ) const
 			if ( dep.second != dt )
 				continue;
 
-			const item *newItem = retrieveItem( dep.first );
+			const Item *newItem = retrieveItem( dep.first );
 			if ( ! newItem )
 				throw std::logic_error( "Unknown item ID traversing dependents" );
 
@@ -244,7 +245,7 @@ item::extract_dependencies( DependencyType dt ) const
 
 
 void
-item::update_dependency( const std::string &name, ID otherID )
+Item::update_dependency( const std::string &name, ID otherID )
 {
 	for ( auto x = myUnresolvedDependencies.begin(); x != myUnresolvedDependencies.end(); ++x )
 	{
@@ -263,7 +264,7 @@ item::update_dependency( const std::string &name, ID otherID )
 
 
 void
-item::check_dependencies( void )
+Item::check_dependencies( void )
 {
 	for ( auto x = theItemsByID.begin(); x != theItemsByID.end(); ++x )
 	{
@@ -277,7 +278,7 @@ item::check_dependencies( void )
 
 
 void
-item::recurse_chain( std::vector<const item *> &chain ) const
+Item::recurse_chain( std::vector<const Item *> &chain ) const
 {
 	for ( auto &dep: myDependencies )
 	{
@@ -293,9 +294,9 @@ item::recurse_chain( std::vector<const item *> &chain ) const
 
 
 void
-item::add_chain_dependent( std::vector<const item *> &chain, ID otherID ) const
+Item::add_chain_dependent( std::vector<const Item *> &chain, ID otherID ) const
 {
-	const item *newItem = retrieveItem( otherID );
+	const Item *newItem = retrieveItem( otherID );
 	if ( ! newItem )
 		throw std::logic_error( "Unknown item ID traversing chain dependents" );
 

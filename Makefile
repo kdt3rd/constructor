@@ -8,10 +8,14 @@ OUTPUT:= Build
 
 #SRC:= item.cpp main.cpp variable.cpp
 SRC:= main.cpp \
+	item.cpp \
+	Scope.cpp \
+	variable.cpp \
 	LuaEngine.cpp \
 	StrUtil.cpp \
 	OSUtil.cpp \
 	FileUtil.cpp \
+	Directory.cpp \
 	PackageConfig.cpp
 
 SRC:=$(addprefix $(OUTPUT)/,$(SRC))

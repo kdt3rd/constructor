@@ -153,7 +153,7 @@ struct ParmAdapt<std::string>
 		if ( s )
 			ret.assign( s, n );
 
-		return ret;
+		return std::move( ret );
 	}
 
 	static inline std::string check_and_get( lua_State *l, int i )
@@ -191,7 +191,7 @@ struct ParmAdapt< std::vector<std::string> >
 			ret[idx] = std::move( ParmAdapt<std::string>::get( l, -1 ) );
 			lua_pop( l, 1 );
 		}
-		return ret;
+		return std::move( ret );
 	}
 
 	static inline std::vector<std::string> check_and_get( lua_State *l, int i )

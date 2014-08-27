@@ -29,43 +29,13 @@
 ////////////////////////////////////////
 
 
-class Directory
-{
-public:
-	Directory( void );
-	Directory( std::string root );
-
-	void reset( std::string root );
-
-	void cd( std::string name );
-	void cdUp( void );
-
-	void mkpath( void ) const;
-	const std::string &fullpath( void ) const;
-
-	// returns the first name found
-	bool find( std::string &concatpath, const std::vector<std::string> &names ) const;
-	bool exists( std::string &concatpath, const char *fn ) const;
-	bool exists( std::string &concatpath, const std::string &fn ) const;
-	std::string makefilename( const char *fn ) const;
-	std::string makefilename( const std::string &fn ) const;
-
-	// NB: modifying this will modify global state, but doesn't change
-	// any O.S. level current directory, at least currently. if we
-	// support running scripts in the future, this may have to change
-	static Directory &currentDirectory( void );
-
-private:
-	bool checkRootPath( void ) const;
-	void updateFullPath( void );
-
-	std::string myRoot;
-	std::vector<std::string> mySubDirs;
-	std::string myCurFullPath;
-};
-
 namespace File
 {
+
+inline constexpr const char *buildFileName( void )
+{
+	return "build.lua";
+}
 
 inline constexpr char pathSeparator( void ) 
 {
@@ -91,6 +61,8 @@ bool find( std::string &filepath, const std::string &name, const std::vector<std
 // assumes the extension contains any separator (i.e. '.')
 // returns the first result found
 bool find( std::string &filepath, const std::string &name, const std::vector<std::string> &extensions, const std::vector<std::string> &path );
+
+bool findExectuable( std::string &filepath, const std::string &name );
 
 void startParsing( const std::string &dir );
 

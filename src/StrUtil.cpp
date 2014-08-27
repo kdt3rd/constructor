@@ -22,6 +22,7 @@
 
 #include "StrUtil.h"
 #include <iostream>
+#include <stack>
 
 
 ////////////////////////////////////////
@@ -37,8 +38,8 @@ namespace String
 void
 split_append( std::vector<std::string> &l, const std::string &s, const char sep )
 {
-	typename std::string::size_type last = s.find_first_not_of( sep, 0 );
-	typename std::string::size_type cur = s.find_first_of( sep, last );
+	std::string::size_type last = s.find_first_not_of( sep, 0 );
+	std::string::size_type cur = s.find_first_of( sep, last );
 		
 	while ( cur != std::string::npos || last < s.size() )
 	{
@@ -70,10 +71,10 @@ split_space_or_sep( const std::string &s, const char sep )
 {
 	std::vector<std::string> ret;
 
-	typename std::string::size_type last = 0;
+	std::string::size_type last = 0;
 	while ( last != s.size() && ( s[last] == sep || std::isspace( s[last] ) ) )
 		++last;
-	typename std::string::size_type cur = last;
+	std::string::size_type cur = last;
 	while ( cur != s.size() && s[cur] != sep && ! std::isspace( s[cur] ) )
 		++cur;
 		
@@ -87,6 +88,90 @@ split_space_or_sep( const std::string &s, const char sep )
 		cur = last;
 		while ( cur != s.size() && s[cur] != sep && ! std::isspace( s[cur] ) )
 			++cur;
+	}
+
+	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
+namespace
+{
+std::string::size_type
+advanceToEndQuote( const std::string &s, std::string::size_type quoteStart )
+{
+	std::string::size_type out = quoteStart;
+	std::stack< std::pair<char, bool> > matchQ;
+	matchQ.push( std::make_pair( s[quoteStart], false ) );
+	bool inEscape = false;
+	while ( ! matchQ.empty() )
+	{
+		++out;
+		if ( out >= s.size() )
+			throw std::runtime_error( "Unbalanced quotes in string, unable to skip" );
+
+		if ( s[out] == '\\' )
+			inEscape = ! inEscape;
+		else if ( inEscape )
+		{
+			if ( s[out] == matchQ.top().first )
+			{
+				if ( matchQ.top().second )
+					matchQ.pop();
+				else
+					matchQ.push( std::make_pair( s[out], true ) );
+			}
+			else if ( s[out] == '\'' || s[out] == '"' )
+				matchQ.push( std::make_pair( s[out], false ) );
+		}
+		else if ( s[out] == matchQ.top().first )
+		{
+			if ( matchQ.top().second )
+				throw std::runtime_error( "Unbalanced quotes in string, unable to skip" );
+			matchQ.pop();
+		}
+	}
+	if ( out < s.size() )
+		++out;
+
+	return out;
+}
+} // empty namespace
+
+std::vector<std::string>
+shell_split( const std::string &s )
+{
+	std::vector<std::string> ret;
+
+	std::string::size_type last = 0;
+	while ( last != s.size() && std::isspace( s[last] ) )
+		++last;
+	std::string::size_type cur = last;
+	while ( cur != s.size() && ! std::isspace( s[cur] ) )
+	{
+		if ( s[cur] == '\'' || s[cur] == '"' )
+			cur = advanceToEndQuote( s, cur );
+		else
+			++cur;
+	}
+
+	while ( cur != s.size() || last < s.size() )
+	{
+		if ( cur != last )
+			ret.push_back( s.substr( last, cur - last ) );
+		last = cur;
+		while ( last != s.size() && std::isspace( s[last] ) )
+			++last;
+		cur = last;
+		while ( cur != s.size() && ! std::isspace( s[cur] ) )
+		{
+			if ( s[cur] == '\'' || s[cur] == '"' )
+				cur = advanceToEndQuote( s, cur );
+			else
+				++cur;
+		}
 	}
 
 	return std::move( ret );

@@ -37,31 +37,32 @@ enum class DependencyType : uint8_t
 	ORDER
 };
 	
-class scope;		
+class Scope;		
 
 /// @brief base class for everything else in the system
 ///
 /// In a build system, there are either targets
-class item
+class Item
 {
 public:
 	typedef uint64_t ID;
 	static const ID UNKNOWN = static_cast<uint64_t>(-1);
 
-	item( const std::shared_ptr<scope> &s, const std::string &name );
-	item( const std::shared_ptr<scope> &s, std::string &&name );
-	virtual ~item( void );
+	Item( const std::string &name );
+	Item( std::string &&name );
+	virtual ~Item( void );
 
 	inline ID id( void ) const;
 	inline const std::string &name( void ) const;
+	inline const std::shared_ptr<Scope> &scope( void ) const;
 
 	void add_dependency( DependencyType dt, ID otherObj );
 	void add_dependency( DependencyType dt, const std::string &otherObj );
-	inline void add_dependency( DependencyType dt, const item &otherObj );
+	inline void add_dependency( DependencyType dt, const Item &otherObj );
 
 	/// (recursively) check if this item has a dependency on
 	/// the other passed in
-	bool has_dependency( const item &other ) const;
+	bool has_dependency( const Item &other ) const;
 
 	/// for a chain dependency,
 	/// Recursively traverses the chain dependencies and
@@ -71,9 +72,9 @@ public:
 	///
 	/// for all other dependency types,
 	/// returns the list of items that this item has that dependency type on
-	std::vector<const item *> extract_dependencies( DependencyType dt ) const;
+	std::vector<const Item *> extract_dependencies( DependencyType dt ) const;
 
-	std::vector<const item *> extract_explicit_dependencies( void ) const;
+	std::vector<const Item *> extract_explicit_dependencies( void ) const;
 	inline bool has_unresolved_dependencies( void ) const;
 	void update_dependency( const std::string &name, ID otherID );
 
@@ -82,21 +83,22 @@ public:
 	static void check_dependencies( void );
 
 private:
-	void recurse_chain( std::vector<const item *> &chain ) const;
-	void add_chain_dependent( std::vector<const item *> &chain, ID otherID ) const;
+	void recurse_chain( std::vector<const Item *> &chain ) const;
+	void add_chain_dependent( std::vector<const Item *> &chain, ID otherID ) const;
 	ID myID;
 	std::string myName;
 
 	std::vector<std::pair<DependencyType, std::string>> myUnresolvedDependencies;
 	std::map<ID, DependencyType> myDependencies;
+	std::shared_ptr<Scope> myScope;
 };
 
 
 ////////////////////////////////////////
 
 
-inline item::ID
-item::id( void ) const
+inline Item::ID
+Item::id( void ) const
 {
 	return myID;
 }
@@ -106,7 +108,7 @@ item::id( void ) const
 
 
 inline const std::string &
-item::name( void ) const 
+Item::name( void ) const 
 {
 	return myName;
 }
@@ -115,8 +117,18 @@ item::name( void ) const
 ////////////////////////////////////////
 
 
+inline const std::shared_ptr<Scope> &
+Item::scope( void ) const 
+{
+	return myScope;
+}
+
+
+////////////////////////////////////////
+
+
 inline void
-item::add_dependency( DependencyType dt, const item &otherObj )
+Item::add_dependency( DependencyType dt, const Item &otherObj )
 {
 	add_dependency( dt, otherObj.id() );
 }
@@ -126,7 +138,7 @@ item::add_dependency( DependencyType dt, const item &otherObj )
 
 
 inline bool
-item::has_unresolved_dependencies( void ) const
+Item::has_unresolved_dependencies( void ) const
 {
 	return ! myUnresolvedDependencies.empty();
 }

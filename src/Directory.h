@@ -23,33 +23,45 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 
 ////////////////////////////////////////
 
 
-namespace OS
+class Directory
 {
+public:
+	Directory( void );
+	Directory( std::string root );
 
-const std::string &system( void );
-const std::string &node( void );
-const std::string &release( void );
-const std::string &version( void );
-const std::string &machine( void );
+	void reset( std::string root );
 
-bool is64bit( void );
+	void cd( std::string name );
+	void cdUp( void );
 
-void registerFunctions( void );
+	void mkpath( void ) const;
+	const std::string &fullpath( void ) const;
 
-inline constexpr char pathSeparator( void ) 
-{
-#ifdef WIN32
-	return ';';
-#else
-	return ':';
-#endif
-}
+	// returns the first name found
+	bool find( std::string &concatpath, const std::vector<std::string> &names ) const;
+	bool exists( std::string &concatpath, const char *fn ) const;
+	bool exists( std::string &concatpath, const std::string &fn ) const;
+	std::string makefilename( const char *fn ) const;
+	std::string makefilename( const std::string &fn ) const;
 
+	// NB: modifying this will modify global state, but doesn't change
+	// any O.S. level current directory, at least currently. if we
+	// support running scripts in the future, this may have to change
+	static Directory &currentDirectory( void );
 
-} // namespace src
+	static void registerFunctions( void );
 
+private:
+	bool checkRootPath( void ) const;
+	void updateFullPath( void );
+
+	std::string myRoot;
+	std::vector<std::string> mySubDirs;
+	std::string myCurFullPath;
+};

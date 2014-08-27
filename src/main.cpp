@@ -28,6 +28,7 @@
 #include <iostream>
 #include "OSUtil.h"
 #include "FileUtil.h"
+#include "Directory.h"
 #include "PackageConfig.h"
 
 
@@ -41,6 +42,7 @@ main( int argc, char *argv[] )
 	{
 		OS::registerFunctions();
 		File::registerFunctions();
+		Directory::registerFunctions();
 		PackageConfig::registerFunctions();
 
 		std::string subdir;
@@ -49,7 +51,7 @@ main( int argc, char *argv[] )
 
 		File::startParsing( subdir );
 
-//		item::check_dependencies();
+		Item::check_dependencies();
 		
 	}
 	catch ( std::exception &e )

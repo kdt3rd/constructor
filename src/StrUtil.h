@@ -38,6 +38,10 @@ namespace String
 void split_append( std::vector<std::string> &l, const std::string &s, const char sep );
 std::vector<std::string> split( const std::string &s, const char sep );
 std::vector<std::string> split_space_or_sep( const std::string &s, const char sep );
+
+// splits as the shell might (splitting on spaces, but paying attention to quotes)
+std::vector<std::string> shell_split( const std::string &s );
+
 void strip( std::string &s );
 
 int versionCompare( const std::string &a, const std::string &b );

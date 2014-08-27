@@ -34,6 +34,7 @@
 #include <mutex>
 #include "StrUtil.h"
 #include "FileUtil.h"
+#include "OSUtil.h"
 #include "ScopeGuard.h"
 #include "LuaEngine.h"
 #include <iostream>
@@ -49,11 +50,6 @@ namespace
 
 std::map<std::string, std::string> thePackageConfigs;
 std::map<std::string, std::shared_ptr<PackageConfig> > theParsedPackageConfigs;
-#ifdef WIN32
-static constexpr char theSeparator = ';';
-#else
-static constexpr char theSeparator = ':';
-#endif
 static std::once_flag theNeedInit;
 
 static int theParseDepth = 0;
@@ -64,10 +60,10 @@ init( void )
 	std::vector<std::string> searchPaths;
 	const char *pcPath = getenv( "PKG_CONFIG_PATH" );
 	if ( pcPath )
-		String::split_append( searchPaths, std::string( pcPath ), theSeparator );
+		String::split_append( searchPaths, std::string( pcPath ), OS::pathSeparator() );
 	pcPath = getenv( "PKG_CONFIG_LIBDIR" );
 	if ( pcPath )
-		String::split_append( searchPaths, std::string( pcPath ), theSeparator );
+		String::split_append( searchPaths, std::string( pcPath ), OS::pathSeparator() );
 	else
 	{
 		searchPaths.push_back( "/usr/lib/pkgconfig" );

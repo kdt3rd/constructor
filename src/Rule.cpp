@@ -20,36 +20,70 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#pragma once
-
-#include <string>
+#include "Rule.h"
+#include "StrUtil.h"
 
 
 ////////////////////////////////////////
 
 
-namespace OS
+Rule::Rule( std::string tag, std::string desc )
+		: Item( std::move( tag ) ), myDesc( std::move( desc ) )
 {
-
-const std::string &system( void );
-const std::string &node( void );
-const std::string &release( void );
-const std::string &version( void );
-const std::string &machine( void );
-
-bool is64bit( void );
-
-void registerFunctions( void );
-
-inline constexpr char pathSeparator( void ) 
-{
-#ifdef WIN32
-	return ';';
-#else
-	return ':';
-#endif
 }
 
 
-} // namespace src
+////////////////////////////////////////
+
+
+Rule::~Rule( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+void
+Rule::command( const std::string &c )
+{
+	myCommand = String::shell_split( c );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Rule::command( const std::vector<std::string> &c )
+{
+	myCommand = c;
+}
+
+
+////////////////////////////////////////
+
+
+std::string
+Rule::command( void ) const
+{
+	std::string ret;
+	for ( const std::string &i: myCommand )
+	{
+		if ( i.empty() )
+			continue;
+
+		if ( ! ret.empty() )
+			ret.push_back( ' ' );
+
+		ret.append( i );
+	}
+	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
+
 
