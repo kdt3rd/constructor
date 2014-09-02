@@ -131,7 +131,7 @@ init( void )
 
 
 PackageConfig::PackageConfig( const std::string &n, const std::string &pf )
-		: myName( n ), myPackageFile( pf )
+		: Item( n ), myPackageFile( pf )
 {
 	parse();
 }
@@ -333,7 +333,7 @@ PackageConfig::parse( void )
 void
 PackageConfig::extractNameAndValue( const std::string &curline )
 {
-	std::string name, val;
+	std::string nm, val;
 
 	std::string::size_type i = 0;
 	while ( i < curline.size() )
@@ -350,7 +350,7 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 		return;
 
 	if ( i > 0 )
-		name = curline.substr( 0, i );
+		nm = curline.substr( 0, i );
 
 	while ( i < curline.size() && std::isspace( curline[i] ) )
 		++i;
@@ -370,63 +370,63 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 
 	if ( separator == ':' )
 	{
-		if ( myValues.find( name ) != myValues.end() )
+		if ( myValues.find( nm ) != myValues.end() )
 		{
-			std::cerr << "WARNING: Package config file '" << myPackageFile << "' has multiple entries for tag '" << name << "'" << std::endl;
+			std::cerr << "WARNING: Package config file '" << myPackageFile << "' has multiple entries for tag '" << nm << "'" << std::endl;
 			return;
 		}
 
-		if ( name == "Name" || name == "Description" || name == "URL" )
+		if ( nm == "Name" || nm == "Description" || nm == "URL" )
 		{
-			myValues[name] = val;
+			myValues[nm] = val;
 		}
-		else if ( name == "Version" )
+		else if ( nm == "Version" )
 		{
-			std::cout << std::setw( theParseDepth * 2 ) << std::setfill( ' ' ) << "" << "Found package '" << myName << "', version " << val << std::endl;
-			myValues[name] = val;
+			std::cout << std::setw( theParseDepth * 2 ) << std::setfill( ' ' ) << "" << "Found package '" << name() << "', version " << val << std::endl;
+			myValues[nm] = val;
 		}
-		else if ( name == "Libs.private" || name == "Libs" )
+		else if ( nm == "Libs.private" || nm == "Libs" )
 		{
 			// pkg-config parses these as shell arguments and attempts to collapse them when
 			// chained, let's not bother with that, it doesn't seem needed
-			myValues[name] = val;
+			myValues[nm] = val;
 		}
-		else if ( name == "Requires.private" || name == "Requires" )
+		else if ( nm == "Requires.private" || nm == "Requires" )
 		{
-//			myDepends[name] = extractOtherModules( val, true );
-			myValues[name] = val;
+//			myDepends[nm] = extractOtherModules( val, true );
+			myValues[nm] = val;
 		}
-		else if ( name == "Cflags" || name == "CFlags" )
+		else if ( nm == "Cflags" || nm == "CFlags" )
 		{
 			// make sure we only have to look up by the one name later
 			myValues["CFlags"] = val;
 		}
-		else if ( name == "Conflicts" )
+		else if ( nm == "Conflicts" )
 		{
 			// do we care about this???
-			//myDepends[name] = extractOtherModules( val, false );
-			myValues[name] = val;
+			//myDepends[nm] = extractOtherModules( val, false );
+			myValues[nm] = val;
 		}
 		else
-			std::cerr << "WARNING: Ignoring unknown package config tag: '" << name << "', value: " << val << std::endl;
+			std::cerr << "WARNING: Ignoring unknown package config tag: '" << nm << "', value: " << val << std::endl;
 
 	}
 	else if ( separator == '=' )
 	{
-		if ( myVariables.find( name ) != myVariables.end() )
+		if ( myVariables.find( nm ) != myVariables.end() )
 		{
-			std::cerr << "WARNING: Package config file '" << myPackageFile << "' has multiple entries for variable '" << name << "'" << std::endl;
+			std::cerr << "WARNING: Package config file '" << myPackageFile << "' has multiple entries for variable '" << nm << "'" << std::endl;
 			return;
 		}
 		// do we need to implement the special handling
 		// for trying to auto-figure out the prefix?
 		// this seems to be done on Windows in the pkg-config
 		// source. Let's cross that bridge when we get to it
-//		if ( name == "prefix" )
+//		if ( nm == "prefix" )
 //		{
 //			
 //		}
-		myVariables[name] = val;
+		myVariables[nm] = val;
 	}
 	else
 	{
@@ -666,7 +666,44 @@ PackageConfig::find( const std::string &name, VersionCompare comp, const std::st
 static bool
 PackageExists( const std::string &name, const std::string &reqVersion )
 {
-	auto x = PackageConfig::find( name, VersionCompare::ANY, reqVersion );
+	VersionCompare vc = VersionCompare::ANY;
+	std::shared_ptr<PackageConfig> x;
+	if ( ! reqVersion.empty() )
+	{
+		std::string::size_type verPos = reqVersion.find_first_not_of( "<>=!" );
+		if ( verPos == std::string::npos )
+			throw std::runtime_error( "Invalid version specification, missing version number" );
+		std::string vercmp;
+		std::string ver;
+		if ( verPos > 0 )
+		{
+			vercmp = reqVersion.substr( 0, verPos );
+			ver = reqVersion.substr( verPos );
+		}
+		else
+			ver = reqVersion;
+
+		String::strip( vercmp );
+		String::strip( ver );
+
+		if ( vercmp.empty() || vercmp == "=" )
+			vc = VersionCompare::EQUAL;
+		else if ( vercmp == "!=" )
+			vc = VersionCompare::NOT_EQUAL;
+		else if ( vercmp == "<" )
+			vc = VersionCompare::LESS;
+		else if ( vercmp == "<=" )
+			vc = VersionCompare::LESS_EQUAL;
+		else if ( vercmp == ">" )
+			vc = VersionCompare::GREATER;
+		else if ( vercmp == ">=" )
+			vc = VersionCompare::GREATER_EQUAL;
+
+		x = PackageConfig::find( name, vc, ver );
+	}
+	else
+		x = PackageConfig::find( name, vc, reqVersion );
+
 	if ( x )
 		return true;
 	return false;

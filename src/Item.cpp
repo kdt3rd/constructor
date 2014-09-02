@@ -25,59 +25,89 @@
 #include "Item.h"
 #include <algorithm>
 #include "Scope.h"
+#include "LuaEngine.h"
 
 
 ////////////////////////////////////////
 
 namespace {
 
-static Item::ID theLastID = 1;
-static std::map<std::string, Item *> theItemsByName;
-static std::map<Item::ID, Item *> theItemsByID;
-static std::map<std::string, std::vector<Item *>> theUnresolvedBackPointers;
-
-static inline void
-registerItem( Item *i )
+int itemGetName( lua_State *L )
 {
-	theItemsByName[i->name()] = i;
-	theItemsByID[i->id()] = i;
-	auto u = theUnresolvedBackPointers.find( i->name() );
-	if ( u != theUnresolvedBackPointers.end() )
+	if ( lua_gettop( L ) != 1 )
+		throw std::runtime_error( "Item:name() expects only one argument - self" );
+	ItemPtr p = Item::extract( L, 1 );
+	const std::string &n = p->name();
+	lua_pushlstring( L, n.c_str(), n.size() );
+	return 1;
+}
+
+int itemGetID( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 )
+		throw std::runtime_error( "Item:id() expects only one argument - self" );
+	ItemPtr p = Item::extract( L, 1 );
+	lua_pushunsigned( L, p->id() );
+	return 1;
+}
+
+int itemAddDependency( lua_State *L )
+{
+	if ( lua_gettop( L ) != 3 )
+		throw std::runtime_error( "Item:addDependency() expects 3 arguments - self, dependencyType, dependency" );
+	ItemPtr p = Item::extract( L, 1 );
+	size_t len = 0;
+	const char *dtp = lua_tolstring( L, 2, &len );
+	if ( dtp )
 	{
-		for ( auto &i: u->second )
-			i->update_dependency( i->name(), i->id() );
+		std::string dt( dtp, len );
+		ItemPtr d = Item::extract( L, 3 );
+		if ( dt == "explicit" )
+			p->addDependency( DependencyType::EXPLICIT, d );
+		else if ( dt == "implicit" )
+			p->addDependency( DependencyType::IMPLICIT, d );
+		else if ( dt == "order" )
+			p->addDependency( DependencyType::ORDER, d );
+		else if ( dt == "chain" )
+			p->addDependency( DependencyType::CHAIN, d );
+		else
+			throw std::runtime_error( "Invalid dependency type: expect explicit, implicit, order, or chain" );
 	}
+	else
+		throw std::runtime_error( "Unable to extract string in addDependency" );
+	return 0;
 }
 
-static inline void
-unregisterItem( Item *i )
+int itemHasDependency( lua_State *L )
 {
-	auto x = theItemsByName.find( i->name() );
-	if ( x != theItemsByName.end() )
-		theItemsByName.erase( x );
-
-	auto y = theItemsByID.find( i->id() );
-	if ( y != theItemsByID.end() )
-		theItemsByID.erase( y );
+	if ( lua_gettop( L ) != 2 )
+		throw std::runtime_error( "Item:addDependency() expects 2 arguments - self and dependency check" );
+	ItemPtr p = Item::extract( L, 1 );
+	ItemPtr d = Item::extract( L, 2 );
+	bool hd = p->hasDependency( d );
+	lua_pushboolean( L, hd ? 1 : 0 );
+	return 1;
 }
 
-static inline Item::ID
-findItem( const std::string &name )
+int itemCreate( lua_State *L )
 {
-	auto x = theItemsByName.find( name );
-	if ( x != theItemsByName.end() )
-		return x->second->id();
-	return Item::UNKNOWN;
+	if ( lua_gettop( L ) != 1 || ! lua_isstring( L, 1 ) )
+		throw std::runtime_error( "Item.new expects a single argument - a name" );
+
+	size_t len = 0;
+	const char *p = lua_tolstring( L, 1, &len );
+	if ( p )
+	{
+		ItemPtr np = std::make_shared<Item>( std::string( p, len ) );
+		Item::push( L, np );
+	}
+	else
+		throw std::runtime_error( "Unable to extract item name" );
+
+	return 1;
 }
 
-static inline Item *
-retrieveItem( Item::ID i )
-{
-	auto y = theItemsByID.find( i );
-	if ( y != theItemsByID.end() )
-		return y->second;
-	return nullptr;
-}
+static Item::ID theLastID = 1;
 
 } // empty namespace
 
@@ -86,9 +116,8 @@ retrieveItem( Item::ID i )
 
 
 Item::Item( const std::string &name )
-		: myID( theLastID++ ), myName( name ), myScope( Scope::currentScope() )
+		: myID( theLastID++ ), myName( name )
 {
-	registerItem( this );
 }
 
 
@@ -96,9 +125,8 @@ Item::Item( const std::string &name )
 
 
 Item::Item( std::string &&name )
-		: myID( theLastID++ ), myName( std::move( name ) ), myScope( Scope::currentScope() )
+		: myID( theLastID++ ), myName( std::move( name ) )
 {
-	registerItem( this );
 }
 
 
@@ -107,7 +135,6 @@ Item::Item( std::string &&name )
 
 Item::~Item( void )
 {
-	unregisterItem( this );
 }
 
 
@@ -115,17 +142,17 @@ Item::~Item( void )
 
 
 void
-Item::add_dependency( DependencyType dt, ID otherObj )
+Item::addDependency( DependencyType dt, ItemPtr otherObj )
 {
-	Item *i = retrieveItem( otherObj );
-	if ( i && i->has_dependency( *this ) )
-		throw std::runtime_error( "Attempt to create a circular dependency between '" + name() + "' and '" + i->name() + "'" );
+	if ( ! otherObj )
+		return;
+
+	if ( otherObj->hasDependency( shared_from_this() ) )
+		throw std::runtime_error( "Attempt to create a circular dependency between '" + name() + "' and '" + otherObj->name() + "'" );
 
 	auto cur = myDependencies.find( otherObj );
 	if ( cur == myDependencies.end() )
-	{
 		myDependencies[otherObj] = dt;
-	}
 	else if ( cur->second > dt )
 		cur->second = dt;
 }
@@ -134,53 +161,16 @@ Item::add_dependency( DependencyType dt, ID otherObj )
 ////////////////////////////////////////
 
 
-void
-Item::add_dependency( DependencyType dt, const std::string &otherObj )
-{
-	ID o = findItem( otherObj );
-	if ( o == UNKNOWN )
-	{
-		bool found = false;
-		for ( auto &x: myUnresolvedDependencies )
-		{
-			if ( x.second == otherObj )
-			{
-				found = true;
-				if ( dt < x.first )
-					x.first = dt;
-			}
-		}
-		if ( ! found )
-			myUnresolvedDependencies.push_back( std::make_pair( dt, otherObj ) );
-	}
-	else
-		add_dependency( dt, o );
-}
-
-
-////////////////////////////////////////
-
-
 bool
-Item::has_dependency( const Item &other ) const
+Item::hasDependency( const ItemPtr &other ) const
 {
-	if ( myDependencies.find( other.id() ) != myDependencies.end() )
+	if ( myDependencies.find( other ) != myDependencies.end() )
 		return true;
-
-	for ( auto &unres: myUnresolvedDependencies )
-	{
-		if ( unres.second == other.name() )
-			return true;
-	}
 
 	for ( auto &dep: myDependencies )
 	{
-		Item *i = retrieveItem( dep.first );
-		if ( i )
-		{
-			if ( i->has_dependency( other ) )
-				return true;
-		}
+		if ( dep.first->hasDependency( other ) )
+			return true;
 	}
 
 	return false;
@@ -190,14 +180,14 @@ Item::has_dependency( const Item &other ) const
 ////////////////////////////////////////
 
 
-std::vector<const Item *>
-Item::extract_dependencies( DependencyType dt ) const
+std::vector<ItemPtr>
+Item::extractDependencies( DependencyType dt ) const
 {
-	std::vector<const Item *> retval;
+	std::vector<ItemPtr> retval;
 
 	if ( dt == DependencyType::CHAIN )
 	{
-		recurse_chain( retval );
+		recurseChain( retval );
 
 		if ( ! retval.empty() )
 		{
@@ -228,16 +218,12 @@ Item::extract_dependencies( DependencyType dt ) const
 			if ( dep.second != dt )
 				continue;
 
-			const Item *newItem = retrieveItem( dep.first );
-			if ( ! newItem )
-				throw std::logic_error( "Unknown item ID traversing dependents" );
-
-			retval.push_back( newItem );
+			retval.push_back( dep.first );
 		}
 	}
 	
 
-	return retval;
+	return std::move( retval );
 }
 
 
@@ -245,47 +231,15 @@ Item::extract_dependencies( DependencyType dt ) const
 
 
 void
-Item::update_dependency( const std::string &name, ID otherID )
-{
-	for ( auto x = myUnresolvedDependencies.begin(); x != myUnresolvedDependencies.end(); ++x )
-	{
-		if ( (*x).second == name )
-		{
-			add_dependency( (*x).first, otherID );
-			myUnresolvedDependencies.erase( x );
-			return;
-		}
-	}
-	throw std::runtime_error( "Unable to find unresolved dependency '" + name + "'" );
-}
-
-
-////////////////////////////////////////
-
-
-void
-Item::check_dependencies( void )
-{
-	for ( auto x = theItemsByID.begin(); x != theItemsByID.end(); ++x )
-	{
-		if ( x->second->has_unresolved_dependencies() )
-			throw std::runtime_error( "Object '" + x->second->name() + "' has unresolved dependencies" );
-	}
-}
-
-
-////////////////////////////////////////
-
-
-void
-Item::recurse_chain( std::vector<const Item *> &chain ) const
+Item::recurseChain( std::vector<ItemPtr> &chain ) const
 {
 	for ( auto &dep: myDependencies )
 	{
 		if ( dep.second != DependencyType::CHAIN )
 			continue;
 
-		add_chain_dependent( chain, dep.first );
+		chain.push_back( dep.first );
+		dep.first->recurseChain( chain );
 	}
 }
 
@@ -293,15 +247,56 @@ Item::recurse_chain( std::vector<const Item *> &chain ) const
 ////////////////////////////////////////
 
 
-void
-Item::add_chain_dependent( std::vector<const Item *> &chain, ID otherID ) const
+ItemPtr
+Item::extract( lua_State *L, int i )
 {
-	const Item *newItem = retrieveItem( otherID );
-	if ( ! newItem )
-		throw std::logic_error( "Unknown item ID traversing chain dependents" );
+	void *ud = luaL_checkudata( L, i, "Constructor.Item" );
+	if ( ! ud )
+		throw std::runtime_error( "User Data item is not a constructor item" );
+	return *( reinterpret_cast<ItemPtr *>( ud ) );
+}
 
-	chain.push_back( newItem );
-	newItem->recurse_chain( chain );
+
+
+////////////////////////////////////////
+
+
+void
+Item::push( lua_State *L, ItemPtr i )
+{
+	void *sptr = lua_newuserdata( L, sizeof(ItemPtr) );
+	if ( ! sptr )
+		throw std::runtime_error( "Unable to create item userdata" );
+
+	luaL_setmetatable( L, "Constructor.Item" );
+	new (sptr) ItemPtr( std::move( i ) );
+}
+
+
+////////////////////////////////////////
+
+
+static const struct luaL_Reg item_m[] =
+{
+	{ "__tostring", itemGetName },
+	{ "name", itemGetName },
+	{ "id", itemGetID },
+	{ "addDependency", itemAddDependency },
+	{ "depends", itemHasDependency },
+	{ nullptr, nullptr }
+};
+
+static const struct luaL_Reg class_f[] =
+{
+	{ "new", itemCreate },
+	{ nullptr, nullptr }
+};
+	
+void
+Item::registerFunctions( void )
+{
+	Lua::Engine &eng = Lua::Engine::singleton();
+	eng.registerClass( "Item", class_f, item_m );
 }
 
 

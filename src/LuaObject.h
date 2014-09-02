@@ -26,10 +26,13 @@
 ////////////////////////////////////////
 
 
-class Toolset
+class LuaObjectBase
 {
 public:
-	Toolset( void );
-	~Toolset( void );
+	LuaObjectBase( std::string name ) {}
+	virtual ~LuaObjectBase( void ) {}
 
+	int handleFuncDispatch( lua_State *L );
+	void push_new( lua_State *L, void *item );
 };
+

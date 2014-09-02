@@ -35,6 +35,9 @@
 #include <sys/param.h>
 #include <stdlib.h>
 #include <sstream>
+#include <fstream>
+#include <fcntl.h>
+#include <string.h>
 
 
 ////////////////////////////////////////
@@ -96,7 +99,7 @@ exists( const char *fn )
 	else
 	{
 		std::string tmp;
-		e = Directory::currentDirectory().exists( tmp, fn );
+		e = Directory::current().exists( tmp, fn );
 	}
 
 	return e;
@@ -124,7 +127,7 @@ isDirectory( const char *fn )
 	}
 	else
 	{
-		std::string tmp = Directory::currentDirectory().makefilename( fn );
+		std::string tmp = Directory::current().makefilename( fn );
 		struct stat sb;
 		if ( stat( tmp.c_str(), &sb ) == 0 )
 		{
@@ -141,9 +144,120 @@ isDirectory( const char *fn )
 
 
 bool
+diff( const char *fn, const std::vector<std::string> &lines )
+{
+	std::ifstream f( fn );
+	if ( ! f )
+		return true;
+	std::string curline;
+	size_t lIdx = 0;
+	bool founddiff = false;
+	while ( f )
+	{
+		std::getline( f, curline );
+
+		if ( lIdx >= lines.size() )
+		{
+			if ( ! curline.empty() )
+				founddiff = true;
+			break;
+		}
+
+		if ( curline != lines[lIdx] )
+		{
+			founddiff = true;
+			break;
+		}
+
+		++lIdx;
+	}
+	if ( lIdx < lines.size() )
+		founddiff = true;
+
+	return founddiff;
+}
+
+
+////////////////////////////////////////
+
+
+bool
+compare( const char *pathA, const char *pathB )
+{
+	if ( ! pathA )
+		throw std::runtime_error( "nil path A passed for comparison" );
+	if ( ! pathB )
+		throw std::runtime_error( "nil path B passed for comparison" );
+	if ( strcmp( pathA, pathB ) == 0 )
+		return false;
+
+	int fdA = open( pathA, O_RDONLY );
+	ON_EXIT{ if ( fdA >= 0 ) close( fdA ); };
+	if ( fdA < 0 )
+	{
+		std::stringstream msg;
+		msg << "Unable to open file '" << pathA << "' for comparison";
+		throw std::system_error( errno, std::system_category(), msg.str() );
+	}
+
+	int fdB = open( pathB, O_RDONLY );
+	ON_EXIT{ if ( fdB >= 0 ) close( fdB ); };
+	if ( fdB < 0 )
+	{
+		std::stringstream msg;
+		msg << "Unable to open file '" << pathB << "' for comparison";
+		throw std::system_error( errno, std::system_category(), msg.str() );
+	}
+
+	char aBuf[4096], bBuf[4096];
+	ssize_t nA = 0, nB = 0;
+	off_t offset = 0;
+	do
+	{
+		nA = pread( fdA, aBuf, 4096, offset );
+		if ( nA < 0 )
+		{
+			if ( errno == EINTR )
+				continue;
+
+			std::stringstream msg;
+			msg << "Error reading from file '" << pathA << "'";
+			throw std::system_error( errno, std::system_category(), msg.str() );
+		}
+		nB = pread( fdB, bBuf, 4096, offset );
+		if ( nB < 0 )
+		{
+			if ( errno == EINTR )
+				continue;
+
+			std::stringstream msg;
+			msg << "Error reading from file '" << pathB << "'";
+			throw std::system_error( errno, std::system_category(), msg.str() );
+		}
+
+		if ( nA != nB )
+			break;
+
+		if ( nA == 0 )
+			break;
+
+		if ( memcmp( aBuf, bBuf, nA ) != 0 )
+			return true;
+
+		offset += nA;
+	} while ( true );
+
+	return nA != nB;
+}
+
+
+////////////////////////////////////////
+
+
+bool
 find( std::string &filepath, const std::vector<std::string> &names )
 {
-	return Directory::currentDirectory().find( filepath, names );
+	return Directory::current().find( filepath, names );
 }
 
 
@@ -200,7 +314,7 @@ find( std::string &filepath, const std::string &name,
 
 
 bool
-findExectuable( std::string &filepath, const std::string &name )
+findExecutable( std::string &filepath, const std::string &name )
 {
 	filepath.clear();
 	const char *p = getenv( "PATH" );
@@ -216,26 +330,27 @@ findExectuable( std::string &filepath, const std::string &name )
 	return ret;
 }
 
-
-////////////////////////////////////////
-
-
-void
-startParsing( const std::string &dir )
+static int
+luaFindExecutable( lua_State *L )
 {
-	Directory &curDir = Directory::currentDirectory();
-	if ( ! dir.empty() )
-		curDir.reset( dir );
-
-	std::string firstFile;
-	if ( curDir.exists( firstFile, buildFileName() ) )
-		Lua::Engine::singleton().runFile( firstFile.c_str() );
-	else
+	if ( lua_gettop( L ) != 1 )
+		throw std::runtime_error( "Expecting executable name to find_exe" );
+	if ( ! lua_isstring( L, 1 ) )
+		throw std::runtime_error( "Expecting string argument to find_exe" );
+	size_t len = 0;
+	const char *ename = lua_tolstring( L, 1, &len );
+	if ( ename )
 	{
-		std::stringstream msg;
-		msg << "Unable to find " << buildFileName() << " in " << curDir.fullpath();
-		throw std::runtime_error( msg.str() );
+		std::string name( ename, len );
+		std::string ret;
+		if ( findExecutable( ret, name ) )
+			lua_pushlstring( L, ret.c_str(), ret.size() );
+		else
+			lua_pushnil( L );
 	}
+	else
+		lua_pushnil( L );
+	return 1;
 }
 
 
@@ -246,7 +361,17 @@ void
 registerFunctions( void )
 {
 	Lua::Engine &eng = Lua::Engine::singleton();
+	eng.pushLibrary( "file" );
 	eng.registerFunction( "exists", &exists );
+	eng.registerFunction( "diff", &diff );
+	eng.registerFunction( "compare", &compare );
+	eng.registerFunction( "find_exe", &luaFindExecutable );
+	std::string path_sep;
+	path_sep.push_back( pathSeparator() );
+	lua_pushliteral( eng.state(), "path_sep" );
+	lua_pushlstring( eng.state(), path_sep.c_str(), path_sep.size() );
+	lua_rawset( eng.state(), -3 );
+	eng.popLibrary();
 }
 
 } // namespace File

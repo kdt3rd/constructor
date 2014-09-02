@@ -29,7 +29,7 @@
 ////////////////////////////////////////
 
 
-variable::variable( std::string n, bool checkEnv )
+Variable::Variable( std::string n, bool checkEnv )
 		: myName( std::move( n ) )
 {
 	if ( checkEnv )
@@ -47,7 +47,7 @@ variable::variable( std::string n, bool checkEnv )
 ////////////////////////////////////////
 
 
-variable::~variable( void )
+Variable::~Variable( void )
 {
 }
 
@@ -56,7 +56,7 @@ variable::~variable( void )
 
 
 void
-variable::clear( void )
+Variable::clear( void )
 {
 	myValues.clear();
 }
@@ -66,7 +66,7 @@ variable::clear( void )
 
 
 void
-variable::add( std::string v )
+Variable::add( std::string v )
 {
 	if ( ! v.empty() )
 		myValues.emplace_back( std::move( v ) );
@@ -77,7 +77,7 @@ variable::add( std::string v )
 
 
 void
-variable::add( std::vector<std::string> v )
+Variable::add( std::vector<std::string> v )
 {
 	if ( myValues.empty() )
 	{
@@ -96,7 +96,7 @@ variable::add( std::vector<std::string> v )
 
 
 void
-variable::reset( std::string v )
+Variable::reset( std::string v )
 {
 	myValues.clear();
 	if ( ! v.empty() )
@@ -108,7 +108,7 @@ variable::reset( std::string v )
 
 
 void
-variable::reset( std::vector<std::string> v )
+Variable::reset( std::vector<std::string> v )
 {
 	myValues = std::move( v );
 }
@@ -118,7 +118,7 @@ variable::reset( std::vector<std::string> v )
 
 
 std::string
-variable::value( void ) const
+Variable::value( void ) const
 {
 	std::string ret;
 	if ( myInherit )
@@ -141,7 +141,7 @@ variable::value( void ) const
 
 
 std::string
-variable::prepended_value( const std::string &prefix ) const
+Variable::prepended_value( const std::string &prefix ) const
 {
 	std::string ret;
 	if ( myInherit )

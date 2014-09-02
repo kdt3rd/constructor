@@ -22,14 +22,27 @@
 
 #pragma once
 
+#include "Item.h"
+#include "Directory.h"
+
 
 ////////////////////////////////////////
 
 
-class Toolset
+class CompileSet : public Item
 {
 public:
-	Toolset( void );
-	~Toolset( void );
+	CompileSet( void );
+	virtual ~CompileSet( void );
 
+	void addItem( const ItemPtr &i );
+	void addItem( const std::string &name );
+
+	static void registerFunctions( void );
+private:
+	Directory myDir;
+	std::vector<ItemPtr> myItems;
 };
+
+
+

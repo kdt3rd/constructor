@@ -125,7 +125,12 @@ void
 registerFunctions( void )
 {
 	Lua::Engine &eng = Lua::Engine::singleton();
-
+	eng.registerFunction( "is64bit", &is64bit );
+	eng.registerFunction( "machine", &machine );
+	eng.registerFunction( "release", &release );
+	eng.registerFunction( "version", &version );
+	eng.registerFunction( "system", &system );
+	eng.registerFunction( "node", &node );
 }
 
 } // namespace OS

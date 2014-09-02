@@ -91,6 +91,39 @@ private:
 	std::function<R (Args...)> myFunc;
 };
 
+////////////////////////////////////////
+
+
+template <typename... Args>
+class Function<void, Args...> : public FunctionBase
+{
+public:
+	inline Function( const char *name, void (*f)(Args...) ) : myName( name ), myFunc( f ) {}
+	inline Function( const char *name, std::function<void (Args...)> &&f ) : myName( name ), myFunc( std::move( f ) ) {}
+	inline Function( const char *name, const std::function<void (Args...)> &f ) : myName( name ), myFunc( f ) {}
+	template <typename LambdaFunc> Function( const char *name, LambdaFunc &&f ) : myName( name ), myFunc( f ) {}
+	virtual ~Function( void )
+	{}
+
+	virtual int process( lua_State *l )
+	{
+		extractArgsAndCall( l, typename gen_sequence<sizeof...(Args)>::type() );
+		lua_pop( l, static_cast<int>( sizeof...(Args) ) );
+		return 0;
+	}
+
+private:
+	template <int ...S>
+	void extractArgsAndCall( lua_State *l, const unpack_sequence<S...> & )
+	{
+		int N = lua_gettop( l );
+		myFunc( Parm<Args>::get( l, N, S + 1 )... );
+	}
+
+	std::string myName;
+	std::function<void (Args...)> myFunc;
+};
+
 } // namespace Lua
 
 

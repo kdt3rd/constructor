@@ -56,9 +56,13 @@ Scope::~Scope( void )
 
 
 std::shared_ptr<Scope>
-Scope::new_sub_scope( void )
+Scope::newSubScope( bool inherits )
 {
 	mySubScopes.emplace_back( std::make_shared<Scope>( shared_from_this() ) );
+	if ( inherits )
+	{
+		
+	}
 	return mySubScopes.back();
 }
 
@@ -66,22 +70,67 @@ Scope::new_sub_scope( void )
 ////////////////////////////////////////
 
 
-std::shared_ptr<Scope>
-Scope::rootScope( void )
+void
+Scope::addTool( const std::shared_ptr<Tool> &t )
 {
-	return theRootScope;
+	myTools.push_back( t );
 }
 
 
 ////////////////////////////////////////
 
 
-std::shared_ptr<Scope>
-Scope::currentScope( void )
+std::shared_ptr<Tool>
+Scope::findTool( const std::string &extension ) const
+{
+	for ( auto &t: myTools )
+		if ( t->handlesExtension( extension ) )
+			return t;
+
+	if ( myInheritParentScope )
+		return parent()->findTool( extension );
+	return std::shared_ptr<Tool>();
+}
+
+
+////////////////////////////////////////
+
+
+void
+Scope::useToolset( const std::string &tset )
+{
+}
+
+
+////////////////////////////////////////
+
+
+void
+Scope::addItem( const ItemPtr &i )
+{
+	myItems.push_back( i );
+}
+
+
+////////////////////////////////////////
+
+
+Scope &
+Scope::root( void )
+{
+	return *(theRootScope);
+}
+
+
+////////////////////////////////////////
+
+
+Scope &
+Scope::current( void )
 {
 	if ( theScopes.empty() )
-		return theRootScope;
-	return theScopes.top();
+		return *(theRootScope);
+	return *(theScopes.top());
 }
 
 

@@ -22,14 +22,32 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "LuaValue.h"
+
 
 ////////////////////////////////////////
 
 
-class Toolset
+class Configuration
 {
 public:
-	Toolset( void );
-	~Toolset( void );
+	Configuration( void );
+	Configuration( Lua::Table &&t );
+	~Configuration( void );
 
+	const std::string &name( void ) const;
+
+	static const Configuration &getDefault( void );
+	static const Configuration &getActive( void );
+	static std::vector<Configuration> &defined( void );
+	static void requestedConfig( const std::string &name, bool useSubDir );
+	static void registerFunctions( void );
+
+private:
+	Lua::Table myConfigSettings;
 };
+
+

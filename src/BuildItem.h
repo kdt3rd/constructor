@@ -22,14 +22,40 @@
 
 #pragma once
 
+#include "Item.h"
+#include "Tool.h"
+
 
 ////////////////////////////////////////
 
 
-class Toolset
+class BuildItem : public Item
 {
 public:
-	Toolset( void );
-	~Toolset( void );
+	BuildItem( const std::string &name );
+	BuildItem( std::string &&name );
+	virtual ~BuildItem( void );
 
+	void setTool( const std::shared_ptr<Tool> &t );
+	inline const std::shared_ptr<Tool> &tool( void ) const;
+
+	void addOutput( const std::string &o );
+	void addOutput( std::string &&o );
+	inline const std::vector<std::string> &outputs( void ) const;
+
+private:
+	std::shared_ptr<Tool> myTool;
+	std::vector<std::string> myOutputs;
 };
+
+
+////////////////////////////////////////
+
+
+inline const std::shared_ptr<Tool> &
+BuildItem::tool( void ) const
+{
+	return myTool;
+}
+
+

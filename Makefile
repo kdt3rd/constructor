@@ -10,8 +10,15 @@ OUTPUT:= Build
 SRC:= main.cpp \
 	Item.cpp \
 	Scope.cpp \
+	Compile.cpp \
+	Tool.cpp \
+	Configuration.cpp \
 	Variable.cpp \
+	Generator.cpp \
+	NinjaGenerator.cpp \
+	MakeGenerator.cpp \
 	LuaEngine.cpp \
+	LuaValue.cpp \
 	StrUtil.cpp \
 	OSUtil.cpp \
 	FileUtil.cpp \

@@ -22,14 +22,25 @@
 
 #pragma once
 
+#include "Generator.h"
+
 
 ////////////////////////////////////////
 
 
-class Toolset
+class MakeGenerator : public Generator
 {
 public:
-	Toolset( void );
-	~Toolset( void );
+	MakeGenerator( std::string p );
+	virtual ~MakeGenerator( void );
 
+	virtual void targetCall( std::ostream &os,
+							 const std::string &tname );
+	virtual void emit( const Directory &dest,
+					   const Configuration &cfg,
+					   int args, const char *argv[] );
+
+	static void init( void );
 };
+
+

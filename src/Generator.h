@@ -22,61 +22,52 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
-#include <vector>
-#include <map>
+#include <ostream>
+#include "Directory.h"
 
 
 ////////////////////////////////////////
 
 
-///
-/// @brief Class Variable provides an abstraction around storing a name
-///        with associated values
-///
-class Variable
+class Configuration;
+
+
+////////////////////////////////////////
+
+
+class Generator
 {
 public:
-	Variable( std::string n, bool checkEnv = false );
-	~Variable( void );
+	Generator( std::string n, std::string d, std::string p );
+	virtual ~Generator( void );
 
 	inline const std::string &name( void ) const;
+	inline const std::string &description( void ) const;
+	inline const std::string &program( void ) const;
 
-	inline void inherit( bool yesno );
-	inline bool inherit( void ) const;
+	virtual void targetCall( std::ostream &os,
+							 const std::string &tname ) = 0;
+	virtual void emit( const Directory &dest,
+					   const Configuration &config,
+					   int args, const char *argv[] ) = 0;
 
-	void clear( void );
-	void add( std::string v );
-	void add( std::vector<std::string> v );
-	void reset( std::string v );
-	void reset( std::vector<std::string> v );
+	static const std::vector< std::shared_ptr<Generator> > &available( void );
+	static void registerGenerator( const std::shared_ptr<Generator> &g );
 
-	std::string value( void ) const;
-
-	// if any of the values in the Variable don't begin
-	// with the provided prefix, it is preprended to that
-	// value.
-	std::string prepended_value( const std::string &prefix ) const;
-
-	inline const std::vector<std::string> &values( void ) const;
-
-private:
-	std::string replace_vars( const std::string &v );
-
+protected:
 	std::string myName;
-	std::vector<std::string> myValues;
-	bool myInherit = false;
+	std::string myDescription;
+	std::string myProgram;
 };
 
 
-typedef std::map<std::string, Variable> VariableSet;
-
-
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 
 
 inline const std::string &
-Variable::name( void ) const
+Generator::name( void ) const
 {
 	return myName;
 }
@@ -85,30 +76,20 @@ Variable::name( void ) const
 ////////////////////////////////////////
 
 
-inline void
-Variable::inherit( bool yesno )
+inline const std::string &
+Generator::description( void ) const
 {
-	myInherit = yesno;
+	return myDescription;
 }
 
 
 ////////////////////////////////////////
 
 
-inline bool
-Variable::inherit( void ) const
+inline const std::string &
+Generator::program( void ) const
 {
-	return myInherit;
-}
-
-
-////////////////////////////////////////
-
-
-inline const std::vector<std::string> &
-Variable::values( void ) const
-{
-	return myValues;
+	return myProgram;
 }
 
 

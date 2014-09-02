@@ -27,6 +27,7 @@
 #include <map>
 #include <string>
 #include <memory>
+#include "LuaEngine.h"
 
 
 enum class DependencyType : uint8_t
@@ -37,16 +38,18 @@ enum class DependencyType : uint8_t
 	ORDER
 };
 	
-class Scope;		
+class Item;
+typedef std::shared_ptr<Item> ItemPtr;
 
 /// @brief base class for everything else in the system
 ///
-/// In a build system, there are either targets
-class Item
+/// In a build system, there are either targets, sources,
+/// or transformers. All of these things will be items
+/// such that we can track dependencies.
+class Item : public std::enable_shared_from_this<Item>
 {
 public:
 	typedef uint64_t ID;
-	static const ID UNKNOWN = static_cast<uint64_t>(-1);
 
 	Item( const std::string &name );
 	Item( std::string &&name );
@@ -54,15 +57,15 @@ public:
 
 	inline ID id( void ) const;
 	inline const std::string &name( void ) const;
-	inline const std::shared_ptr<Scope> &scope( void ) const;
 
-	void add_dependency( DependencyType dt, ID otherObj );
-	void add_dependency( DependencyType dt, const std::string &otherObj );
-	inline void add_dependency( DependencyType dt, const Item &otherObj );
+//	virtual void transform( std::vector<BuildItem> &b,
+//	const VariableSet &config );
+
+	void addDependency( DependencyType dt, ItemPtr o );
 
 	/// (recursively) check if this item has a dependency on
 	/// the other passed in
-	bool has_dependency( const Item &other ) const;
+	bool hasDependency( const ItemPtr &other ) const;
 
 	/// for a chain dependency,
 	/// Recursively traverses the chain dependencies and
@@ -72,25 +75,18 @@ public:
 	///
 	/// for all other dependency types,
 	/// returns the list of items that this item has that dependency type on
-	std::vector<const Item *> extract_dependencies( DependencyType dt ) const;
+	std::vector<ItemPtr> extractDependencies( DependencyType dt ) const;
 
-	std::vector<const Item *> extract_explicit_dependencies( void ) const;
-	inline bool has_unresolved_dependencies( void ) const;
-	void update_dependency( const std::string &name, ID otherID );
-
-	/// Will throw if unable to resolve all dependencies from all live items -
-	/// should only be called once prior to generating the build files
-	static void check_dependencies( void );
-
+	static ItemPtr extract( lua_State *l, int i );
+	static void push( lua_State *l, ItemPtr i );
+	static void registerFunctions( void );
 private:
-	void recurse_chain( std::vector<const Item *> &chain ) const;
-	void add_chain_dependent( std::vector<const Item *> &chain, ID otherID ) const;
+	void recurseChain( std::vector<ItemPtr> &chain ) const;
+
 	ID myID;
 	std::string myName;
 
-	std::vector<std::pair<DependencyType, std::string>> myUnresolvedDependencies;
-	std::map<ID, DependencyType> myDependencies;
-	std::shared_ptr<Scope> myScope;
+	std::map<ItemPtr, DependencyType> myDependencies;
 };
 
 
@@ -111,36 +107,6 @@ inline const std::string &
 Item::name( void ) const 
 {
 	return myName;
-}
-
-
-////////////////////////////////////////
-
-
-inline const std::shared_ptr<Scope> &
-Item::scope( void ) const 
-{
-	return myScope;
-}
-
-
-////////////////////////////////////////
-
-
-inline void
-Item::add_dependency( DependencyType dt, const Item &otherObj )
-{
-	add_dependency( dt, otherObj.id() );
-}
-
-
-////////////////////////////////////////
-
-
-inline bool
-Item::has_unresolved_dependencies( void ) const
-{
-	return ! myUnresolvedDependencies.empty();
 }
 
 

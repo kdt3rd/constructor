@@ -20,16 +20,74 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#pragma once
+#include "BuildItem.h"
+#include <stdexcept>
+#include "LuaEngine.h"
 
 
 ////////////////////////////////////////
 
 
-class Toolset
+BuildItem::BuildItem( const std::string &name )
+		: Item( name )
 {
-public:
-	Toolset( void );
-	~Toolset( void );
+}
 
-};
+
+////////////////////////////////////////
+
+
+BuildItem::BuildItem( std::string &&name )
+		: Item( std::move( name ) )
+{
+}
+
+
+////////////////////////////////////////
+
+
+BuildItem::~BuildItem( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::setTool( const std::shared_ptr<Tool> &t )
+{
+	if ( myTool )
+		throw std::runtime_error( "Tool already specified for build item " + name() );
+
+	myTool = t;
+	addDependency( TOOL, t );
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::addOutput( const std::string &o )
+{
+	myOutputs.push_back( o );
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::addOutput( std::string &&o )
+{
+	myOutputs.push_back( o );
+}
+
+
+
+////////////////////////////////////////
+
+
+
+

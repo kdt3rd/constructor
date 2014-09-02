@@ -27,6 +27,8 @@
 #include <vector>
 
 #include "Variable.h"
+#include "Item.h"
+#include "Tool.h"
 
 
 ////////////////////////////////////////
@@ -46,33 +48,45 @@ public:
 	Scope( std::shared_ptr<Scope> parent );
 	~Scope( void );
 
-	inline std::shared_ptr<Scope> parent_scope( void ) const;
-	std::shared_ptr<Scope> new_sub_scope( void );
-	inline const std::vector< std::shared_ptr<Scope> > &sub_scopes( void ) const;
+	inline std::shared_ptr<Scope> parent( void ) const;
+	std::shared_ptr<Scope> newSubScope( bool inherits );
+	inline const std::vector< std::shared_ptr<Scope> > &subScopes( void ) const;
 
-	inline void inherit( bool yesno );
-	inline bool inherit( void ) const;
+	inline VariableSet &vars( void );
+	inline const VariableSet &vars( void ) const;
 
-	inline variable_set &vars( void );
-	inline const variable_set &vars( void ) const;
+	inline std::vector< std::shared_ptr<Tool> > &tools( void );
+	inline const std::vector< std::shared_ptr<Tool> > &tools( void ) const;
 
-	static std::shared_ptr<Scope> rootScope( void );
-	static std::shared_ptr<Scope> currentScope( void );
+	void addTool( const std::shared_ptr<Tool> &t );
+	std::shared_ptr<Tool> findTool( const std::string &extension ) const;
+
+	void useToolset( const std::string &tset );
+	void addItem( const ItemPtr &i );
+
+	static Scope &root( void );
+	static Scope &current( void );
 	static void pushScope( const std::shared_ptr<Scope> &scope );
 	static void popScope( void );
 
 private:
 	std::weak_ptr<Scope> myParent;
-	variable_set myVariables;
+	VariableSet myVariables;
 	bool myInheritParentScope = false;
 	std::vector< std::shared_ptr<Scope> > mySubScopes;
+
+	std::vector<ItemPtr> myItems;
+
+	std::vector< std::shared_ptr<Tool> > myTools;
+	std::vector<std::string> myEnabledToolsets;
+	std::map<std::string, std::vector<std::shared_ptr<Tool> > > myExtensionMap;
 };
 
 
 ////////////////////////////////////////
 
 
-inline const std::vector< std::shared_ptr<Scope> > &Scope::sub_scopes( void ) const
+inline const std::vector< std::shared_ptr<Scope> > &Scope::subScopes( void ) const
 {
 	return mySubScopes;
 }
@@ -81,21 +95,37 @@ inline const std::vector< std::shared_ptr<Scope> > &Scope::sub_scopes( void ) co
 ////////////////////////////////////////
 
 
-inline void Scope::inherit( bool yesno ) { myInheritParentScope = yesno; }
-inline bool Scope::inherit( void ) const { return myInheritParentScope; }
+//inline void Scope::inherit( bool yesno ) { myInheritParentScope = yesno; }
+//inline bool Scope::inherit( void ) const { return myInheritParentScope; }
 
 
 ////////////////////////////////////////
 
 
-inline std::shared_ptr<Scope> Scope::parent_scope( void ) const { return myParent.lock(); }
+inline std::shared_ptr<Scope> Scope::parent( void ) const { return myParent.lock(); }
 
 
 ////////////////////////////////////////
 
 
-inline variable_set &Scope::vars( void ) { return myVariables; }
-inline const variable_set &Scope::vars( void ) const { return myVariables; }
+inline VariableSet &Scope::vars( void ) { return myVariables; }
+inline const VariableSet &Scope::vars( void ) const { return myVariables; }
+
+
+////////////////////////////////////////
+
+
+inline std::vector< std::shared_ptr<Tool> > &
+Scope::tools( void )
+{
+	return myTools;
+}
+inline const std::vector< std::shared_ptr<Tool> > &
+Scope::tools( void ) const
+{
+	return myTools;
+}
+
 
 
 ////////////////////////////////////////

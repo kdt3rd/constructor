@@ -20,15 +20,19 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#include "Rule.h"
-#include "StrUtil.h"
+#include "MakeGenerator.h"
+#include "FileUtil.h"
+#include <fstream>
+#include <iostream>
+#include <unistd.h>
 
 
 ////////////////////////////////////////
 
 
-Rule::Rule( std::string tag, std::string desc )
-		: Item( std::move( tag ) ), myDesc( std::move( desc ) )
+MakeGenerator::MakeGenerator( std::string p )
+		: Generator( "make", "Standard GNU makefile system",
+					 std::move( p ) )
 {
 }
 
@@ -36,28 +40,8 @@ Rule::Rule( std::string tag, std::string desc )
 ////////////////////////////////////////
 
 
-Rule::~Rule( void )
+MakeGenerator::~MakeGenerator( void )
 {
-}
-
-
-////////////////////////////////////////
-
-
-void
-Rule::command( const std::string &c )
-{
-	myCommand = String::shell_split( c );
-}
-
-
-////////////////////////////////////////
-
-
-void
-Rule::command( const std::vector<std::string> &c )
-{
-	myCommand = c;
 }
 
 
@@ -65,35 +49,56 @@ Rule::command( const std::vector<std::string> &c )
 
 
 void
-Rule::addCommand( const std::vector<std::string> &c )
+MakeGenerator::targetCall( std::ostream &os,
+						   const std::string &tname )
 {
-	myCommand.insert( myCommand.end(), c.begin(), c.end() );
+	os << program();
+	long np = sysconf( _SC_NPROCESSORS_ONLN );
+	if ( np > 0 )
+		os << " -J " << np;
+
+	if ( tname.find_first_of( ' ' ) != std::string::npos )
+		os << " \"" << tname << "\"";
+	else if ( ! tname.empty() )
+		os << ' ' << tname;
+}
+
+
+
+////////////////////////////////////////
+
+
+void
+MakeGenerator::emit( const Directory &d,
+					 const Configuration &conf,
+					 int argc, const char *argv[] )
+{
+	std::ofstream f( d.makefilename( "Makefile" ) );
+	f <<
+		".PHONY: all clean\n"
+		".ONESHELL:\n"
+		".DEFAULT: all\n"
+		"\n";
+	f << "all:\n\n";
+	f << "clean:\n\t@echo \"Cleaning...\"\n";
 }
 
 
 ////////////////////////////////////////
 
 
-std::string
-Rule::command( void ) const
+void
+MakeGenerator::init( void )
 {
-	std::string ret;
-	for ( const std::string &i: myCommand )
+	std::string makeP;
+	if ( File::findExecutable( makeP, "make" ) )
 	{
-		if ( i.empty() )
-			continue;
-
-		if ( ! ret.empty() )
-			ret.push_back( ' ' );
-
-		ret.append( i );
+		registerGenerator( std::make_shared<MakeGenerator>( std::move( makeP ) ) );
 	}
-	return std::move( ret );
+	else
+	{
+		std::cout << "WARNING: make not found in path, ignoring Makefile generator" << std::endl;
+	}
 }
-
-
-////////////////////////////////////////
-
-
 
 

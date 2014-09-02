@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 #include <type_traits>
+#include "LuaValue.h"
 
 
 ////////////////////////////////////////
@@ -138,7 +139,10 @@ struct ParmAdapt<const char *>
 
 	static inline void put( lua_State *l, const char *v )
 	{
-		lua_pushstring( l, v );
+		if ( v )
+			lua_pushstring( l, v );
+		else
+			lua_pushnil( l );
 	}
 };
 
@@ -217,6 +221,27 @@ struct ParmAdapt< std::vector<std::string> >
 			ParmAdapt<std::string>::put( l, v[i] );
 			lua_rawseti( l, -2, static_cast<int>( i + 1 ) );
 		}
+	}
+};
+
+template <>
+struct ParmAdapt<Lua::Value>
+{
+	static inline Lua::Value get( lua_State *l, int i )
+	{
+		Lua::Value v;
+		v.load( l, i );
+		return std::move( v );
+	}
+
+	static inline Lua::Value check_and_get( lua_State *l, int i )
+	{
+		return std::move( get( l, i ) );
+	}
+
+	static inline void put( lua_State *l, const Lua::Value &v )
+	{
+		v.push( l );
 	}
 };
 

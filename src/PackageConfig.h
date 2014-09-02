@@ -26,6 +26,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include "Item.h"
 
 
 ////////////////////////////////////////
@@ -42,13 +43,12 @@ enum class VersionCompare
 	GREATER_EQUAL // greater than or equal to (>=)
 };
 	
-class PackageConfig
+class PackageConfig : public Item
 {
 public:
 	PackageConfig( const std::string &n, const std::string &pkgfile );
 	~PackageConfig( void );
 
-	inline const std::string &name( void ) const { return myName; }
 	inline const std::string &filename( void ) const { return myPackageFile; }
 
 	const std::string &version( void ) const;
@@ -77,7 +77,6 @@ private:
 	void extractNameAndValue( const std::string &curline );
 	std::vector< std::shared_ptr<PackageConfig> > extractOtherModules( const std::string &val, bool required );
 
-	std::string myName;
 	std::string myPackageFile;
 	std::map<std::string, std::string> myVariables;
 	std::map<std::string, std::string> myValues;

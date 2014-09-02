@@ -32,11 +32,6 @@
 namespace File
 {
 
-inline constexpr const char *buildFileName( void )
-{
-	return "build.lua";
-}
-
 inline constexpr char pathSeparator( void ) 
 {
 #ifdef WIN32
@@ -51,6 +46,9 @@ bool isAbsolute( const char *path );
 bool exists( const char *path );
 bool isDirectory( const char *path );
 
+bool diff( const char *path, const std::vector<std::string> &lines );
+bool compare( const char *pathA, const char *pathB );
+
 // looks in the current directory for a file
 // returns the first name found
 bool find( std::string &filepath, const std::vector<std::string> &names );
@@ -62,9 +60,7 @@ bool find( std::string &filepath, const std::string &name, const std::vector<std
 // returns the first result found
 bool find( std::string &filepath, const std::string &name, const std::vector<std::string> &extensions, const std::vector<std::string> &path );
 
-bool findExectuable( std::string &filepath, const std::string &name );
-
-void startParsing( const std::string &dir );
+bool findExecutable( std::string &filepath, const std::string &name );
 
 void registerFunctions( void );
 

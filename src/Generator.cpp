@@ -20,16 +20,55 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#pragma once
+#include "Generator.h"
+
+namespace
+{
+std::vector< std::shared_ptr<Generator> > theGenerators;
+} // empty namespace
 
 
 ////////////////////////////////////////
 
 
-class Toolset
+Generator::Generator( std::string n, std::string d, std::string p )
+		: myName( std::move( n ) ),
+		  myDescription( std::move( d ) ),
+		  myProgram( std::move( p ) )
 {
-public:
-	Toolset( void );
-	~Toolset( void );
+}
 
-};
+
+////////////////////////////////////////
+
+
+Generator::~Generator( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+const std::vector< std::shared_ptr<Generator> > &
+Generator::available( void )
+{
+	return theGenerators;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Generator::registerGenerator( const std::shared_ptr<Generator> &g )
+{
+	theGenerators.push_back( g );
+}
+
+
+////////////////////////////////////////
+
+
+
+

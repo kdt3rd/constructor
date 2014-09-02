@@ -31,6 +31,7 @@
 #include <functional>
 #include <utility>
 #include <vector>
+#include <stack>
 #include <memory>
 #include "LuaFunction.h"
 
@@ -91,8 +92,17 @@ public:
 		registerFunction( name, std::bind( &FunctionBase::process, mCPPFuncs.back().get(), std::placeholders::_1 ) );
 	}
 
+	void pushLibrary( const char *name );
+	void popLibrary( void );
+	void registerLibrary( const char *name,
+						  const struct luaL_Reg *libFuncs );
+	void registerClass( const char *name,
+						const struct luaL_Reg *classFuncs,
+						const struct luaL_Reg *memberFuncs );
+
 	int runFile( const char *filename );
 
+	inline lua_State *state( void ) { return L; }
 	const char *getError( void );
 
 	static Engine &singleton( void );
@@ -108,6 +118,7 @@ private:
 	int myErrFunc;
 	std::vector<BoundFunction> mFuncs;
 	std::vector< std::shared_ptr<FunctionBase> > mCPPFuncs;
+	std::stack<std::string> myCurLib;
 };
 
 } // namespace Lua

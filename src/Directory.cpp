@@ -24,6 +24,7 @@
 #include "FileUtil.h"
 #include "ScopeGuard.h"
 #include "LuaEngine.h"
+#include "StrUtil.h"
 
 #include <unistd.h>
 #include <errno.h>
@@ -32,9 +33,20 @@
 #include <sys/param.h>
 #include <stdlib.h>
 #include <sstream>
+#include <iostream>
+#include <vector>
+#include <mutex>
 
 namespace 
 {
+
+inline constexpr const char *buildFileName( void )
+{
+	return "build.lua";
+}
+
+std::string theBinaryRoot;
+std::vector<std::string> theSubDirFiles;
 
 int
 SubDir( lua_State *L )
@@ -51,17 +63,20 @@ SubDir( lua_State *L )
 	int ret = 0;
 
 	std::string file = lua_tolstring( L, 1, NULL );
-	Directory &curDir = Directory::currentDirectory();
+	Directory &curDir = Directory::current();
 	std::string tmp;
 	lua_pop( L, 1 );
 	if ( curDir.exists( tmp, file ) )
 	{
 		curDir.cd( file );
 		std::string nextFile;
-		if ( curDir.exists( nextFile, File::buildFileName() ) )
+		if ( curDir.exists( nextFile, buildFileName() ) )
+		{
 			ret = Lua::Engine::singleton().runFile( nextFile.c_str() );
+			theSubDirFiles.push_back( nextFile );
+		}
 		else
-			throw std::runtime_error( "Unable to find a '" + std::string( File::buildFileName() ) + "' in " + curDir.fullpath() );
+			throw std::runtime_error( "Unable to find a '" + std::string( buildFileName() ) + "' in " + curDir.fullpath() );
 
 		curDir.cdUp();
 	}
@@ -69,6 +84,56 @@ SubDir( lua_State *L )
 		throw std::runtime_error( "Sub Directory '" + file + "' does not exist in " + curDir.fullpath() );
 
 	return stk.returns( ret );
+}
+
+std::string
+SourceDir( void )
+{
+	return Directory::current().fullpath();
+}
+
+std::string
+RelSourceDir( void )
+{
+	return Directory::current().relpath();
+}
+
+std::string
+BinaryDir( void )
+{
+	if ( theBinaryRoot.empty() )
+		throw std::runtime_error( "Binary output directory not yet chosen, please specify configurations before attempting to access" );
+
+	Directory tmpDir( theBinaryRoot );
+	tmpDir.cd( Directory::current().relpath() );
+	return tmpDir.fullpath();
+}
+
+std::string
+SourceFile( const std::string &fn )
+{
+	return Directory::current().makefilename( fn );
+}
+
+std::string
+BinaryFile( const std::string &fn )
+{
+	return Directory::binary().makefilename( fn );
+}
+
+static std::string theCWD;
+static std::vector<std::string> theCWDPath;
+static std::once_flag theNeedCWDInit;
+static void initCWD( void )
+{
+	char *cwd = getcwd( NULL, MAXPATHLEN );
+	if ( ! cwd )
+		throw std::system_error( errno, std::system_category(),
+								 "Unable to query current directory" );
+	ON_EXIT{ free( cwd ); };
+
+	theCWD = cwd;
+	theCWDPath = String::split( theCWD, File::pathSeparator() );
 }
 
 } // empty namespace
@@ -79,23 +144,103 @@ SubDir( lua_State *L )
 
 Directory::Directory( void )
 {
-	char *cwd = getcwd( NULL, MAXPATHLEN );
-	if ( ! cwd )
-		throw std::system_error( errno, std::system_category(),
-								 "Unable to query current directory" );
-	ON_EXIT{ free( cwd ); };
+	std::call_once( theNeedCWDInit, &initCWD );
 
-	myRoot = cwd;
-	updateFullPath();
+	myRoot = theCWD;
+	myFullDirs = theCWDPath;
+	myCurFullPath = myRoot;
 }
 
 
 ////////////////////////////////////////
 
 
-Directory::Directory( std::string root )
+Directory::Directory( const std::string &root )
+		: myRoot( root )
 {
-	reset( std::move( root ) );
+	myFullDirs = String::split( myRoot, File::pathSeparator() );
+	myCurFullPath = myRoot;
+}
+
+
+////////////////////////////////////////
+
+
+Directory::Directory( std::string &&root )
+		: myRoot( std::move( root ) )
+{
+	myFullDirs = String::split( myRoot, File::pathSeparator() );
+	myCurFullPath = myRoot;
+}
+
+
+////////////////////////////////////////
+
+
+Directory::Directory( const Directory &d )
+		: myRoot( d.myRoot ), mySubDirs( d.mySubDirs ),
+		  myFullDirs( d.myFullDirs ),
+		  myCurFullPath( d.myCurFullPath )
+{
+}
+
+
+////////////////////////////////////////
+
+
+Directory::Directory( Directory &&d )
+		: myRoot( std::move( d.myRoot ) ),
+		  mySubDirs( std::move( d.mySubDirs ) ),
+		  myFullDirs( std::move( d.myFullDirs ) ),
+		  myCurFullPath( std::move( d.myCurFullPath ) )
+{
+}
+
+
+////////////////////////////////////////
+
+
+Directory &
+Directory::operator=( const Directory &d )
+{
+	if ( this != &d )
+	{
+		myRoot = d.myRoot;
+		mySubDirs = d.mySubDirs;
+		myFullDirs = d.myFullDirs;
+		myCurFullPath = d.myCurFullPath;
+	}
+	return *this;
+}
+
+
+////////////////////////////////////////
+
+
+Directory &
+Directory::operator=( Directory &&d )
+{
+	if ( this != &d )
+	{
+		myRoot = std::move( d.myRoot );
+		mySubDirs = std::move( d.mySubDirs );
+		myFullDirs = std::move( d.myFullDirs );
+		myCurFullPath = std::move( d.myCurFullPath );
+	}
+	return *this;
+}
+
+
+////////////////////////////////////////
+
+
+Directory
+Directory::reroot( const std::string &newroot ) const
+{
+	Directory ret( newroot );
+	ret.mySubDirs = mySubDirs;
+	ret.updateFullPath();
+	return std::move( ret );
 }
 
 
@@ -103,10 +248,26 @@ Directory::Directory( std::string root )
 
 
 void
-Directory::reset( std::string root )
+Directory::rematch( const Directory &d )
 {
-	myRoot = std::move( root );
-	updateFullPath();
+	bool needChange = true;
+	if ( d.mySubDirs.size() == mySubDirs.size() )
+	{
+		needChange = false;
+		for ( size_t i = 0; i != mySubDirs.size(); ++i )
+		{
+			if ( mySubDirs[i] != d.mySubDirs[i] )
+			{
+				needChange = true;
+				break;
+			}
+		}
+	}
+	if ( needChange )
+	{
+		mySubDirs = d.mySubDirs;
+		updateFullPath();
+	}
 }
 
 
@@ -114,9 +275,15 @@ Directory::reset( std::string root )
 
 
 void
-Directory::cd( std::string name )
+Directory::cd( const std::string &name )
 {
-	mySubDirs.emplace_back( std::move( name ) );
+	std::vector<std::string> dirs = String::split( name, File::pathSeparator() );
+	if ( dirs.empty() )
+		return;
+
+	for ( auto &d: dirs )
+		mySubDirs.emplace_back( std::move( d ) );
+
 	updateFullPath();
 }
 
@@ -140,10 +307,13 @@ Directory::cdUp( void )
 void
 Directory::mkpath( void ) const
 {
-	if ( ! checkRootPath() )
-		throw std::runtime_error( "Attempt to create path but root directory does not exist" );
-	std::string tmpPath = myRoot;
-	for ( const auto &curDir: mySubDirs )
+#ifdef WIN32
+	throw std::logic_error( "NYI: Need to handle drive letters" );
+#endif
+	std::string tmpPath;
+	std::vector<std::string> alldirs;
+	combinePath( alldirs );
+	for ( const auto &curDir: alldirs )
 	{
 		tmpPath.push_back( File::pathSeparator() );
 		tmpPath.append( curDir );
@@ -173,14 +343,38 @@ Directory::fullpath( void ) const
 ////////////////////////////////////////
 
 
+std::string
+Directory::relpath( void ) const
+{
+	std::string ret;
+
+	for ( const std::string &p: mySubDirs )
+	{
+		if ( ! ret.empty() )
+			ret.push_back( File::pathSeparator() );
+		ret.append( p );
+	}
+	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
 void
 Directory::updateFullPath( void )
 {
-	myCurFullPath = myRoot;
-	for ( const auto &curDir: mySubDirs )
+	std::vector<std::string> pathElements;
+	combinePath( pathElements );
+
+#ifdef WIN32
+	throw std::logic_error( "NYI: Need to handle drive letters" );
+#endif
+	myCurFullPath.clear();
+	for ( const std::string &i: pathElements )
 	{
 		myCurFullPath.push_back( File::pathSeparator() );
-		myCurFullPath.append( curDir );
+		myCurFullPath.append( i );
 	}
 }
 
@@ -262,8 +456,21 @@ Directory::makefilename( const std::string &fn ) const
 ////////////////////////////////////////
 
 
+std::string
+Directory::relfilename( const std::string &fn ) const
+{
+	std::string cpath = relpath();
+	cpath.push_back( File::pathSeparator() );
+	cpath.append( fn );
+	return std::move( cpath );
+}
+
+
+////////////////////////////////////////
+
+
 Directory &
-Directory::currentDirectory( void )
+Directory::current( void )
 {
 	static Directory theDir;
 	return theDir;
@@ -273,21 +480,90 @@ Directory::currentDirectory( void )
 ////////////////////////////////////////
 
 
-bool
-Directory::checkRootPath( void ) const
+void
+Directory::startParsing( const std::string &dir )
 {
-	// we should always check as some process may have created the
-	// directory under us (or removed it)... there's still a possibility
-	// of a collision with mkpath, etc. but not much we can do about that
-	struct stat sb;
-	if ( stat( myRoot.c_str(), &sb ) == 0 )
+	Directory &curDir = current();
+	if ( ! dir.empty() )
+		curDir.cd( dir );
+
+	std::string firstFile;
+	if ( curDir.exists( firstFile, buildFileName() ) )
 	{
-		if ( ! S_ISDIR( sb.st_mode ) )
-			throw std::runtime_error( "Path '" + myRoot + "' exists, but is not a directory" );
-		return true;
+		theSubDirFiles.push_back( firstFile );
+		Lua::Engine::singleton().runFile( firstFile.c_str() );
 	}
-	return false;
+	else
+	{
+		std::stringstream msg;
+		msg << "Unable to find " << buildFileName() << " in " << curDir.fullpath();
+		throw std::runtime_error( msg.str() );
+	}
 }
+
+
+////////////////////////////////////////
+
+
+void
+Directory::combinePath( std::vector<std::string> &elements ) const
+{
+	elements = myFullDirs;
+	for ( const std::string &p: mySubDirs )
+	{
+		if ( p == "." )
+			continue;
+
+		if ( p == ".." )
+		{
+			if ( elements.empty() )
+				throw std::runtime_error( "Invalid attempt to create relative path above root" );
+
+			elements.pop_back();
+		}
+		else
+			elements.push_back( p );
+	}
+
+}
+
+
+////////////////////////////////////////
+
+
+const std::vector<std::string> &
+Directory::visited( void )
+{
+	return theSubDirFiles;
+}
+
+
+////////////////////////////////////////
+
+
+static Directory theBinaryDir;
+
+void
+Directory::setBinaryRoot( const std::string &root )
+{
+	theBinaryRoot = root;
+	theBinaryDir = current().reroot( theBinaryRoot );
+}
+
+
+////////////////////////////////////////
+
+
+Directory &
+Directory::binary( void )
+{
+	if ( theBinaryRoot.empty() )
+		throw std::runtime_error( "Binary path not set" );
+
+	theBinaryDir.rematch( current() );
+	return theBinaryDir;
+}
+
 
 
 ////////////////////////////////////////
@@ -298,6 +574,11 @@ Directory::registerFunctions( void )
 {
 	Lua::Engine &eng = Lua::Engine::singleton();
 	eng.registerFunction( "SubDir", &SubDir );
+	eng.registerFunction( "SourceDir", &SourceDir );
+	eng.registerFunction( "RelativeSourceDir", &RelSourceDir );
+	eng.registerFunction( "BinaryDir", &BinaryDir );
+	eng.registerFunction( "SourceFile", &SourceFile );
+	eng.registerFunction( "BinaryFile", &BinaryFile );
 }
 
 

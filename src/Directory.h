@@ -33,35 +33,67 @@ class Directory
 {
 public:
 	Directory( void );
-	Directory( std::string root );
+	Directory( const std::string &root );
+	Directory( std::string &&root );
+	Directory( const Directory &d );
+	Directory( Directory &&d );
+	Directory &operator=( const Directory &d );
+	Directory &operator=( Directory &&d );
 
-	void reset( std::string root );
+	Directory reroot( const std::string &newroot ) const;
+	void rematch( const Directory &d );
 
-	void cd( std::string name );
+	void cd( const std::string &name );
 	void cdUp( void );
 
 	void mkpath( void ) const;
+	// kind of like realpath, but doesn't actually
+	// check for existence or resolve any symlinks, but
+	// cleans up multiple separators and ./.. paths
 	const std::string &fullpath( void ) const;
+
+	// only the path elements that have been cd-ed to
+	std::string relpath( void ) const;
 
 	// returns the first name found
 	bool find( std::string &concatpath, const std::vector<std::string> &names ) const;
 	bool exists( std::string &concatpath, const char *fn ) const;
 	bool exists( std::string &concatpath, const std::string &fn ) const;
+	inline bool exists( const std::string &fn ) const;
+
 	std::string makefilename( const char *fn ) const;
 	std::string makefilename( const std::string &fn ) const;
+	std::string relfilename( const std::string &fn ) const;
 
 	// NB: modifying this will modify global state, but doesn't change
 	// any O.S. level current directory, at least currently. if we
 	// support running scripts in the future, this may have to change
-	static Directory &currentDirectory( void );
-
+	static Directory &current( void );
+	static void startParsing( const std::string &dir );
+	static const std::vector<std::string> &visited( void );
 	static void registerFunctions( void );
+	static void setBinaryRoot( const std::string &root );
+	static Directory &binary( void );
 
 private:
+	void combinePath( std::vector<std::string> &fullpath ) const;
 	bool checkRootPath( void ) const;
 	void updateFullPath( void );
 
 	std::string myRoot;
 	std::vector<std::string> mySubDirs;
+	std::vector<std::string> myFullDirs;
 	std::string myCurFullPath;
 };
+
+
+////////////////////////////////////////
+
+
+inline bool
+Directory::exists( const std::string &fn ) const
+{
+	std::string p;
+	return exists( p, fn );
+}
+

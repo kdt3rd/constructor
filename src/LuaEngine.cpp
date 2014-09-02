@@ -41,11 +41,7 @@ void throwIfError( lua_State *L, int r, const char *file )
 	if ( r == LUA_OK )
 		return;
 
-	const char *errmsg = NULL;
-
-	if ( lua_isstring( L, -1 ) )
-		errmsg = lua_tolstring( L, -1, NULL );
-
+	const char *errmsg = lua_tolstring( L, -1, NULL );
 	if ( ! errmsg )
 		errmsg = "Unknown error";
 
@@ -53,22 +49,22 @@ void throwIfError( lua_State *L, int r, const char *file )
 	switch ( r )
 	{
 		case LUA_ERRFILE:
-			msg = std::string( "Unable to open / read file '" ) + file + std::string( "': " ) + errmsg;
+			msg = std::string( "Unable to open / read file '" ) + file + std::string( "':\n\t" ) + errmsg;
 			break;
 		case LUA_ERRSYNTAX:
-			msg = std::string( "Syntax error in file '" ) + file + std::string( "': " ) + errmsg;
+			msg = std::string( "Syntax error in file '" ) + file + std::string( "':\n\t" ) + errmsg;
 			break;
 		case LUA_ERRMEM:
-			msg = std::string( "Memory error processing file '" ) + file + std::string( "': " ) + errmsg;
+			msg = std::string( "Memory error processing file '" ) + file + std::string( "':\n\t" ) + errmsg;
 			break;
 		case LUA_ERRERR:
-			msg = std::string( "Error while running message handler processing file '" ) + file + std::string( "': " ) + errmsg;
+			msg = std::string( "Error while running message handler processing file '" ) + file + std::string( "':\n\t" ) + errmsg;
 			break;
 		case LUA_ERRRUN:
-			msg = std::string( "Error while running message handler processing file '" ) + file + std::string( "': Runtime Error" );
+			msg = std::string( "Runtime Error while processing file '" ) + file + std::string( "':\n\t" ) + errmsg;
 			break;
 		case LUA_ERRGCMM:
-			msg = std::string( "Error while running message handler processing file '" ) + file + std::string( "': Error while running a __gc metamethod");
+			msg = std::string( "Error while processing file '" ) + file + std::string( "': Error while running a __gc metamethod");
 			break;
 		case LUA_OK:
 		default:
@@ -237,8 +233,17 @@ Engine::~Engine( void )
 void
 Engine::registerFunction( const char *name, int (*funcPtr)( lua_State * ) )
 {
-	lua_pushcfunction( L, funcPtr );
-	lua_setglobal( L, name );
+	if ( myCurLib.empty() )
+	{
+		lua_pushcfunction( L, funcPtr );
+		lua_setglobal( L, name );
+	}
+	else
+	{
+		lua_pushstring( L, name );
+		lua_pushcfunction( L, funcPtr );
+		lua_rawset( L, -3 );
+	}
 }
 
 
@@ -249,10 +254,80 @@ void
 Engine::registerFunction( const char *name, const BoundFunction &f )
 {
 	int i = mFuncs.size();
-	lua_pushinteger( L, i );
-	lua_pushcclosure( L, &Engine::dispatchFunc, 1 );
-	lua_setglobal( L, name );
+	if ( myCurLib.empty() )
+	{
+		lua_pushinteger( L, i );
+		lua_pushcclosure( L, &Engine::dispatchFunc, 1 );
+		lua_setglobal( L, name );
+	}
+	else
+	{
+		lua_pushstring( L, name );
+		lua_pushinteger( L, i );
+		lua_pushcclosure( L, &Engine::dispatchFunc, 1 );
+		lua_rawset( L, -3 );
+	}
 	mFuncs.push_back( f );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::pushLibrary( const char *name )
+{
+	myCurLib.push( std::string( name ) );
+	lua_createtable( L, 0, 0 );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::popLibrary( void )
+{
+	if ( myCurLib.empty() )
+		throw std::runtime_error( "unbalanced push / pops" );
+	lua_setglobal( L, myCurLib.top().c_str() );
+	myCurLib.pop();
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::registerLibrary( const char *name,
+						 const struct luaL_Reg *libFuncs )
+{
+	lua_createtable( L, 0, 0 );
+	luaL_setfuncs( L, libFuncs, 0 );
+	lua_setglobal( L, name );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::registerClass( const char *name,
+					   const struct luaL_Reg *classFuncs,
+					   const struct luaL_Reg *memberFuncs )
+{
+	std::string metaName = "Constructor.";
+	metaName.append( name );
+	luaL_newmetatable( L, metaName.c_str() );
+	lua_pushliteral( L, "__index" );
+	lua_pushvalue( L, -2 );
+	lua_settable( L, -3 );
+	luaL_setfuncs( L, memberFuncs, 0 );
+
+	lua_createtable( L, 0, 0 );
+	luaL_setfuncs( L, classFuncs, 0 );
+	lua_setglobal( L, name );
+	lua_pop( L, 1 );
 }
 
 
@@ -262,15 +337,17 @@ Engine::registerFunction( const char *name, const BoundFunction &f )
 int
 Engine::runFile( const char *file )
 {
-	LUA_STACK( stkcheck, L );
-
+	if ( ! myCurLib.empty() )
+		throw std::runtime_error( "unbalanced push / pops for library definitions" );
 	// create a new global environment for the file
 	// but let it still look up in the current one;
 	lua_newtable( L );
 	int envPos = lua_gettop( L );
 
+	std::string tmpname = "@";
+	tmpname.append( file );
 	LuaFile f( file );
-	throwIfError( L, lua_load( L, &fileReader, &f, file, NULL ), file );
+	throwIfError( L, lua_load( L, &fileReader, &f, tmpname.c_str(), NULL ), file );
 
 	int funcPos = lua_gettop( L );
 
@@ -321,7 +398,7 @@ Engine::runFile( const char *file )
 //			lua_pop( L, 2 );
 //	}
 //	lua_pop( L, 1 );
-	return stkcheck.returns( 1 );
+	return 1;
 }
 
 
