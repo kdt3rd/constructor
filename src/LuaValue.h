@@ -88,6 +88,10 @@ public:
 	void push( lua_State *L ) const;
 
 	int type( void ) const { return myType; }
+	Table &initTable( void );
+	void initBool( bool v );
+	void initNil( void );
+	void initString( String v );
 
 	bool asBool( void ) const { checkType( LUA_TBOOLEAN ); return b; }
 	void *asPointer( void ) const { return p; }

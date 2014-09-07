@@ -80,6 +80,10 @@ public:
 	}
 
 private:
+	R extractArgsAndCall( lua_State *, const unpack_sequence<> & )
+	{
+		return myFunc();
+	}
 	template <int ...S>
 	R extractArgsAndCall( lua_State *l, const unpack_sequence<S...> & )
 	{

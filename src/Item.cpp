@@ -26,6 +26,8 @@
 #include <algorithm>
 #include "Scope.h"
 #include "LuaEngine.h"
+#include "StrUtil.h"
+#include <iostream>
 
 
 ////////////////////////////////////////
@@ -88,6 +90,120 @@ int itemHasDependency( lua_State *L )
 	lua_pushboolean( L, hd ? 1 : 0 );
 	return 1;
 }
+
+int itemVariables( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 )
+		throw std::runtime_error( "Item:variables() expects 1 argument - self" );
+	ItemPtr p = Item::extract( L, 1 );
+	Lua::Value ret;
+	Lua::Table &t = ret.initTable();
+	for ( auto &v: p->variables() )
+		t[v.first].initString( std::move( v.second.value() ) );
+
+	ret.push( L );
+	return 1;
+}
+
+
+////////////////////////////////////////
+
+
+int itemClearVariable( lua_State *L )
+{
+	if ( lua_gettop( L ) != 2 )
+		throw std::runtime_error( "Item:clearVariable() expects 2 arguments - self, variable name" );
+	ItemPtr p = Item::extract( L, 1 );
+	std::string nm = Lua::Parm<std::string>::get( L, 2, 2 );
+
+	VariableSet &vars = p->variables();
+	auto x = vars.find( nm );
+	if ( x != vars.end() )
+		vars.erase( x );
+	return 0;
+}
+
+int itemSetVariable( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 3 )
+		throw std::runtime_error( "Item:setVariable() expects 3 or 4 arguments - self, variable name, variable value, bool env check (nil)" );
+	ItemPtr p = Item::extract( L, 1 );
+	std::string nm = Lua::Parm<std::string>::get( L, N, 2 );
+	Lua::Value v;
+	v.load( L, 3 );
+	bool envCheck = false;
+	if ( N == 4 )
+		envCheck = Lua::Parm<bool>::get( L, N, 4 );
+
+	VariableSet &vars = p->variables();
+	auto x = vars.find( nm );
+	if ( v.type() == LUA_TNIL )
+	{
+		if ( x != vars.end() )
+			vars.erase( x );
+		return 0;
+	}
+
+	if ( x == vars.end() )
+		x = vars.emplace( std::make_pair( nm, Variable( nm, envCheck ) ) ).first;
+
+	if ( v.type() == LUA_TTABLE )
+		x->second.reset( std::move( v.toStringList() ) );
+	else if ( v.type() == LUA_TSTRING )
+		x->second.reset( v.asString() );
+	else
+		throw std::runtime_error( "Item:setVariable() - unhandled variable value type, expect nil, table or string" );
+
+	return 0;
+}
+
+int itemAddToVariable( lua_State *L )
+{
+	if ( lua_gettop( L ) != 3 )
+		throw std::runtime_error( "Item:addToVariable() expects 3 arguments - self, variable name, variable value to add" );
+	ItemPtr p = Item::extract( L, 1 );
+	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
+	Lua::Value v;
+	v.load( L, 3 );
+	if ( v.type() == LUA_TNIL )
+		return 0;
+
+	VariableSet &vars = p->variables();
+	auto x = vars.find( nm );
+	// should this be an error?
+	if ( x == vars.end() )
+		x = vars.emplace( std::make_pair( nm, Variable( nm ) ) ).first;
+
+	if ( v.type() == LUA_TTABLE )
+		x->second.add( v.toStringList() );
+	else if ( v.type() == LUA_TSTRING )
+		x->second.add( v.asString() );
+	else
+		throw std::runtime_error( "Item:addToVariable() - unhandled variable value type, expect nil, table or string" );
+	return 0;
+}
+
+int itemInheritVariable( lua_State *L )
+{
+	if ( lua_gettop( L ) != 3 )
+		throw std::runtime_error( "Item:inheritVariable() expects 3 arguments - self, variable name, boolean" );
+	ItemPtr p = Item::extract( L, 1 );
+	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
+	bool v = Lua::Parm<bool>::get( L, 3, 3 );
+	VariableSet &vars = p->variables();
+	auto x = vars.find( nm );
+	// should this be an error?
+	if ( x == vars.end() )
+		x = vars.emplace( std::make_pair( nm, Variable( nm ) ) ).first;
+
+	x->second.inherit( v );
+	return 0;
+}
+
+
+////////////////////////////////////////
+
 
 int itemCreate( lua_State *L )
 {
@@ -230,6 +346,31 @@ Item::extractDependencies( DependencyType dt ) const
 ////////////////////////////////////////
 
 
+Variable &
+Item::variable( const std::string &nm )
+{
+	auto v = myVariables.emplace( std::make_pair( nm, Variable( nm ) ) );
+	return v.first->second;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Item::setVariable( const std::string &nm, const std::string &value,
+				   bool doSplit )
+{
+	if ( doSplit )
+		variable( nm ).reset( String::split( value, ' ' ) );
+	else
+		variable( nm ).reset( value );
+}
+
+
+////////////////////////////////////////
+
+
 void
 Item::recurseChain( std::vector<ItemPtr> &chain ) const
 {
@@ -264,6 +405,12 @@ Item::extract( lua_State *L, int i )
 void
 Item::push( lua_State *L, ItemPtr i )
 {
+	if ( ! i )
+	{
+		lua_pushnil( L );
+		return;
+	}
+
 	void *sptr = lua_newuserdata( L, sizeof(ItemPtr) );
 	if ( ! sptr )
 		throw std::runtime_error( "Unable to create item userdata" );
@@ -283,6 +430,11 @@ static const struct luaL_Reg item_m[] =
 	{ "id", itemGetID },
 	{ "addDependency", itemAddDependency },
 	{ "depends", itemHasDependency },
+	{ "variables", itemVariables },
+	{ "clearVariable", itemClearVariable },
+	{ "setVariable", itemSetVariable },
+	{ "addToVariable", itemAddToVariable },
+	{ "inheritVariable", itemInheritVariable },
 	{ nullptr, nullptr }
 };
 

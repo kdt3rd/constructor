@@ -19,6 +19,7 @@ SRC:= main.cpp \
 	MakeGenerator.cpp \
 	LuaEngine.cpp \
 	LuaValue.cpp \
+	Debug.cpp \
 	StrUtil.cpp \
 	OSUtil.cpp \
 	FileUtil.cpp \
@@ -28,7 +29,7 @@ SRC:= main.cpp \
 SRC:=$(addprefix $(OUTPUT)/,$(SRC))
 
 COMPILER := g++
-CXXFLAGS := --std=c++11 -Wall -Wextra -g
+CXXFLAGS := --std=c++11 -Wall -Wextra -g -pthread
 LDFLAGS :=
 OS := $(shell uname -s)
 ifeq ($(OS),Darwin)

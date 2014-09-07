@@ -29,6 +29,7 @@
 #include <fstream>
 #include <iomanip>
 #include <string.h>
+#include "Debug.h"
 #include "OSUtil.h"
 #include "FileUtil.h"
 #include "Directory.h"
@@ -69,9 +70,76 @@ usageAndExit( const char *argv0, int es )
 		" -emit-wrapper     Creates a GNU makefile wrapper in source tree for all configurations\n"
 		" -G|--generator    Specifies which generator to use\n"
 		" --show-generators Displays a list of generators and exits\n"
+		" --verbose         Displays messages as the build tree is processed\n"
+		" --debug           Displays debugging messages\n"
 		" -h|--help|-?      This help message\n"
 		"\n";
 	emitGenerators( es );
+}
+
+
+////////////////////////////////////////
+
+
+static void
+emitWrapper( Directory &srcDir,
+			 const std::shared_ptr<Generator> &generator,
+			 bool doConfigDir )
+{
+	std::string wrapper = srcDir.makefilename( "Makefile" );
+	std::ofstream wf( wrapper );
+
+	if ( doConfigDir )
+	{
+		const std::vector<Configuration> &clist = Configuration::defined();
+		wf << ".PHONY: all clean";
+		for ( const Configuration &c: clist )
+			wf << ' ' << c.name();
+		wf << "\n.ONESHELL:\n"
+			".SHELLFLAGS := -e\n"
+			".DEFAULT: all\n"
+			"\n"
+			"all: "
+		   << Configuration::getDefault().name()
+		   << "\n\n";
+		for ( const Configuration &c: clist )
+		{
+			wf << c.name() << ":\n";
+			Directory cdir;
+			cdir.cd( c.name() );
+			wf << "\t@pushd " << cdir.fullpath() << " > /dev/null && ";
+			generator->targetCall( wf, std::string() );
+			wf << " && popd > /dev/null\n\n";
+		}
+		wf
+			<< "clean:\n\t@echo \"Cleaning...\"\n";
+		for ( const Configuration &c: clist )
+		{
+			Directory cdir;
+			cdir.cd( c.name() );
+			wf << "\t@pushd " << cdir.fullpath() << " > /dev/null && ";
+			generator->targetCall( wf, "clean" );
+			wf << " && popd > /dev/null\n";
+		}
+	}
+	else
+	{
+		Directory &outDir = Directory::binary();
+		wf << ".PHONY: all clean";
+		wf << "\n.ONESHELL:\n"
+			".SHELLFLAGS := -e\n"
+			".DEFAULT: all\n"
+			"\n"
+			"all:\n"
+			"\t@pushd " << outDir.fullpath() << " > /dev/null && ";
+		generator->targetCall( wf, std::string() );
+		wf << " && popd > /dev/null\n\n"
+		   <<
+			"clean:\n\t@echo \"Cleaning...\"\n"
+			"\t@pushd " << outDir.fullpath() << " > /dev/null && ";
+		generator->targetCall( wf, "clean" );
+		wf << " && popd > /dev/null\n\n";
+	}
 }
 
 
@@ -122,6 +190,18 @@ main( int argc, const char *argv[] )
 				if ( tmp == "emit-wrapper" )
 				{
 					doWrapper = true;
+					continue;
+				}
+
+				if ( tmp == "debug" )
+				{
+					Debug::enable( true );
+					continue;
+				}
+
+				if ( tmp == "verbose" )
+				{
+					Verbose::enable( true );
 					continue;
 				}
 
@@ -193,7 +273,7 @@ main( int argc, const char *argv[] )
 		Directory::startParsing( subdir );
 
 		const Configuration &cfg = Configuration::getActive();
-		Directory outDir = Directory::binary();
+		Directory &outDir = Directory::binary();
 		outDir.mkpath();
 
 		generator->emit( outDir, cfg, argc, argv );
@@ -202,59 +282,8 @@ main( int argc, const char *argv[] )
 		{
 			Directory srcDir;
 			srcDir.cd( subdir );
-			std::string wrapper = srcDir.makefilename( "Makefile" );
-			std::ofstream wf( wrapper );
+			emitWrapper( srcDir, generator, doConfigDir );
 
-			if ( doConfigDir )
-			{
-				const std::vector<Configuration> &clist = Configuration::defined();
-				wf << ".PHONY: all clean";
-				for ( const Configuration &c: clist )
-					wf << ' ' << c.name();
-				wf << "\n.ONESHELL:\n"
-					".SHELLFLAGS := -e\n"
-					".DEFAULT: all\n"
-					"\n"
-					"all: "
-				   << Configuration::getDefault().name()
-				   << "\n\n";
-				for ( const Configuration &c: clist )
-				{
-					wf << c.name() << ":\n";
-					Directory cdir;
-					cdir.cd( c.name() );
-					wf << "\t@pushd " << cdir.fullpath() << " > /dev/null && ";
-					generator->targetCall( wf, std::string() );
-					wf << " && popd > /dev/null\n\n";
-				}
-				wf
-				   << "clean:\n\t@echo \"Cleaning...\"\n";
-				for ( const Configuration &c: clist )
-				{
-					Directory cdir;
-					cdir.cd( c.name() );
-					wf << "\t@pushd " << cdir.fullpath() << " > /dev/null && ";
-					generator->targetCall( wf, "clean" );
-					wf << " && popd > /dev/null\n";
-				}
-			}
-			else
-			{
-				wf << ".PHONY: all clean";
-				wf << "\n.ONESHELL:\n"
-					".SHELLFLAGS := -e\n"
-					".DEFAULT: all\n"
-					"\n"
-					"all:\n"
-					"\t@pushd " << outDir.fullpath() << " > /dev/null && ";
-				generator->targetCall( wf, std::string() );
-				wf << " && popd > /dev/null\n\n"
-				   <<
-					"clean:\n\t@echo \"Cleaning...\"\n"
-					"\t@pushd " << outDir.fullpath() << " > /dev/null && ";
-				generator->targetCall( wf, "clean" );
-				wf << " && popd > /dev/null\n\n";
-			}
 		}
 	}
 	catch ( std::exception &e )

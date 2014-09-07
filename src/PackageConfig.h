@@ -61,26 +61,24 @@ public:
 	const std::string &libsStatic( void ) const;
 	const std::string &requires( void ) const;
 	const std::string &requiresStatic( void ) const;
-	const std::vector< std::shared_ptr<PackageConfig> > &dependencies( void ) const;
-
-	//	inline const std::vector<PackageConfig> &dependsOn( void ) const { return myDepends; }
 
 	static std::shared_ptr<PackageConfig> find( const std::string &name,
 												VersionCompare comp = VersionCompare::ANY,
 												const std::string &reqVersion = std::string() );
-	static void registerFunctions( void );
+	static std::shared_ptr<PackageConfig> makeLibraryReference( const std::string &name,
+																const std::string &path );
 
+	static void registerFunctions( void );
 private:
 	const std::string &getAndReturn( const char *tag ) const;
 
 	void parse( void );
 	void extractNameAndValue( const std::string &curline );
+	// do we care about anything but direct requires?
 	std::vector< std::shared_ptr<PackageConfig> > extractOtherModules( const std::string &val, bool required );
 
 	std::string myPackageFile;
-	std::map<std::string, std::string> myVariables;
+	std::map<std::string, std::string> myLocalVars;
 	std::map<std::string, std::string> myValues;
-	// do we care about anything but direct requires?
-	std::vector< std::shared_ptr<PackageConfig> > myDepends;
 };
 

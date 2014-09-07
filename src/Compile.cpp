@@ -80,6 +80,40 @@ compile( lua_State *L )
 	return 1;
 }
 
+int
+executable( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 2 )
+		throw std::runtime_error( "Executable expects a name as the first argument and at least 1 link object" );
+	std::string ename = Lua::Parm<std::string>::get( L, N, 1 );
+
+	std::shared_ptr<CompileSet> ret = std::make_shared<Executable>( std::move( ename ) );
+	for ( int i = 1; i <= N; ++i )
+		recurseAndAdd( ret, L, i );
+
+	Scope::current().addItem( ret );
+	Item::push( L, ret );
+	return 1;
+}
+
+int
+library( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 2 )
+		throw std::runtime_error( "Library expects a name as the first argument and at least 1 link object" );
+	std::string ename = Lua::Parm<std::string>::get( L, N, 1 );
+
+	std::shared_ptr<CompileSet> ret = std::make_shared<Library>( std::move( ename ) );
+	for ( int i = 1; i <= N; ++i )
+		recurseAndAdd( ret, L, i );
+
+	Scope::current().addItem( ret );
+	Item::push( L, ret );
+	return 1;
+}
+
 } // empty namespace
 
 
@@ -88,6 +122,15 @@ compile( lua_State *L )
 
 CompileSet::CompileSet( void )
 		: Item( "__compile__" ), myDir( Directory::current() )
+{
+}
+
+
+////////////////////////////////////////
+
+
+CompileSet::CompileSet( std::string nm )
+		: Item( std::move( nm ) ), myDir( Directory::current() )
 {
 }
 
@@ -107,6 +150,7 @@ void
 CompileSet::addItem( const ItemPtr &i )
 {
 	myItems.push_back( i );
+	addDependency( DependencyType::EXPLICIT, i );
 }
 
 
@@ -121,6 +165,7 @@ CompileSet::addItem( const std::string &name )
 
 	ItemPtr i = std::make_shared<Item>( name );
 	myItems.push_back( i );
+	addDependency( DependencyType::EXPLICIT, i );
 }
 
 
@@ -131,6 +176,42 @@ void
 CompileSet::registerFunctions( void )
 {
 	Lua::Engine::singleton().registerFunction( "Compile", &compile );
+	Lua::Engine::singleton().registerFunction( "Executable", &executable );
+	Lua::Engine::singleton().registerFunction( "Library", &library );
+}
+
+
+////////////////////////////////////////
+
+
+Executable::Executable( std::string name )
+		: CompileSet( std::move( name ) )
+{
+}
+
+
+////////////////////////////////////////
+
+
+Executable::~Executable( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+Library::Library( std::string name )
+		: CompileSet( std::move( name ) )
+{
+}
+
+
+////////////////////////////////////////
+
+
+Library::~Library( void )
+{
 }
 
 

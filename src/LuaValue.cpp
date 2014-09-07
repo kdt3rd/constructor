@@ -462,6 +462,55 @@ Value::push( lua_State *L ) const
 ////////////////////////////////////////
 
 
+Table &
+Value::initTable( void )
+{
+	destroyData();
+	myType = LUA_TTABLE;
+	new (&t) Table;
+	return t;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Value::initBool( bool v )
+{
+	destroyData();
+	myType = LUA_TBOOLEAN;
+	b = v;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Value::initNil( void )
+{
+	destroyData();
+	myType = LUA_TNIL;
+	p = nullptr;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Value::initString( String v )
+{
+	destroyData();
+	myType = LUA_TSTRING;
+	new (&s) String( std::move( v ) );
+}
+
+
+////////////////////////////////////////
+
+
 std::vector<std::string>
 Value::toStringList( void ) const
 {

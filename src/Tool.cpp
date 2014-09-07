@@ -233,6 +233,8 @@ Tool::parse( const Lua::Value &v )
 
 	std::string tag, name, desc;
 	std::vector<std::string> inpExt;
+	std::vector<std::string> altExt;
+	std::vector<std::string> inpTools;
 	std::vector<std::string> outpExt;
 	ItemPtr exePtr;
 	std::string exe;
@@ -272,9 +274,17 @@ Tool::parse( const Lua::Value &v )
 		{
 			inpExt = i.second.toStringList();
 		}
+		else if ( k == "alt_extensions" )
+		{
+			altExt = i.second.toStringList();
+		}
 		else if ( k == "output_extensions" )
 		{
 			outpExt = i.second.toStringList();
+		}
+		else if ( k == "input_tools" )
+		{
+			inpTools = i.second.toStringList();
 		}
 		else if ( k == "options" )
 		{
@@ -283,7 +293,7 @@ Tool::parse( const Lua::Value &v )
 				if ( o.first.type == Lua::KeyType::INDEX )
 					throw std::runtime_error( "Expecting hash map of option name to option sets" );
 
-				OptionSet &os = opts[i.first.tag];
+				OptionSet &os = opts[o.first.tag];
 				for ( auto &s: o.second.asTable() )
 				{
 					if ( s.first.type == Lua::KeyType::INDEX )
@@ -326,8 +336,10 @@ Tool::parse( const Lua::Value &v )
 	ret->myExePointer = exePtr;
 	ret->myExeName = exe;
 	ret->myExtensions = inpExt;
+	ret->myAltExtensions = altExt;
 	ret->myOutputs = outpExt;
 	ret->myCommand = cmd;
+	ret->myInputTools = inpTools;
 	ret->myOptions = opts;
 	ret->myOptionDefaults = optDefaults;
 	ret->myImplDepName = impFile;

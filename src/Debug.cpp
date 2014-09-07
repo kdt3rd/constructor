@@ -20,47 +20,80 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#pragma once
-
-#include "Item.h"
-#include "Directory.h"
+#include "Debug.h"
 
 
 ////////////////////////////////////////
 
 
-class CompileSet : public Item
+namespace
 {
-public:
-	CompileSet( void );
-	virtual ~CompileSet( void );
+static bool theDebugEnable = false;
+static bool theVerboseEnable = false;
+}
 
-	void addItem( const ItemPtr &i );
-	void addItem( const std::string &name );
 
-	static void registerFunctions( void );
+////////////////////////////////////////
 
-protected:
-	CompileSet( std::string name );
 
-private:
-	Directory myDir;
-	std::vector<ItemPtr> myItems;
-};
-
-class Executable : public CompileSet
+namespace Debug
 {
-public:
-	Executable( std::string name );
-	virtual ~Executable( void );
-};
 
-class Library : public CompileSet
+
+////////////////////////////////////////
+
+
+bool on( void )
 {
-public:
-	Library( std::string name );
-	virtual ~Library( void );
-};
+	return theDebugEnable;
+}
+
+
+////////////////////////////////////////
+
+
+void enable( bool d )
+{
+	theDebugEnable = d;
+}
+
+
+////////////////////////////////////////
+
+
+} // Debug
+
+
+////////////////////////////////////////
+
+
+namespace Verbose
+{
+
+
+////////////////////////////////////////
+
+
+bool on( void )
+{
+	return theVerboseEnable;
+}
+
+
+////////////////////////////////////////
+
+
+void enable( bool d )
+{
+	theVerboseEnable = d;
+}
+
+
+////////////////////////////////////////
+
+
+} // Verbose
+
 
 
 

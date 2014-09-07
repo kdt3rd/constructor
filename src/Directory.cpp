@@ -237,6 +237,9 @@ Directory::operator=( Directory &&d )
 Directory
 Directory::reroot( const std::string &newroot ) const
 {
+#ifdef WIN32
+	throw std::runtime_error( "Need to handle UNC paths and / and \\ in split" );
+#endif
 	Directory ret( newroot );
 	ret.mySubDirs = mySubDirs;
 	ret.updateFullPath();
@@ -541,13 +544,11 @@ Directory::visited( void )
 ////////////////////////////////////////
 
 
-static Directory theBinaryDir;
-
 void
 Directory::setBinaryRoot( const std::string &root )
 {
 	theBinaryRoot = root;
-	theBinaryDir = current().reroot( theBinaryRoot );
+	binary() = current().reroot( theBinaryRoot );
 }
 
 
@@ -557,6 +558,8 @@ Directory::setBinaryRoot( const std::string &root )
 Directory &
 Directory::binary( void )
 {
+	static Directory theBinaryDir;
+
 	if ( theBinaryRoot.empty() )
 		throw std::runtime_error( "Binary path not set" );
 

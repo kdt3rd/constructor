@@ -28,6 +28,7 @@
 #include <string>
 #include <memory>
 #include "LuaEngine.h"
+#include "Variable.h"
 
 
 enum class DependencyType : uint8_t
@@ -77,9 +78,19 @@ public:
 	/// returns the list of items that this item has that dependency type on
 	std::vector<ItemPtr> extractDependencies( DependencyType dt ) const;
 
+	inline VariableSet &variables( void );
+	inline const VariableSet &variables( void ) const;
+	Variable &variable( const std::string &nm );
+	void setVariable( const std::string &nm, const std::string &value,
+					  bool doSplit = false );
+
 	static ItemPtr extract( lua_State *l, int i );
 	static void push( lua_State *l, ItemPtr i );
 	static void registerFunctions( void );
+
+protected:
+	VariableSet myVariables;
+
 private:
 	void recurseChain( std::vector<ItemPtr> &chain ) const;
 
@@ -107,6 +118,21 @@ inline const std::string &
 Item::name( void ) const 
 {
 	return myName;
+}
+
+
+////////////////////////////////////////
+
+
+inline VariableSet &
+Item::variables( void )
+{
+	return myVariables;
+}
+inline const VariableSet &
+Item::variables( void ) const
+{
+	return myVariables;
 }
 
 

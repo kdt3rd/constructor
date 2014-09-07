@@ -34,10 +34,11 @@
 #include <mutex>
 #include "StrUtil.h"
 #include "FileUtil.h"
+#include "Directory.h"
 #include "OSUtil.h"
 #include "ScopeGuard.h"
 #include "LuaEngine.h"
-#include <iostream>
+#include "Debug.h"
 #include <iomanip>
 #include <fstream>
 
@@ -124,6 +125,69 @@ init( void )
 	}
 }
 
+
+std::shared_ptr<PackageConfig>
+getPackage( const std::string &name, const std::string &reqVersion )
+{
+	VersionCompare vc = VersionCompare::ANY;
+	std::shared_ptr<PackageConfig> x;
+	if ( ! reqVersion.empty() )
+	{
+		std::string::size_type verPos = reqVersion.find_first_not_of( "<>=!" );
+		if ( verPos == std::string::npos )
+			throw std::runtime_error( "Invalid version specification, missing version number" );
+		std::string vercmp;
+		std::string ver;
+		if ( verPos > 0 )
+		{
+			vercmp = reqVersion.substr( 0, verPos );
+			ver = reqVersion.substr( verPos );
+		}
+		else
+			ver = reqVersion;
+
+		String::strip( vercmp );
+		String::strip( ver );
+
+		if ( vercmp.empty() || vercmp == "=" )
+			vc = VersionCompare::EQUAL;
+		else if ( vercmp == "!=" )
+			vc = VersionCompare::NOT_EQUAL;
+		else if ( vercmp == "<" )
+			vc = VersionCompare::LESS;
+		else if ( vercmp == "<=" )
+			vc = VersionCompare::LESS_EQUAL;
+		else if ( vercmp == ">" )
+			vc = VersionCompare::GREATER;
+		else if ( vercmp == ">=" )
+			vc = VersionCompare::GREATER_EQUAL;
+
+		return PackageConfig::find( name, vc, ver );
+	}
+
+	return PackageConfig::find( name, vc, reqVersion );
+}
+
+
+static bool
+PackageExists( const std::string &name, const std::string &reqVersion )
+{
+	if ( getPackage( name, reqVersion ) )
+		return true;
+	return false;
+}
+
+static int
+FindPackage( lua_State *L )
+{
+	int N = lua_gettop( L );
+	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
+	std::string ver = Lua::Parm<std::string>::get( L, N, 2 );
+
+	Item::push( L, getPackage( name, ver ) );
+	return 1;
+}
+
 } // empty namespace
 
 
@@ -133,7 +197,8 @@ init( void )
 PackageConfig::PackageConfig( const std::string &n, const std::string &pf )
 		: Item( n ), myPackageFile( pf )
 {
-	parse();
+	// can't call parse here since we add dependencies that uses
+	// shared_from_this, which isn't fully initialized yet
 }
 
 
@@ -248,16 +313,6 @@ PackageConfig::requiresStatic( void ) const
 ////////////////////////////////////////
 
 
-const std::vector< std::shared_ptr<PackageConfig> > &
-PackageConfig::dependencies( void ) const
-{
-	return myDepends;
-}
-
-
-////////////////////////////////////////
-
-
 const std::string &
 PackageConfig::getAndReturn( const char *tag ) const
 {
@@ -322,8 +377,19 @@ PackageConfig::parse( void )
 	{
 		++theParseDepth;
 		ON_EXIT{ --theParseDepth; };
-		myDepends = extractOtherModules( req, true );
+		std::vector< std::shared_ptr<PackageConfig> > deps =
+			extractOtherModules( req, true );
+		for ( auto &d: deps )
+			addDependency( DependencyType::EXPLICIT, d );
 	}
+
+	// now promote everything to item variables we might care about
+	for ( auto &x: myLocalVars )
+		setVariable( x.first, x.second );
+	setVariable( "version", version() );
+	setVariable( "cflags", cflags(), true );
+	setVariable( "libs", libs(), true );
+	setVariable( "libs.static", libsStatic(), true );
 }
 
 
@@ -366,7 +432,7 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 	if ( i < curline.size() )
 		val = curline.substr( i );
 
-	String::substituteVariables( val, true, myVariables );
+	String::substituteVariables( val, true, myLocalVars );
 
 	if ( separator == ':' )
 	{
@@ -382,7 +448,7 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 		}
 		else if ( nm == "Version" )
 		{
-			std::cout << std::setw( theParseDepth * 2 ) << std::setfill( ' ' ) << "" << "Found package '" << name() << "', version " << val << std::endl;
+			VERBOSE( std::setw( theParseDepth * 2 ) << std::setfill( ' ' ) << "" << "Found package '" << name() << "', version " << val );
 			myValues[nm] = val;
 		}
 		else if ( nm == "Libs.private" || nm == "Libs" )
@@ -413,7 +479,7 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 	}
 	else if ( separator == '=' )
 	{
-		if ( myVariables.find( nm ) != myVariables.end() )
+		if ( myLocalVars.find( nm ) != myLocalVars.end() )
 		{
 			std::cerr << "WARNING: Package config file '" << myPackageFile << "' has multiple entries for variable '" << nm << "'" << std::endl;
 			return;
@@ -426,7 +492,7 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 //		{
 //			
 //		}
-		myVariables[nm] = val;
+		myLocalVars[nm] = val;
 	}
 	else
 	{
@@ -625,21 +691,48 @@ PackageConfig::find( const std::string &name, VersionCompare comp, const std::st
 
 	std::shared_ptr<PackageConfig> ret;
 
-	auto f = thePackageConfigs.find( name );
-	if ( f != thePackageConfigs.end() )
+	auto preparsed = theParsedPackageConfigs.find( name );
+	if ( preparsed != theParsedPackageConfigs.end() )
+		ret = preparsed->second;
+	else
 	{
-		auto preparsed = theParsedPackageConfigs.find( name );
-		if ( preparsed != theParsedPackageConfigs.end() )
-			ret = preparsed->second;
+		auto f = thePackageConfigs.find( name );
+		if ( f != thePackageConfigs.end() )
+		{
+			DEBUG( "using pkg-config information for " << name );
+			ret = std::make_shared<PackageConfig>( f->first, f->second );
+			// we can't call this in the constructor
+			ret->parse();
+			theParsedPackageConfigs[f->first] = ret;
+		}
 		else
 		{
-			ret = std::make_shared<PackageConfig>( f->first, f->second );
-			theParsedPackageConfigs[f->first] = ret;
+			DEBUG( "Searching in OS path for library " << name );
+			std::string libpath;
+#ifdef __APPLE__
+			// look for framework
+			if ( File::find( libpath, name, {".framework"}, {"/System/Library/Frameworks", "/Library/Frameworks"} ) )
+			{
+				ret = PackageConfig::makeLibraryReference( name, libpath );
+				theParsedPackageConfigs[name] = ret;
+			} else
+#endif
+#ifndef WIN32
+			if ( File::find( libpath, "lib" + name, {".so", ".a"}, {"/usr/lib", "/usr/local/lib"} ) )
+			{
+				ret = PackageConfig::makeLibraryReference( name, libpath );
+				theParsedPackageConfigs[name] = ret;
+			}
+#else
+#error "Need to implement library search for windows"
+#endif
 		}
 	}
 
 	if ( ret )
 	{
+		if ( ! reqVersion.empty() )
+			DEBUG( "Comparing found version '" << ret->version() << "' to requested version '" << reqVersion << "'" );
 		int rc = String::versionCompare( ret->version(), reqVersion );
 		bool zap = false;
 		switch ( comp )
@@ -663,51 +756,47 @@ PackageConfig::find( const std::string &name, VersionCompare comp, const std::st
 	return ret;
 }
 
-static bool
-PackageExists( const std::string &name, const std::string &reqVersion )
+
+////////////////////////////////////////
+
+
+std::shared_ptr<PackageConfig>
+PackageConfig::makeLibraryReference( const std::string &name,
+									 const std::string &path )
 {
-	VersionCompare vc = VersionCompare::ANY;
-	std::shared_ptr<PackageConfig> x;
-	if ( ! reqVersion.empty() )
+	std::shared_ptr<PackageConfig> ret = std::make_shared<PackageConfig>( name, std::string() );
+
+	VariableSet &vars = ret->variables();
+
+#ifdef __APPLE__
+	if ( path.find( ".framework" ) != std::string::npos )
 	{
-		std::string::size_type verPos = reqVersion.find_first_not_of( "<>=!" );
-		if ( verPos == std::string::npos )
-			throw std::runtime_error( "Invalid version specification, missing version number" );
-		std::string vercmp;
-		std::string ver;
-		if ( verPos > 0 )
-		{
-			vercmp = reqVersion.substr( 0, verPos );
-			ver = reqVersion.substr( verPos );
-		}
-		else
-			ver = reqVersion;
-
-		String::strip( vercmp );
-		String::strip( ver );
-
-		if ( vercmp.empty() || vercmp == "=" )
-			vc = VersionCompare::EQUAL;
-		else if ( vercmp == "!=" )
-			vc = VersionCompare::NOT_EQUAL;
-		else if ( vercmp == "<" )
-			vc = VersionCompare::LESS;
-		else if ( vercmp == "<=" )
-			vc = VersionCompare::LESS_EQUAL;
-		else if ( vercmp == ">" )
-			vc = VersionCompare::GREATER;
-		else if ( vercmp == ">=" )
-			vc = VersionCompare::GREATER_EQUAL;
-
-		x = PackageConfig::find( name, vc, ver );
+		Variable &cflags = ret->variable( "cflags" );
+		cflags.add( "-framework" );
+		cflags.add( name );
+		Variable &libs = ret->variable( "libs" );
+		libs.add( "-framework" );
+		libs.add( name );
+		return ret;
 	}
-	else
-		x = PackageConfig::find( name, vc, reqVersion );
+#endif
+	Directory d( path );
+	d.cdUp();
 
-	if ( x )
-		return true;
-	return false;
+	Variable &libs = ret->variable( "libs" );
+	libs.add( "-L" );
+	libs.add( d.fullpath() );
+	libs.add( "-l" + name );
+
+	d.cdUp();
+	d.cd( "include" );
+
+	Variable &cflags = ret->variable( "cflags" );
+	cflags.add( "-I" );
+	cflags.add( d.fullpath() );
+	return ret;
 }
+
 
 
 ////////////////////////////////////////
@@ -717,7 +806,8 @@ void
 PackageConfig::registerFunctions( void )
 {
 	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.registerFunction( "PackageExists", &PackageExists );
+	eng.registerFunction( "ExternalLibraryExists", &PackageExists );
+	eng.registerFunction( "FindExternalLibrary", &FindPackage );
 }
 
 

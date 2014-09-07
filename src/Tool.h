@@ -83,8 +83,10 @@ private:
 	std::string myExeName;
 
 	std::vector<std::string> myExtensions;
+	std::vector<std::string> myAltExtensions;
 	std::vector<std::string> myOutputs;
 	std::vector<std::string> myCommand;
+	std::vector<std::string> myInputTools;
 
 	OptionGroup myOptions;
 	OptionDefaultSet myOptionDefaults;

@@ -22,45 +22,24 @@
 
 #pragma once
 
-#include "Item.h"
-#include "Directory.h"
+#include <iostream>
 
 
 ////////////////////////////////////////
 
 
-class CompileSet : public Item
+
+namespace Debug
 {
-public:
-	CompileSet( void );
-	virtual ~CompileSet( void );
+bool on( void );
+void enable( bool d );
+}
 
-	void addItem( const ItemPtr &i );
-	void addItem( const std::string &name );
-
-	static void registerFunctions( void );
-
-protected:
-	CompileSet( std::string name );
-
-private:
-	Directory myDir;
-	std::vector<ItemPtr> myItems;
-};
-
-class Executable : public CompileSet
+namespace Verbose
 {
-public:
-	Executable( std::string name );
-	virtual ~Executable( void );
-};
+bool on( void );
+void enable( bool d );
+}
 
-class Library : public CompileSet
-{
-public:
-	Library( std::string name );
-	virtual ~Library( void );
-};
-
-
-
+#define DEBUG( x ) if ( Debug::on() ) { std::cout << x << std::endl; }
+#define VERBOSE( x ) if ( Verbose::on() ) { std::cout << x << std::endl; }
