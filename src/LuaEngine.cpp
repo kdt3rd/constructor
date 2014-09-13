@@ -290,7 +290,13 @@ Engine::popLibrary( void )
 {
 	if ( myCurLib.empty() )
 		throw std::runtime_error( "unbalanced push / pops" );
+
+	luaL_getsubtable( L, LUA_REGISTRYINDEX, "_LOADED" );
+	lua_pushvalue( L, -2 ); // copy of library table
+	lua_setfield( L, -2, myCurLib.top().c_str() );
+	lua_pop( L, 1 );
 	lua_setglobal( L, myCurLib.top().c_str() );
+
 	myCurLib.pop();
 }
 

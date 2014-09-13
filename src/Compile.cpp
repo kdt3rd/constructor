@@ -89,7 +89,7 @@ executable( lua_State *L )
 	std::string ename = Lua::Parm<std::string>::get( L, N, 1 );
 
 	std::shared_ptr<CompileSet> ret = std::make_shared<Executable>( std::move( ename ) );
-	for ( int i = 1; i <= N; ++i )
+	for ( int i = 2; i <= N; ++i )
 		recurseAndAdd( ret, L, i );
 
 	Scope::current().addItem( ret );
@@ -106,7 +106,7 @@ library( lua_State *L )
 	std::string ename = Lua::Parm<std::string>::get( L, N, 1 );
 
 	std::shared_ptr<CompileSet> ret = std::make_shared<Library>( std::move( ename ) );
-	for ( int i = 1; i <= N; ++i )
+	for ( int i = 2; i <= N; ++i )
 		recurseAndAdd( ret, L, i );
 
 	Scope::current().addItem( ret );
@@ -150,7 +150,6 @@ void
 CompileSet::addItem( const ItemPtr &i )
 {
 	myItems.push_back( i );
-	addDependency( DependencyType::EXPLICIT, i );
 }
 
 
@@ -158,14 +157,13 @@ CompileSet::addItem( const ItemPtr &i )
 
 
 void
-CompileSet::addItem( const std::string &name )
+CompileSet::addItem( std::string name )
 {
 	if ( ! myDir.exists( name ) )
 		throw std::runtime_error( "File '" + name + "' does not exist in directory '" + myDir.fullpath() + "'" );
 
-	ItemPtr i = std::make_shared<Item>( name );
+	ItemPtr i = std::make_shared<Item>( std::move( name ) );
 	myItems.push_back( i );
-	addDependency( DependencyType::EXPLICIT, i );
 }
 
 

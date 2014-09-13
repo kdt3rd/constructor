@@ -22,19 +22,21 @@
 
 #pragma once
 
-#include "Item.h"
+#include "Dependency.h"
 #include "Tool.h"
 
 
 ////////////////////////////////////////
 
 
-class BuildItem : public Item
+class BuildItem : public Dependency<BuildItem>
 {
 public:
 	BuildItem( const std::string &name );
 	BuildItem( std::string &&name );
 	virtual ~BuildItem( void );
+
+	virtual const std::string &name( void ) const;
 
 	void setTool( const std::shared_ptr<Tool> &t );
 	inline const std::shared_ptr<Tool> &tool( void ) const;
@@ -44,6 +46,8 @@ public:
 	inline const std::vector<std::string> &outputs( void ) const;
 
 private:
+	std::string myName;
+
 	std::shared_ptr<Tool> myTool;
 	std::vector<std::string> myOutputs;
 };

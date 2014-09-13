@@ -24,6 +24,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 
 ////////////////////////////////////////
@@ -59,8 +60,15 @@ bool find( std::string &filepath, const std::string &name, const std::vector<std
 // assumes the extension contains any separator (i.e. '.')
 // returns the first result found
 bool find( std::string &filepath, const std::string &name, const std::vector<std::string> &extensions, const std::vector<std::string> &path );
+// looks along given path and returns a map of found
+// items
+std::map<std::string, std::string>
+find( std::vector<std::string> progs,
+	  const std::vector<std::string> &path,
+	  const std::vector<std::string> &extensions = std::vector<std::string>() );
 
 bool findExecutable( std::string &filepath, const std::string &name );
+std::map<std::string, std::string> findExecutables( std::vector<std::string> progs );
 
 void registerFunctions( void );
 

@@ -121,9 +121,11 @@ BinaryFile( const std::string &fn )
 	return Directory::binary().makefilename( fn );
 }
 
+static std::once_flag theNeedCWDInit;
+
 static std::string theCWD;
 static std::vector<std::string> theCWDPath;
-static std::once_flag theNeedCWDInit;
+
 static void initCWD( void )
 {
 	char *cwd = getcwd( NULL, MAXPATHLEN );

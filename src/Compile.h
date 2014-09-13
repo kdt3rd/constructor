@@ -36,7 +36,7 @@ public:
 	virtual ~CompileSet( void );
 
 	void addItem( const ItemPtr &i );
-	void addItem( const std::string &name );
+	void addItem( std::string name );
 
 	static void registerFunctions( void );
 

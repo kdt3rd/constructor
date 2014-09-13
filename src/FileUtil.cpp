@@ -38,6 +38,7 @@
 #include <fstream>
 #include <fcntl.h>
 #include <string.h>
+#include <iostream>
 
 
 ////////////////////////////////////////
@@ -313,6 +314,66 @@ find( std::string &filepath, const std::string &name,
 ////////////////////////////////////////
 
 
+std::map<std::string, std::string>
+find( std::vector<std::string> progs,
+	  const std::vector<std::string> &path,
+	  const std::vector<std::string> &extensions )
+{
+	std::map<std::string, std::string> ret;
+	std::string filepath;
+	for ( const auto &p: path )
+	{
+		if ( progs.empty() )
+			break;
+
+		try
+		{
+			Directory d( p );
+			for ( size_t i = 0; i != progs.size(); ++i )
+			{
+				const std::string &name = progs[i];
+				try
+				{
+					Directory tmpD( d );
+					if ( extensions.empty() )
+					{
+						if ( tmpD.exists( filepath, name ) )
+						{
+							ret[name] = filepath;
+							progs.erase( progs.begin() + i );
+							--i;
+						}
+					}
+					else
+					{
+						for ( const auto &e: extensions )
+						{
+							if ( tmpD.exists( filepath, name + e ) )
+							{
+								ret[name] = filepath;
+								progs.erase( progs.begin() + i );
+								--i;
+								break;
+							}
+						}
+					}
+				}
+				catch ( ... )
+				{
+				}
+			}
+		}
+		catch ( ... )
+		{
+		}
+	}
+	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
 bool
 findExecutable( std::string &filepath, const std::string &name )
 {
@@ -329,6 +390,33 @@ findExecutable( std::string &filepath, const std::string &name )
 #endif
 	return ret;
 }
+
+
+////////////////////////////////////////
+
+
+std::map<std::string, std::string>
+findExecutables( std::vector<std::string> progs )
+{
+	const char *p = getenv( "PATH" );
+	if ( ! p )
+		return std::map<std::string, std::string>();
+
+	std::vector<std::string> paths = String::split( p, OS::pathSeparator() );
+#ifdef WIN32
+	return find( std::move( progs ),
+				 { std::string(), ".exe" },
+				 String::split( p, OS::pathSeparator() ) );
+#else
+	return find( std::move( progs ),
+				 { std::string() },
+				 String::split( p, OS::pathSeparator() ) );
+#endif
+}
+
+
+////////////////////////////////////////
+
 
 static int
 luaFindExecutable( lua_State *L )
@@ -362,6 +450,8 @@ registerFunctions( void )
 {
 	Lua::Engine &eng = Lua::Engine::singleton();
 	eng.pushLibrary( "file" );
+	ON_EXIT{ eng.popLibrary(); };
+
 	eng.registerFunction( "exists", &exists );
 	eng.registerFunction( "diff", &diff );
 	eng.registerFunction( "compare", &compare );
@@ -371,7 +461,6 @@ registerFunctions( void )
 	lua_pushliteral( eng.state(), "path_sep" );
 	lua_pushlstring( eng.state(), path_sep.c_str(), path_sep.size() );
 	lua_rawset( eng.state(), -3 );
-	eng.popLibrary();
 }
 
 } // namespace File

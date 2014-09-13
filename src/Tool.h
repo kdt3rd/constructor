@@ -72,7 +72,6 @@ public:
 	Rule rule( const OptionDefaultSet &scopeOptions, const Configuration &conf ) const;
 
 	static std::shared_ptr<Tool> parse( const Lua::Value &v );
-	static void registerFunctions( void );
 
 private:
 	std::string myTag;

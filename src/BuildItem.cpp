@@ -29,7 +29,7 @@
 
 
 BuildItem::BuildItem( const std::string &name )
-		: Item( name )
+		: myName( name )
 {
 }
 
@@ -38,7 +38,7 @@ BuildItem::BuildItem( const std::string &name )
 
 
 BuildItem::BuildItem( std::string &&name )
-		: Item( std::move( name ) )
+		: myName( std::move( name ) )
 {
 }
 
@@ -54,6 +54,16 @@ BuildItem::~BuildItem( void )
 ////////////////////////////////////////
 
 
+const std::string &
+BuildItem::name( void ) const
+{
+	return myName;
+}
+
+
+////////////////////////////////////////
+
+
 void
 BuildItem::setTool( const std::shared_ptr<Tool> &t )
 {
@@ -61,7 +71,6 @@ BuildItem::setTool( const std::shared_ptr<Tool> &t )
 		throw std::runtime_error( "Tool already specified for build item " + name() );
 
 	myTool = t;
-	addDependency( TOOL, t );
 }
 
 

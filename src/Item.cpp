@@ -257,89 +257,10 @@ Item::~Item( void )
 ////////////////////////////////////////
 
 
-void
-Item::addDependency( DependencyType dt, ItemPtr otherObj )
+const std::string &
+Item::name( void ) const 
 {
-	if ( ! otherObj )
-		return;
-
-	if ( otherObj->hasDependency( shared_from_this() ) )
-		throw std::runtime_error( "Attempt to create a circular dependency between '" + name() + "' and '" + otherObj->name() + "'" );
-
-	auto cur = myDependencies.find( otherObj );
-	if ( cur == myDependencies.end() )
-		myDependencies[otherObj] = dt;
-	else if ( cur->second > dt )
-		cur->second = dt;
-}
-
-
-////////////////////////////////////////
-
-
-bool
-Item::hasDependency( const ItemPtr &other ) const
-{
-	if ( myDependencies.find( other ) != myDependencies.end() )
-		return true;
-
-	for ( auto &dep: myDependencies )
-	{
-		if ( dep.first->hasDependency( other ) )
-			return true;
-	}
-
-	return false;
-}
-
-
-////////////////////////////////////////
-
-
-std::vector<ItemPtr>
-Item::extractDependencies( DependencyType dt ) const
-{
-	std::vector<ItemPtr> retval;
-
-	if ( dt == DependencyType::CHAIN )
-	{
-		recurseChain( retval );
-
-		if ( ! retval.empty() )
-		{
-			// go through in reverse order and remove any duplicates
-			// that follow
-			std::reverse( std::begin( retval ), std::end( retval ) );
-
-			size_t i = 0;
-			while ( i != retval.size() )
-			{
-				for ( size_t j = i + 1; j < retval.size(); ++j )
-				{
-					if ( retval[i] == retval[j] )
-					{
-						retval.erase( retval.begin() + j );
-						j = i;
-					}
-				}
-				++i;
-			}
-			std::reverse( std::begin( retval ), std::end( retval ) );
-		}
-	}
-	else
-	{
-		for ( auto &dep: myDependencies )
-		{
-			if ( dep.second != dt )
-				continue;
-
-			retval.push_back( dep.first );
-		}
-	}
-	
-
-	return std::move( retval );
+	return myName;
 }
 
 
@@ -365,23 +286,6 @@ Item::setVariable( const std::string &nm, const std::string &value,
 		variable( nm ).reset( String::split( value, ' ' ) );
 	else
 		variable( nm ).reset( value );
-}
-
-
-////////////////////////////////////////
-
-
-void
-Item::recurseChain( std::vector<ItemPtr> &chain ) const
-{
-	for ( auto &dep: myDependencies )
-	{
-		if ( dep.second != DependencyType::CHAIN )
-			continue;
-
-		chain.push_back( dep.first );
-		dep.first->recurseChain( chain );
-	}
 }
 
 

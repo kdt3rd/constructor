@@ -35,7 +35,7 @@ public:
 	inline ScopeGuard( const std::function<void()> &f ) : myF( f ) {}
 	inline ScopeGuard( std::function<void()> &&f ) : myF( std::move( f ) ) {}
 	template <typename Lambda>
-	inline ScopeGuard( Lambda &&f ) : myF( std::forward( f ) ) {}
+	inline ScopeGuard( Lambda &&f ) : myF( std::forward<Lambda>( f ) ) {}
 	inline ScopeGuard( ScopeGuard &&o ) noexcept { myF.swap( o.myF ); }
 	
 	inline ~ScopeGuard( void )
@@ -65,4 +65,4 @@ private:
 #define CONCATENATE( s1, s2 ) CONCATENATE_DIRECT( s1, s2 )
 #define ANONYMOUS_VAR( str ) CONCATENATE( str, __LINE__ )
 
-#define ON_EXIT [[gnu::unused]] auto ANONYMOUS_VAR( exitGuard ) = [&]() 
+#define ON_EXIT [[gnu::unused]] ScopeGuard ANONYMOUS_VAR( exitGuard ) = [&]() 

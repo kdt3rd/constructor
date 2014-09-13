@@ -29,25 +29,16 @@
 #include <memory>
 #include "LuaEngine.h"
 #include "Variable.h"
+#include "Dependency.h"
 
-
-enum class DependencyType : uint8_t
-{
-	CHAIN = 0,
-	EXPLICIT,
-	IMPLICIT,
-	ORDER
-};
-	
 class Item;
-typedef std::shared_ptr<Item> ItemPtr;
 
 /// @brief base class for everything else in the system
 ///
 /// In a build system, there are either targets, sources,
 /// or transformers. All of these things will be items
 /// such that we can track dependencies.
-class Item : public std::enable_shared_from_this<Item>
+class Item : public Dependency<Item>
 {
 public:
 	typedef uint64_t ID;
@@ -57,26 +48,11 @@ public:
 	virtual ~Item( void );
 
 	inline ID id( void ) const;
-	inline const std::string &name( void ) const;
+	virtual const std::string &name( void ) const;
 
 //	virtual void transform( std::vector<BuildItem> &b,
 //	const VariableSet &config );
 
-	void addDependency( DependencyType dt, ItemPtr o );
-
-	/// (recursively) check if this item has a dependency on
-	/// the other passed in
-	bool hasDependency( const ItemPtr &other ) const;
-
-	/// for a chain dependency,
-	/// Recursively traverses the chain dependencies and
-	/// constructs a list of them. if an item has 2 chain dependencies
-	/// and both depend on a 3rd item, that 3rd item will appear
-	/// later than any of the items that depend on it
-	///
-	/// for all other dependency types,
-	/// returns the list of items that this item has that dependency type on
-	std::vector<ItemPtr> extractDependencies( DependencyType dt ) const;
 
 	inline VariableSet &variables( void );
 	inline const VariableSet &variables( void ) const;
@@ -92,13 +68,11 @@ protected:
 	VariableSet myVariables;
 
 private:
-	void recurseChain( std::vector<ItemPtr> &chain ) const;
-
 	ID myID;
 	std::string myName;
-
-	std::map<ItemPtr, DependencyType> myDependencies;
 };
+
+using ItemPtr = Item::ItemPtr;
 
 
 ////////////////////////////////////////
@@ -108,16 +82,6 @@ inline Item::ID
 Item::id( void ) const
 {
 	return myID;
-}
-
-
-////////////////////////////////////////
-
-
-inline const std::string &
-Item::name( void ) const 
-{
-	return myName;
 }
 
 

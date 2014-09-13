@@ -766,8 +766,6 @@ PackageConfig::makeLibraryReference( const std::string &name,
 {
 	std::shared_ptr<PackageConfig> ret = std::make_shared<PackageConfig>( name, std::string() );
 
-	VariableSet &vars = ret->variables();
-
 #ifdef __APPLE__
 	if ( path.find( ".framework" ) != std::string::npos )
 	{
@@ -807,7 +805,7 @@ PackageConfig::registerFunctions( void )
 {
 	Lua::Engine &eng = Lua::Engine::singleton();
 	eng.registerFunction( "ExternalLibraryExists", &PackageExists );
-	eng.registerFunction( "FindExternalLibrary", &FindPackage );
+	eng.registerFunction( "ExternalLibrary", &FindPackage );
 }
 
 

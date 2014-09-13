@@ -34,7 +34,7 @@
 #include "FileUtil.h"
 #include "Directory.h"
 #include "Compile.h"
-#include "Tool.h"
+#include "Scope.h"
 #include "PackageConfig.h"
 #include "Configuration.h"
 #include "Generator.h"
@@ -263,7 +263,7 @@ main( int argc, const char *argv[] )
 		File::registerFunctions();
 		Directory::registerFunctions();
 		PackageConfig::registerFunctions();
-		Tool::registerFunctions();
+		Scope::registerFunctions();
 		Item::registerFunctions();
 		CompileSet::registerFunctions();
 		Configuration::registerFunctions();

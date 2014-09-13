@@ -9,6 +9,7 @@ OUTPUT:= Build
 #SRC:= item.cpp main.cpp variable.cpp
 SRC:= main.cpp \
 	Item.cpp \
+	BuildItem.cpp \
 	Scope.cpp \
 	Compile.cpp \
 	Tool.cpp \

@@ -37,10 +37,10 @@
 ///
 /// @brief Class Scope provides an abstraction around a collection of items.
 ///
-/// This is probably most commonly a directory (or sub-directory). It
-/// can have it's own unique config / toolsets / whatever as well as
-/// "global" variables.  Variables can be inherited from a parent
-/// scope or not.
+/// This is probably most commonly at least a directory (and
+/// sub-directories). It can have it's own unique config / toolsets /
+/// whatever as well as "global" variables.  Variables can be
+/// inherited from a parent scope or not.
 ///
 class Scope : public std::enable_shared_from_this<Scope>
 {
@@ -61,13 +61,17 @@ public:
 	void addTool( const std::shared_ptr<Tool> &t );
 	std::shared_ptr<Tool> findTool( const std::string &extension ) const;
 
-	void useToolset( const std::string &tset );
+	void addToolSet( const std::string &name,
+					 const std::vector<std::string> &tools );
+	void useToolSet( const std::string &tset );
+
 	void addItem( const ItemPtr &i );
 
 	static Scope &root( void );
 	static Scope &current( void );
 	static void pushScope( const std::shared_ptr<Scope> &scope );
 	static void popScope( void );
+	static void registerFunctions( void );
 
 private:
 	std::weak_ptr<Scope> myParent;
@@ -76,6 +80,8 @@ private:
 	std::vector< std::shared_ptr<Scope> > mySubScopes;
 
 	std::vector<ItemPtr> myItems;
+
+	std::map<std::string, std::vector<std::string> > myToolSets;
 
 	std::vector< std::shared_ptr<Tool> > myTools;
 	std::vector<std::string> myEnabledToolsets;

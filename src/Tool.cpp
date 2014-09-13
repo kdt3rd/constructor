@@ -30,66 +30,6 @@
 ////////////////////////////////////////
 
 
-namespace
-{
-
-
-////////////////////////////////////////
-
-
-void
-addTool( const Lua::Value &v )
-{
-	Scope::current().addTool( Tool::parse( v ) );
-}
-
-void
-addToolOption( const std::string &t, const std::string &g,
-			   const std::string &name,
-			   const std::vector<std::string> &cmd )
-{
-	bool found = false;
-	for ( auto &tool: Scope::current().tools() )
-	{
-		if ( tool->name() == t )
-		{
-			found = true;
-			tool->addOption( g, name, cmd );
-		}
-	}
-
-	if ( ! found )
-		throw std::runtime_error( "Unable to find tool '" + t + "' in current scope" );
-}
-
-int
-enableLangs( lua_State *L )
-{
-	int N = lua_gettop( L );
-	for ( int i = 1; i <= N; ++i )
-	{
-		if ( lua_isstring( L, i ) )
-		{
-			size_t len = 0;
-			const char *s = lua_tolstring( L, i, &len );
-			std::string curLang( s, len );
-			for ( auto &t: Scope::current().tools() )
-				t->enableLanguage( curLang );
-		}
-		else
-		{
-			std::cout << "WARNING: ignoring non-string argument to EnableLanguages" << std::endl;
-		}
-	}
-	return 0;
-}
-
-} // empty namespace
-
-
-////////////////////////////////////////
-
-
 Tool::Tool( std::string t, std::string n )
 		: myTag( std::move( t ) ), myName( std::move( n ) )
 {
@@ -346,19 +286,6 @@ Tool::parse( const Lua::Value &v )
 	ret->myImplDepCmd = impCmd;
 
 	return ret;
-}
-
-
-////////////////////////////////////////
-
-
-void
-Tool::registerFunctions( void )
-{
-	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.registerFunction( "AddTool", &addTool );
-	eng.registerFunction( "AddToolOption", &addToolOption );
-	eng.registerFunction( "EnableLanguages", &enableLangs );
 }
 
 
