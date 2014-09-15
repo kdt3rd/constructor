@@ -34,17 +34,15 @@ namespace
 
 static std::vector<Configuration> theConfigs;
 static std::string theDefaultConfig;
-static std::string theChosenConfig;
-static bool theUseConfigDir = true;
 
-static void
-updateBinaryPath( const Configuration &c )
-{
-	Directory theDir;
-	if ( theUseConfigDir )
-		theDir.cd( c.name() );
-	Directory::setBinaryRoot( theDir.fullpath() );
-}
+//static void
+//updateBinaryPath( const Configuration &c )
+//{
+//	Directory theDir;
+//	if ( theUseConfigDir )
+//		theDir.cd( c.name() );
+//	Directory::setBinaryRoot( theDir.fullpath() );
+//}
 
 int
 defineConfiguration( lua_State *L )
@@ -53,9 +51,6 @@ defineConfiguration( lua_State *L )
 		throw std::runtime_error( "Expected 1 argument - a table - to BuildConfiguration" );
 	Lua::Value v( L, 1 );
 	theConfigs.emplace_back( Configuration( v.extractTable() ) );
-
-	if ( theConfigs.back().name() == theChosenConfig )
-		updateBinaryPath( theConfigs.back() );
 
 	return 0;
 }
@@ -72,8 +67,6 @@ setDefaultConfig( lua_State *L )
 	{
 		if ( c.name() == s )
 		{
-			if ( theChosenConfig.empty() )
-				updateBinaryPath( c );
 			found = true;
 			break;
 		}
@@ -99,12 +92,32 @@ Configuration::Configuration( void )
 ////////////////////////////////////////
 
 
-Configuration::Configuration( Lua::Table &&t )
-		: myConfigSettings( std::move( t ) )
+Configuration::Configuration( const Lua::Table &t )
 {
-	auto i = myConfigSettings.find( "name" );
-	if ( i == myConfigSettings.end() ||
-		 i->second.type() != LUA_TSTRING )
+	for ( auto i: t )
+	{
+		if ( i.first.type == Lua::KeyType::INDEX )
+			continue;
+
+		if ( i.first.tag == "name" )
+		{
+			if ( i.second.type() != LUA_TSTRING )
+				throw std::runtime_error( "Build configuration requires a name as a string to be provided in configuration table" );
+			myName = i.second.asString();
+		}
+		else
+		{
+			Variable v( i.first.tag );
+			if ( i.second.type() == LUA_TSTRING )
+				v.reset( i.second.asString() );
+			else
+				v.reset( i.second.toStringList() );
+
+			myVariables.emplace( std::make_pair( i.first.tag, std::move( v ) ) );
+		}
+	}
+
+	if ( myName.empty() )
 		throw std::runtime_error( "Build configuration requires a name as a string to be provided in configuration table" );
 }
 
@@ -114,16 +127,6 @@ Configuration::Configuration( Lua::Table &&t )
 
 Configuration::~Configuration( void )
 {
-}
-
-
-////////////////////////////////////////
-
-
-const std::string &
-Configuration::name( void ) const
-{
-	return myConfigSettings.find( "name" )->second.asString();
 }
 
 
@@ -151,49 +154,10 @@ Configuration::getDefault( void )
 ////////////////////////////////////////
 
 
-const Configuration &
-Configuration::getActive( void )
-{
-	if ( theConfigs.empty() )
-		throw std::runtime_error( "No configurations specified, please use BuildConfiguration to define at least one" );
-
-	if ( theChosenConfig.empty() && theDefaultConfig.empty() )
-	{
-		std::cout << "WARNING: No default configuration specified, using first defined configuration: " << theConfigs[0].name() << std::endl;
-		return theConfigs[0];
-	}
-
-	std::string nm = theChosenConfig;
-	if ( nm.empty() )
-		nm = theDefaultConfig;
-
-	for ( const Configuration &r: theConfigs )
-	{
-		if ( r.name() == nm )
-			return r;
-	}
-	throw std::logic_error( "Configuration '" + nm + "' not found" );
-}
-
-
-////////////////////////////////////////
-
-
 std::vector<Configuration> &
 Configuration::defined( void )
 {
 	return theConfigs;
-}
-
-
-////////////////////////////////////////
-
-
-void
-Configuration::requestedConfig( const std::string &c, bool dc )
-{
-	theChosenConfig = c;
-	theUseConfigDir = dc;
 }
 
 

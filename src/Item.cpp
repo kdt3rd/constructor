@@ -23,8 +23,6 @@
 //
 
 #include "Item.h"
-#include <algorithm>
-#include "Scope.h"
 #include "LuaEngine.h"
 #include "StrUtil.h"
 #include <iostream>
@@ -232,7 +230,8 @@ static Item::ID theLastID = 1;
 
 
 Item::Item( const std::string &name )
-		: myID( theLastID++ ), myName( name )
+		: myID( theLastID++ ), myName( name ),
+		  myDirectory( Directory::current() )
 {
 }
 
@@ -241,7 +240,8 @@ Item::Item( const std::string &name )
 
 
 Item::Item( std::string &&name )
-		: myID( theLastID++ ), myName( std::move( name ) )
+		: myID( theLastID++ ), myName( std::move( name ) ),
+		  myDirectory( Directory::current() )
 {
 }
 
@@ -261,6 +261,16 @@ const std::string &
 Item::name( void ) const 
 {
 	return myName;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Item::transform( std::vector< std::shared_ptr<BuildItem> > &,
+				 const TransformSet & ) const
+{
 }
 
 

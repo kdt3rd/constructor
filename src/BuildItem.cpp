@@ -22,14 +22,16 @@
 
 #include "BuildItem.h"
 #include <stdexcept>
-#include "LuaEngine.h"
+#include "FileUtil.h"
+#include <iostream>
 
 
 ////////////////////////////////////////
 
 
-BuildItem::BuildItem( const std::string &name )
-		: myName( name )
+BuildItem::BuildItem( const std::string &name,
+					  const std::shared_ptr<Directory> &srcdir )
+		: myName( name ), myDirectory( srcdir )
 {
 }
 
@@ -37,8 +39,9 @@ BuildItem::BuildItem( const std::string &name )
 ////////////////////////////////////////
 
 
-BuildItem::BuildItem( std::string &&name )
-		: myName( std::move( name ) )
+BuildItem::BuildItem( std::string &&name,
+					  const std::shared_ptr<Directory> &srcdir )
+		: myName( std::move( name ) ), myDirectory( srcdir )
 {
 }
 
@@ -65,34 +68,28 @@ BuildItem::name( void ) const
 
 
 void
+BuildItem::setOutputDir( const std::shared_ptr<Directory> &d )
+{
+	myOutDirectory = d;
+}
+
+
+////////////////////////////////////////
+
+
+void
 BuildItem::setTool( const std::shared_ptr<Tool> &t )
 {
 	if ( myTool )
 		throw std::runtime_error( "Tool already specified for build item " + name() );
 
 	myTool = t;
+	if ( ! myTool )
+		throw std::runtime_error( "Invalid tool specified for build item " + name() );
+
+	for ( const std::string &o: myTool->outputs() )
+		myOutputs.emplace_back( std::move( File::replaceExtension( name(), o ) ) );
 }
-
-
-////////////////////////////////////////
-
-
-void
-BuildItem::addOutput( const std::string &o )
-{
-	myOutputs.push_back( o );
-}
-
-
-////////////////////////////////////////
-
-
-void
-BuildItem::addOutput( std::string &&o )
-{
-	myOutputs.push_back( o );
-}
-
 
 
 ////////////////////////////////////////

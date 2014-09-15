@@ -35,91 +35,11 @@
 #include <sstream>
 #include <iostream>
 #include <vector>
+#include <stack>
 #include <mutex>
 
 namespace 
 {
-
-inline constexpr const char *buildFileName( void )
-{
-	return "build.lua";
-}
-
-std::string theBinaryRoot;
-std::vector<std::string> theSubDirFiles;
-
-int
-SubDir( lua_State *L )
-{
-	LUA_STACK( stk, L );
-	int N = lua_gettop( L );
-	if ( N != 1 || ! lua_isstring( L, 1 ) )
-	{
-		if ( N > 0 )
-			lua_pop( L, N );
-		luaL_error( L, "SubDir expects at directory name string as an argument" );
-		return stk.returns( 1 );
-	}
-	int ret = 0;
-
-	std::string file = lua_tolstring( L, 1, NULL );
-	Directory &curDir = Directory::current();
-	std::string tmp;
-	lua_pop( L, 1 );
-	if ( curDir.exists( tmp, file ) )
-	{
-		curDir.cd( file );
-		std::string nextFile;
-		if ( curDir.exists( nextFile, buildFileName() ) )
-		{
-			ret = Lua::Engine::singleton().runFile( nextFile.c_str() );
-			theSubDirFiles.push_back( nextFile );
-		}
-		else
-			throw std::runtime_error( "Unable to find a '" + std::string( buildFileName() ) + "' in " + curDir.fullpath() );
-
-		curDir.cdUp();
-	}
-	else
-		throw std::runtime_error( "Sub Directory '" + file + "' does not exist in " + curDir.fullpath() );
-
-	return stk.returns( ret );
-}
-
-std::string
-SourceDir( void )
-{
-	return Directory::current().fullpath();
-}
-
-std::string
-RelSourceDir( void )
-{
-	return Directory::current().relpath();
-}
-
-std::string
-BinaryDir( void )
-{
-	if ( theBinaryRoot.empty() )
-		throw std::runtime_error( "Binary output directory not yet chosen, please specify configurations before attempting to access" );
-
-	Directory tmpDir( theBinaryRoot );
-	tmpDir.cd( Directory::current().relpath() );
-	return tmpDir.fullpath();
-}
-
-std::string
-SourceFile( const std::string &fn )
-{
-	return Directory::current().makefilename( fn );
-}
-
-std::string
-BinaryFile( const std::string &fn )
-{
-	return Directory::binary().makefilename( fn );
-}
 
 static std::once_flag theNeedCWDInit;
 
@@ -137,6 +57,8 @@ static void initCWD( void )
 	theCWD = cwd;
 	theCWDPath = String::split( theCWD, File::pathSeparator() );
 }
+
+static std::stack< std::shared_ptr<Directory> > theLiveDirs;
 
 } // empty namespace
 
@@ -474,36 +396,41 @@ Directory::relfilename( const std::string &fn ) const
 ////////////////////////////////////////
 
 
-Directory &
+const std::shared_ptr<Directory> &
 Directory::current( void )
 {
-	static Directory theDir;
-	return theDir;
+	if ( theLiveDirs.empty() )
+		theLiveDirs.push( std::make_shared<Directory>() );
+
+	return theLiveDirs.top();
 }
 
 
 ////////////////////////////////////////
 
 
-void
-Directory::startParsing( const std::string &dir )
+const std::shared_ptr<Directory> &
+Directory::pushd( const std::string &d )
 {
-	Directory &curDir = current();
-	if ( ! dir.empty() )
-		curDir.cd( dir );
+	std::shared_ptr<Directory> newD = std::make_shared<Directory>( *current() );
+	newD->cd( d );
+	theLiveDirs.push( newD );
+	return theLiveDirs.top();
+}
 
-	std::string firstFile;
-	if ( curDir.exists( firstFile, buildFileName() ) )
-	{
-		theSubDirFiles.push_back( firstFile );
-		Lua::Engine::singleton().runFile( firstFile.c_str() );
-	}
-	else
-	{
-		std::stringstream msg;
-		msg << "Unable to find " << buildFileName() << " in " << curDir.fullpath();
-		throw std::runtime_error( msg.str() );
-	}
+
+////////////////////////////////////////
+
+
+const std::shared_ptr<Directory> &
+Directory::popd( void )
+{
+	if ( theLiveDirs.empty() )
+		throw std::runtime_error( "Directory pushd / popd mismatch" );
+	theLiveDirs.pop();
+	if ( theLiveDirs.empty() )
+		throw std::runtime_error( "Directory pushd / popd mismatch" );
+	return theLiveDirs.top();
 }
 
 
@@ -530,60 +457,6 @@ Directory::combinePath( std::vector<std::string> &elements ) const
 			elements.push_back( p );
 	}
 
-}
-
-
-////////////////////////////////////////
-
-
-const std::vector<std::string> &
-Directory::visited( void )
-{
-	return theSubDirFiles;
-}
-
-
-////////////////////////////////////////
-
-
-void
-Directory::setBinaryRoot( const std::string &root )
-{
-	theBinaryRoot = root;
-	binary() = current().reroot( theBinaryRoot );
-}
-
-
-////////////////////////////////////////
-
-
-Directory &
-Directory::binary( void )
-{
-	static Directory theBinaryDir;
-
-	if ( theBinaryRoot.empty() )
-		throw std::runtime_error( "Binary path not set" );
-
-	theBinaryDir.rematch( current() );
-	return theBinaryDir;
-}
-
-
-
-////////////////////////////////////////
-
-
-void
-Directory::registerFunctions( void )
-{
-	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.registerFunction( "SubDir", &SubDir );
-	eng.registerFunction( "SourceDir", &SourceDir );
-	eng.registerFunction( "RelativeSourceDir", &RelSourceDir );
-	eng.registerFunction( "BinaryDir", &BinaryDir );
-	eng.registerFunction( "SourceFile", &SourceFile );
-	eng.registerFunction( "BinaryFile", &BinaryFile );
 }
 
 

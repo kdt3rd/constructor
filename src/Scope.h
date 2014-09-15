@@ -29,6 +29,7 @@
 #include "Variable.h"
 #include "Item.h"
 #include "Tool.h"
+#include "BuildItem.h"
 
 
 ////////////////////////////////////////
@@ -67,13 +68,18 @@ public:
 
 	void addItem( const ItemPtr &i );
 
+	void transform( std::vector< std::shared_ptr<BuildItem> > &items,
+					const std::shared_ptr<Directory> &outdir,
+					const Configuration &conf ) const;
+
 	static Scope &root( void );
 	static Scope &current( void );
 	static void pushScope( const std::shared_ptr<Scope> &scope );
 	static void popScope( void );
-	static void registerFunctions( void );
 
 private:
+	void grabTools( Scope &o );
+
 	std::weak_ptr<Scope> myParent;
 	VariableSet myVariables;
 	bool myInheritParentScope = false;
@@ -83,6 +89,7 @@ private:
 
 	std::map<std::string, std::vector<std::string> > myToolSets;
 
+	std::map<std::string, std::vector< std::shared_ptr<Tool> > > myTagMap;
 	std::vector< std::shared_ptr<Tool> > myTools;
 	std::vector<std::string> myEnabledToolsets;
 	std::map<std::string, std::vector<std::shared_ptr<Tool> > > myExtensionMap;

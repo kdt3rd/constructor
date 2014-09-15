@@ -21,10 +21,18 @@
 //
 
 #include "OSUtil.h"
+#include "StrUtil.h"
 #include <sys/utsname.h>
 #include <system_error>
 #include <mutex>
-#include "LuaEngine.h"
+#include <map>
+
+extern "C"
+{
+
+extern char **environ;
+
+}
 
 
 ////////////////////////////////////////
@@ -43,6 +51,7 @@ bool theIs64bit = true;
 #else
 bool theIs64bit = false;
 #endif
+std::map<std::string, std::string> theEnv;
 
 static std::once_flag theNeedInit;
 
@@ -60,6 +69,28 @@ init( void )
 	}
 	else
 		throw std::system_error( errno, std::system_category(), "Unable to retrieve system information" );
+
+	if ( ! environ )
+		throw std::runtime_error( "Unable to retrieve program environment" );
+	{
+		
+	}
+	for ( char **p = environ; *p; ++p )
+	{
+		std::vector<std::string> v = String::split( *p, '=' );
+		if ( v.size() == 2 )
+			theEnv.emplace( std::make_pair( std::move( v[0] ), std::move( v[1] ) ) );
+		else if ( v.size() > 2 )
+		{
+			std::string nval = std::move( v[1] );
+			for ( size_t i = 2; i < v.size(); ++i )
+			{
+				nval.push_back( '=' );
+				nval.append( v[i] );
+			}
+			theEnv.emplace( std::make_pair( std::move( v[0] ), std::move( nval ) ) );
+		}
+	}
 }
 
 } // empty namespace
@@ -117,20 +148,15 @@ is64bit( void )
 	return theIs64bit;
 }
 
-
-////////////////////////////////////////
-
-
-void
-registerFunctions( void )
+const std::string &
+getenv( const std::string &v )
 {
-	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.registerFunction( "is64bit", &is64bit );
-	eng.registerFunction( "machine", &machine );
-	eng.registerFunction( "release", &release );
-	eng.registerFunction( "version", &version );
-	eng.registerFunction( "system", &system );
-	eng.registerFunction( "node", &node );
+	std::call_once( theNeedInit, &init );
+	static std::string theEmptyVal;
+	auto i = theEnv.find( v );
+	if ( i != theEnv.end() )
+		return i->second;
+	return theEmptyVal;
 }
 
 } // namespace OS

@@ -23,7 +23,6 @@
 #pragma once
 
 #include "Item.h"
-#include "Directory.h"
 
 
 ////////////////////////////////////////
@@ -38,13 +37,18 @@ public:
 	void addItem( const ItemPtr &i );
 	void addItem( std::string name );
 
-	static void registerFunctions( void );
+	virtual void transform( std::vector< std::shared_ptr<BuildItem> > &b,
+							const TransformSet &xform ) const;
 
 protected:
 	CompileSet( std::string name );
 
-private:
-	Directory myDir;
+	void
+	applyTransform( const std::string &name,
+					const std::shared_ptr<Directory> &srcdir,
+					std::vector< std::shared_ptr<BuildItem> > &b,
+					const TransformSet &xform ) const;
+
 	std::vector<ItemPtr> myItems;
 };
 
@@ -53,6 +57,9 @@ class Executable : public CompileSet
 public:
 	Executable( std::string name );
 	virtual ~Executable( void );
+
+	virtual void transform( std::vector< std::shared_ptr<BuildItem> > &b,
+							const TransformSet &xform ) const;
 };
 
 class Library : public CompileSet
@@ -60,6 +67,9 @@ class Library : public CompileSet
 public:
 	Library( std::string name );
 	virtual ~Library( void );
+
+	virtual void transform( std::vector< std::shared_ptr<BuildItem> > &b,
+							const TransformSet &xform ) const;
 };
 
 

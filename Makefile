@@ -11,6 +11,7 @@ SRC:= main.cpp \
 	Item.cpp \
 	BuildItem.cpp \
 	Scope.cpp \
+	TransformSet.cpp \
 	Compile.cpp \
 	Tool.cpp \
 	Configuration.cpp \
@@ -19,6 +20,7 @@ SRC:= main.cpp \
 	NinjaGenerator.cpp \
 	MakeGenerator.cpp \
 	LuaEngine.cpp \
+	LuaExtensions.cpp \
 	LuaValue.cpp \
 	Debug.cpp \
 	StrUtil.cpp \

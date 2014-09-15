@@ -523,9 +523,14 @@ Value::toStringList( void ) const
 			continue;
 		if ( i.second.type() == LUA_TSTRING )
 		{
-			if ( i.first.index >= ret.size() )
-				ret.resize( i.first.index + 1 );
-			ret[i.first.index] = i.second.asString();
+			size_t idx = i.first.index;
+			if ( idx == 0 )
+				throw std::runtime_error( "Invalid index in string list conversion" );
+			--idx;
+
+			if ( idx >= ret.size() )
+				ret.resize( idx + 1 );
+			ret[idx] = i.second.asString();
 		}
 	}
 	return std::move( ret );

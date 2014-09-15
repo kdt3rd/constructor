@@ -27,6 +27,7 @@
 #include "Directory.h"
 #include "OSUtil.h"
 #include "StrUtil.h"
+#include "Scope.h"
 
 #include <unistd.h>
 #include <errno.h>
@@ -39,6 +40,23 @@
 #include <fcntl.h>
 #include <string.h>
 #include <iostream>
+#include <mutex>
+
+
+////////////////////////////////////////
+
+
+namespace
+{
+
+static std::once_flag theNeedPathInit;
+static std::vector<std::string> thePath;
+static void initPath( void )
+{
+	thePath = String::split( OS::getenv( "PATH" ), OS::pathSeparator() );
+}
+
+} // empty namespace
 
 
 ////////////////////////////////////////
@@ -100,7 +118,7 @@ exists( const char *fn )
 	else
 	{
 		std::string tmp;
-		e = Directory::current().exists( tmp, fn );
+		e = Directory::current()->exists( tmp, fn );
 	}
 
 	return e;
@@ -128,7 +146,7 @@ isDirectory( const char *fn )
 	}
 	else
 	{
-		std::string tmp = Directory::current().makefilename( fn );
+		std::string tmp = Directory::current()->makefilename( fn );
 		struct stat sb;
 		if ( stat( tmp.c_str(), &sb ) == 0 )
 		{
@@ -138,6 +156,35 @@ isDirectory( const char *fn )
 	}
 
 	return e;
+}
+
+
+////////////////////////////////////////
+
+
+std::string
+extension( const std::string &fn )
+{
+	std::string::size_type p = fn.find_last_of( '.' );
+	if ( p == std::string::npos )
+		return std::string();
+
+	return fn.substr( p );
+}
+
+
+////////////////////////////////////////
+
+
+std::string
+replaceExtension( const std::string &fn, const std::string &newext )
+{
+	std::string::size_type p = fn.find_last_of( '.' );
+	if ( p == std::string::npos )
+		return fn + newext;
+
+	std::string ret = fn.substr( 0, p );
+	return ret + newext;
 }
 
 
@@ -258,7 +305,40 @@ compare( const char *pathA, const char *pathB )
 bool
 find( std::string &filepath, const std::vector<std::string> &names )
 {
-	return Directory::current().find( filepath, names );
+	return Directory::current()->find( filepath, names );
+}
+
+
+////////////////////////////////////////
+
+
+bool
+find( std::string &filepath, const std::vector<std::string> &names,
+	  const std::vector<std::string> &path )
+{
+	for ( const auto &p: path )
+	{
+		try
+		{
+			if ( isAbsolute( p.c_str() ) )
+			{
+				Directory d( p );
+				if ( d.find( filepath, names ) )
+					return true;
+			}
+			else
+			{
+				Directory d( *Directory::current() );
+				d.cd( p );
+				if ( d.find( filepath, names ) )
+					return true;
+			}
+		}
+		catch ( ... )
+		{
+		}
+	}
+	return false;
 }
 
 
@@ -334,27 +414,22 @@ find( std::vector<std::string> progs,
 				const std::string &name = progs[i];
 				try
 				{
-					Directory tmpD( d );
-					if ( extensions.empty() )
+					if ( d.exists( filepath, name ) )
 					{
-						if ( tmpD.exists( filepath, name ) )
+						ret[name] = filepath;
+						progs.erase( progs.begin() + i );
+						--i;
+						continue;
+					}
+
+					for ( const auto &e: extensions )
+					{
+						if ( d.exists( filepath, name + e ) )
 						{
 							ret[name] = filepath;
 							progs.erase( progs.begin() + i );
 							--i;
-						}
-					}
-					else
-					{
-						for ( const auto &e: extensions )
-						{
-							if ( tmpD.exists( filepath, name + e ) )
-							{
-								ret[name] = filepath;
-								progs.erase( progs.begin() + i );
-								--i;
-								break;
-							}
+							break;
 						}
 					}
 				}
@@ -374,19 +449,37 @@ find( std::vector<std::string> progs,
 ////////////////////////////////////////
 
 
+void
+setPathOverride( const std::vector<std::string> &p )
+{
+	std::call_once( theNeedPathInit, &initPath );
+	thePath = p;
+}
+
+
+////////////////////////////////////////
+
+
+const std::vector<std::string> &
+getPath( void )
+{
+	std::call_once( theNeedPathInit, &initPath );
+	return thePath;
+}
+
+
+////////////////////////////////////////
+
+
 bool
 findExecutable( std::string &filepath, const std::string &name )
 {
-	filepath.clear();
-	const char *p = getenv( "PATH" );
-	if ( ! p )
-		return false;
+	std::call_once( theNeedPathInit, &initPath );
 
-	std::vector<std::string> paths = String::split( p, OS::pathSeparator() );
-	bool ret = find( filepath, name, paths );
+	bool ret = find( filepath, name, thePath );
 #ifdef WIN32
 	if ( ! ret )
-		ret = find( filepath, name + ".exe", paths );
+		ret = find( filepath, name + ".exe", thePath );
 #endif
 	return ret;
 }
@@ -398,69 +491,13 @@ findExecutable( std::string &filepath, const std::string &name )
 std::map<std::string, std::string>
 findExecutables( std::vector<std::string> progs )
 {
-	const char *p = getenv( "PATH" );
-	if ( ! p )
-		return std::map<std::string, std::string>();
+	std::call_once( theNeedPathInit, &initPath );
 
-	std::vector<std::string> paths = String::split( p, OS::pathSeparator() );
 #ifdef WIN32
-	return find( std::move( progs ),
-				 { std::string(), ".exe" },
-				 String::split( p, OS::pathSeparator() ) );
-#else
-	return find( std::move( progs ),
-				 { std::string() },
-				 String::split( p, OS::pathSeparator() ) );
+	return find( std::move( progs ), thePath, { ".exe" } );
 #endif
-}
 
-
-////////////////////////////////////////
-
-
-static int
-luaFindExecutable( lua_State *L )
-{
-	if ( lua_gettop( L ) != 1 )
-		throw std::runtime_error( "Expecting executable name to find_exe" );
-	if ( ! lua_isstring( L, 1 ) )
-		throw std::runtime_error( "Expecting string argument to find_exe" );
-	size_t len = 0;
-	const char *ename = lua_tolstring( L, 1, &len );
-	if ( ename )
-	{
-		std::string name( ename, len );
-		std::string ret;
-		if ( findExecutable( ret, name ) )
-			lua_pushlstring( L, ret.c_str(), ret.size() );
-		else
-			lua_pushnil( L );
-	}
-	else
-		lua_pushnil( L );
-	return 1;
-}
-
-
-////////////////////////////////////////
-
-
-void
-registerFunctions( void )
-{
-	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.pushLibrary( "file" );
-	ON_EXIT{ eng.popLibrary(); };
-
-	eng.registerFunction( "exists", &exists );
-	eng.registerFunction( "diff", &diff );
-	eng.registerFunction( "compare", &compare );
-	eng.registerFunction( "find_exe", &luaFindExecutable );
-	std::string path_sep;
-	path_sep.push_back( pathSeparator() );
-	lua_pushliteral( eng.state(), "path_sep" );
-	lua_pushlstring( eng.state(), path_sep.c_str(), path_sep.size() );
-	lua_rawset( eng.state(), -3 );
+	return find( std::move( progs ), thePath );
 }
 
 } // namespace File

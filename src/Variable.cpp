@@ -59,6 +59,7 @@ void
 Variable::clear( void )
 {
 	myValues.clear();
+	myCachedValue.clear();
 }
 
 
@@ -70,6 +71,7 @@ Variable::add( std::string v )
 {
 	if ( ! v.empty() )
 		myValues.emplace_back( std::move( v ) );
+	myCachedValue.clear();
 }
 
 
@@ -89,6 +91,7 @@ Variable::add( std::vector<std::string> v )
         std::move( std::begin(v), std::end(v), std::back_inserter(myValues) );
         v.clear();
 	}
+	myCachedValue.clear();
 }
 
 
@@ -101,6 +104,7 @@ Variable::reset( std::string v )
 	myValues.clear();
 	if ( ! v.empty() )
 		myValues.emplace_back( std::move( v ) );
+	myCachedValue.clear();
 }
 
 
@@ -111,29 +115,30 @@ void
 Variable::reset( std::vector<std::string> v )
 {
 	myValues = std::move( v );
+	myCachedValue.clear();
 }
 
 
 ////////////////////////////////////////
 
 
-std::string
+const std::string &
 Variable::value( void ) const
 {
-	std::string ret;
+	myCachedValue.clear();
 	if ( myInherit )
-		ret = "${" + myName + "}";
+		myCachedValue = "${" + myName + "}";
 
 	for ( const auto &i: myValues )
 	{
 		if ( i.empty() )
 			continue;
-		if ( ! ret.empty() )
-			ret.push_back( ' ' );
-		ret.append( i );
+		if ( ! myCachedValue.empty() )
+			myCachedValue.push_back( ' ' );
+		myCachedValue.append( i );
 	}
 
-	return std::move( ret );
+	return myCachedValue;
 }
 
 

@@ -30,8 +30,7 @@
 #include <iomanip>
 #include <string.h>
 #include "Debug.h"
-#include "OSUtil.h"
-#include "FileUtil.h"
+#include "LuaExtensions.h"
 #include "Directory.h"
 #include "Compile.h"
 #include "Scope.h"
@@ -124,7 +123,8 @@ emitWrapper( Directory &srcDir,
 	}
 	else
 	{
-		Directory &outDir = Directory::binary();
+//		Directory &outDir = Directory::binary();
+		Directory outDir;
 		wf << ".PHONY: all clean";
 		wf << "\n.ONESHELL:\n"
 			".SHELLFLAGS := -e\n"
@@ -259,24 +259,30 @@ main( int argc, const char *argv[] )
 //			std::cout << "Using default generator: " << generator->name() << std::endl;
 		}
 
-		OS::registerFunctions();
-		File::registerFunctions();
-		Directory::registerFunctions();
 		PackageConfig::registerFunctions();
-		Scope::registerFunctions();
 		Item::registerFunctions();
 		CompileSet::registerFunctions();
 		Configuration::registerFunctions();
+		Lua::registerExtensions();
 
-		Configuration::requestedConfig( config, doConfigDir );
+		Lua::startParsing( subdir );
 
-		Directory::startParsing( subdir );
-
-		const Configuration &cfg = Configuration::getActive();
-		Directory &outDir = Directory::binary();
-		outDir.mkpath();
-
-		generator->emit( outDir, cfg, argc, argv );
+		for ( const Configuration &c: Configuration::defined() )
+		{
+			if ( config.empty() || c.name() == config )
+			{
+				std::shared_ptr<Directory> outDir = Directory::current();
+				if ( doConfigDir )
+				{
+					outDir = Directory::pushd( c.name() );
+					ON_EXIT{ Directory::popd(); };
+					outDir->mkpath();
+					generator->emit( outDir, c, argc, argv );
+				}
+				else
+					generator->emit( outDir, c, argc, argv );
+			}
+		}
 
 		if ( doWrapper )
 		{

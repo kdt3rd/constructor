@@ -93,6 +93,7 @@ public:
 	}
 
 	void pushLibrary( const char *name );
+	void pushSubLibrary( const char *name );
 	void popLibrary( void );
 	void registerLibrary( const char *name,
 						  const struct luaL_Reg *libFuncs );
@@ -118,7 +119,7 @@ private:
 	int myErrFunc;
 	std::vector<BoundFunction> mFuncs;
 	std::vector< std::shared_ptr<FunctionBase> > mCPPFuncs;
-	std::stack<std::string> myCurLib;
+	std::stack< std::pair<std::string, bool> > myCurLib;
 };
 
 } // namespace Lua

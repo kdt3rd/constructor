@@ -37,9 +37,9 @@ const std::string &release( void );
 const std::string &version( void );
 const std::string &machine( void );
 
-bool is64bit( void );
+const std::string &getenv( const std::string &v );
 
-void registerFunctions( void );
+bool is64bit( void );
 
 inline constexpr char pathSeparator( void ) 
 {

@@ -30,8 +30,11 @@
 #include "LuaEngine.h"
 #include "Variable.h"
 #include "Dependency.h"
+#include "Directory.h"
 
 class Item;
+class TransformSet;
+class BuildItem;
 
 /// @brief base class for everything else in the system
 ///
@@ -50,9 +53,11 @@ public:
 	inline ID id( void ) const;
 	virtual const std::string &name( void ) const;
 
-//	virtual void transform( std::vector<BuildItem> &b,
-//	const VariableSet &config );
+	inline const Directory &dir( void ) const;
+	inline const std::shared_ptr<Directory> &directory( void ) const;
 
+	virtual void transform( std::vector< std::shared_ptr<BuildItem> > &b,
+							const TransformSet &xform ) const;
 
 	inline VariableSet &variables( void );
 	inline const VariableSet &variables( void ) const;
@@ -70,6 +75,7 @@ protected:
 private:
 	ID myID;
 	std::string myName;
+	std::shared_ptr<Directory> myDirectory;
 };
 
 using ItemPtr = Item::ItemPtr;
@@ -97,6 +103,24 @@ inline const VariableSet &
 Item::variables( void ) const
 {
 	return myVariables;
+}
+
+
+////////////////////////////////////////
+
+
+inline
+const Directory &
+Item::dir( void ) const
+{
+	return *myDirectory;
+}
+
+inline
+const std::shared_ptr<Directory> &
+Item::directory( void ) const
+{
+	return myDirectory;
 }
 
 

@@ -172,8 +172,7 @@ StackCheck::~StackCheck( void )
 	if ( myTop != -1 )
 	{
 		int x = lua_gettop( L );
-//		if ( x != myTop )
-		if ( x != 0 )
+		if ( x != myTop )
 		{
 			std::cerr << "ERROR: Function '" << myFunc << "' Lua stack mismatch: incoming: " << myTop << " returning top: " << x << std::endl;
 		}
@@ -190,7 +189,7 @@ StackCheck::returns( int x )
 	if ( myTop == -1 )
 		return x;
 	int t = lua_gettop( L );
-	if ( t != x )
+	if ( t != ( myTop + x ) )
 	{
 		std::stringstream err;
 		err << "ERROR: Function '" << myFunc << "' Lua stack mismatch: returning: " << x << " starting state: " << myTop << " stack top: " << t;
@@ -277,7 +276,18 @@ Engine::registerFunction( const char *name, const BoundFunction &f )
 void
 Engine::pushLibrary( const char *name )
 {
-	myCurLib.push( std::string( name ) );
+	myCurLib.push( std::make_pair( std::string( name ), false ) );
+	lua_createtable( L, 0, 0 );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::pushSubLibrary( const char *name )
+{
+	myCurLib.push( std::make_pair( std::string( name ), true ) );
 	lua_createtable( L, 0, 0 );
 }
 
@@ -291,11 +301,16 @@ Engine::popLibrary( void )
 	if ( myCurLib.empty() )
 		throw std::runtime_error( "unbalanced push / pops" );
 
-	luaL_getsubtable( L, LUA_REGISTRYINDEX, "_LOADED" );
-	lua_pushvalue( L, -2 ); // copy of library table
-	lua_setfield( L, -2, myCurLib.top().c_str() );
-	lua_pop( L, 1 );
-	lua_setglobal( L, myCurLib.top().c_str() );
+	if ( myCurLib.top().second )
+		lua_setfield( L, -2, myCurLib.top().first.c_str() );
+	else
+	{
+		luaL_getsubtable( L, LUA_REGISTRYINDEX, "_LOADED" );
+		lua_pushvalue( L, -2 ); // copy of library table
+		lua_setfield( L, -2, myCurLib.top().first.c_str() );
+		lua_pop( L, 1 );
+		lua_setglobal( L, myCurLib.top().first.c_str() );
+	}
 
 	myCurLib.pop();
 }

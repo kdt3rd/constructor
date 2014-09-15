@@ -27,6 +27,8 @@
 #include "Tool.h"
 #include "Debug.h"
 #include "ScopeGuard.h"
+#include "Configuration.h"
+#include "TransformSet.h"
 
 
 ////////////////////////////////////////
@@ -36,92 +38,6 @@ namespace
 {
 static std::shared_ptr<Scope> theRootScope = std::make_shared<Scope>( std::shared_ptr<Scope>() );
 static std::stack< std::shared_ptr<Scope> > theScopes;
-
-
-////////////////////////////////////////
-
-
-void
-luaAddTool( const Lua::Value &v )
-{
-	Scope::current().addTool( Tool::parse( v ) );
-}
-
-void
-luaAddToolSet( const Lua::Value &v )
-{
-	std::string name;
-	std::vector<std::string> tools;
-	const Lua::Table &t = v.asTable();
-	for ( auto &i: t )
-	{
-		if ( i.first.type == Lua::KeyType::INDEX )
-			continue;
-
-		const std::string &k = i.first.tag;
-		if ( k == "name" )
-			name = i.second.asString();
-		else if ( k == "tools" )
-			tools = i.second.toStringList();
-		else
-			throw std::runtime_error( "Unknown tag '" + k + "' in AddToolSet" );
-	}
-	if ( name.empty() )
-		throw std::runtime_error( "Missing name in AddToolSet" );
-	if ( tools.empty() )
-		throw std::runtime_error( "Need list of tools in AddToolSet" );
-
-	Scope::current().addToolSet( name, tools );
-}
-
-void
-luaAddToolOption( const std::string &t, const std::string &g,
-				  const std::string &name,
-				  const std::vector<std::string> &cmd )
-{
-	bool found = false;
-	for ( auto &tool: Scope::current().tools() )
-	{
-		if ( tool->name() == t )
-		{
-			found = true;
-			tool->addOption( g, name, cmd );
-		}
-	}
-
-	if ( ! found )
-		throw std::runtime_error( "Unable to find tool '" + t + "' in current scope" );
-}
-
-int
-luaEnableLangs( lua_State *L )
-{
-	int N = lua_gettop( L );
-	for ( int i = 1; i <= N; ++i )
-	{
-		if ( lua_isstring( L, i ) )
-		{
-			size_t len = 0;
-			const char *s = lua_tolstring( L, i, &len );
-			std::string curLang( s, len );
-			for ( auto &t: Scope::current().tools() )
-				t->enableLanguage( curLang );
-		}
-		else
-		{
-			std::cout << "WARNING: ignoring non-string argument to EnableLanguages" << std::endl;
-		}
-	}
-	return 0;
-}
-
-//int
-//luaSubProj( lua_State *L )
-//{
-//	Scope::pushScope( Scope::current().newSubScope( false ) );
-//	ON_EXIT{ Scope::popScope(); };
-//	return SubDir( L );
-//}
 
 } // empty namespace
 
@@ -151,9 +67,8 @@ Scope::newSubScope( bool inherits )
 {
 	mySubScopes.emplace_back( std::make_shared<Scope>( shared_from_this() ) );
 	if ( inherits )
-	{
-		
-	}
+		mySubScopes.back()->grabTools( *this );
+
 	return mySubScopes.back();
 }
 
@@ -165,6 +80,7 @@ void
 Scope::addTool( const std::shared_ptr<Tool> &t )
 {
 	myTools.push_back( t );
+	myTagMap[t->tag()].push_back( t );
 }
 
 
@@ -221,6 +137,76 @@ Scope::addItem( const ItemPtr &i )
 ////////////////////////////////////////
 
 
+void
+Scope::transform( std::vector< std::shared_ptr<BuildItem> > &items,
+				  const std::shared_ptr<Directory> &outdir,
+				  const Configuration &conf ) const
+{
+	for ( const std::shared_ptr<Scope> &ss: mySubScopes )
+		ss->transform( items, outdir, conf );
+
+	TransformSet xform( outdir );
+
+	for ( auto i: myTagMap )
+	{
+		if ( i.second.size() == 1 )
+			xform.addTool( i.second.front() );
+		else
+		{
+			std::shared_ptr<Tool> found;
+			for ( const std::shared_ptr<Tool> &tagTool: i.second )
+			{
+				for ( const std::string &ts: myEnabledToolsets )
+				{
+					auto tsi = myToolSets.find( ts );
+					if ( tsi != myToolSets.end() )
+					{
+						const std::vector<std::string> &tlist = tsi->second;
+						for ( const std::string &tool: tlist )
+						{
+							if ( tagTool->name() == tool )
+							{
+								if ( found )
+									throw std::runtime_error( "Tool '" + tool + "' conflicts with tool '" + found->name() + "' previously matched to active toolset" );
+
+								found = tagTool;
+							}
+						}
+					}
+				}
+			}
+			if ( found )
+				xform.addTool( found );
+			else
+				throw std::runtime_error( "Unable to find active tool for tool tag '" + i.first + "'" );
+		}
+	}
+
+	xform.mergeVariables( myVariables );
+	xform.mergeVariables( conf.vars() );
+
+	for ( const ItemPtr &i: myItems )
+		i->transform( items, xform );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Scope::grabTools( Scope &o )
+{
+	myToolSets = o.myToolSets;
+	myTagMap = o.myTagMap;
+	myTools = o.myTools;
+	myEnabledToolsets = o.myEnabledToolsets;
+	myExtensionMap = o.myExtensionMap;
+}
+
+
+////////////////////////////////////////
+
+
 Scope &
 Scope::root( void )
 {
@@ -259,21 +245,6 @@ Scope::popScope( void )
 	if ( theScopes.empty() )
 		throw std::runtime_error( "unbalanced Scope management -- too many pops for pushes" );
 	theScopes.pop();
-}
-
-
-////////////////////////////////////////
-
-
-void
-Scope::registerFunctions( void )
-{
-	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.registerFunction( "AddTool", &luaAddTool );
-	eng.registerFunction( "AddToolOption", &luaAddToolOption );
-	eng.registerFunction( "AddToolSet", &luaAddToolSet );
-	eng.registerFunction( "EnableLanguages", &luaEnableLangs );
-//	eng.registerFunction( "SubProject", &luaSubProj );
 }
 
 

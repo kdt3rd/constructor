@@ -69,11 +69,11 @@ MakeGenerator::targetCall( std::ostream &os,
 
 
 void
-MakeGenerator::emit( const Directory &d,
+MakeGenerator::emit( const std::shared_ptr<Directory> &d,
 					 const Configuration &conf,
 					 int argc, const char *argv[] )
 {
-	std::ofstream f( d.makefilename( "Makefile" ) );
+	std::ofstream f( d->makefilename( "Makefile" ) );
 	f <<
 		".PHONY: all clean\n"
 		".ONESHELL:\n"

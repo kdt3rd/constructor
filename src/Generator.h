@@ -49,7 +49,7 @@ public:
 
 	virtual void targetCall( std::ostream &os,
 							 const std::string &tname ) = 0;
-	virtual void emit( const Directory &dest,
+	virtual void emit( const std::shared_ptr<Directory> &dest,
 					   const Configuration &config,
 					   int args, const char *argv[] ) = 0;
 

@@ -23,6 +23,9 @@
 #include "NinjaGenerator.h"
 #include "FileUtil.h"
 #include "Configuration.h"
+#include "LuaExtensions.h"
+#include "BuildItem.h"
+#include "Scope.h"
 #include <fstream>
 #include <iostream>
 
@@ -66,12 +69,16 @@ NinjaGenerator::targetCall( std::ostream &os,
 
 
 void
-NinjaGenerator::emit( const Directory &d,
+NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 					  const Configuration &conf,
 					  int argc, const char *argv[] )
 {
-	std::ofstream f( d.makefilename( "build.ninja" ) );
+	std::ofstream f( d->makefilename( "build.ninja" ) );
 	f << "ninja_required_version = 1.3\n";
+
+	std::vector< std::shared_ptr<BuildItem> > items;
+
+	Scope::root().transform( items, d, conf );
 	
 	f << "build all: phony ";
 	
@@ -90,7 +97,7 @@ NinjaGenerator::emit( const Directory &d,
 		"\n\n";
 
 	f << "build build.ninja: regen_constructor |";
-	for ( const std::string &x: Directory::visited() )
+	for ( const std::string &x: Lua::visitedFiles() )
 		f << ' ' << x;
 	f << "\n\n";
 }

@@ -59,6 +59,8 @@ public:
 					const std::string &name,
 					const std::vector<std::string> &cmd );
 
+	inline const std::vector<std::string> &outputs( void ) const;
+
 	const std::string &executable( void ) const;
 	ItemPtr generatedExecutable( void ) const;
 
@@ -121,6 +123,15 @@ Tool::implicitDependencyFilename( void ) const
 inline const std::vector<std::string> &
 Tool::implicitDependencyOptions( void ) const
 { return myImplDepCmd; }
+
+
+////////////////////////////////////////
+
+
+
+inline const std::vector<std::string> &
+Tool::outputs( void ) const
+{ return myOutputs; }
 
 
 ////////////////////////////////////////

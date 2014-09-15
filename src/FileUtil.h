@@ -47,12 +47,19 @@ bool isAbsolute( const char *path );
 bool exists( const char *path );
 bool isDirectory( const char *path );
 
+std::string extension( const std::string &fn );
+std::string replaceExtension( const std::string &fn, const std::string &newext );
+
 bool diff( const char *path, const std::vector<std::string> &lines );
 bool compare( const char *pathA, const char *pathB );
 
 // looks in the current directory for a file
 // returns the first name found
 bool find( std::string &filepath, const std::vector<std::string> &names );
+// looks along the provided path, returns the first name found
+bool find( std::string &filepath, const std::vector<std::string> &names,
+		   const std::vector<std::string> &path );
+
 // looks in the specified path for the given filename
 // finds the first filepath found
 bool find( std::string &filepath, const std::string &name, const std::vector<std::string> &path );
@@ -61,16 +68,16 @@ bool find( std::string &filepath, const std::string &name, const std::vector<std
 // returns the first result found
 bool find( std::string &filepath, const std::string &name, const std::vector<std::string> &extensions, const std::vector<std::string> &path );
 // looks along given path and returns a map of found
-// items
+// items. checks for both prog and prog + extension
 std::map<std::string, std::string>
 find( std::vector<std::string> progs,
 	  const std::vector<std::string> &path,
 	  const std::vector<std::string> &extensions = std::vector<std::string>() );
 
+void setPathOverride( const std::vector<std::string> &p );
+const std::vector<std::string> &getPath( void );
 bool findExecutable( std::string &filepath, const std::string &name );
 std::map<std::string, std::string> findExecutables( std::vector<std::string> progs );
-
-void registerFunctions( void );
 
 } // namespace File
 

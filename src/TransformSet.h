@@ -22,25 +22,55 @@
 
 #pragma once
 
-#include "Generator.h"
+#include "Tool.h"
+#include "Variable.h"
+#include "Directory.h"
 
 
 ////////////////////////////////////////
 
 
-class MakeGenerator : public Generator
+class TransformSet
 {
 public:
-	MakeGenerator( std::string p );
-	virtual ~MakeGenerator( void );
+	TransformSet( const std::shared_ptr<Directory> &dir );
+	~TransformSet( void );
 
-	virtual void targetCall( std::ostream &os,
-							 const std::string &tname );
-	virtual void emit( const std::shared_ptr<Directory> &dest,
-					   const Configuration &cfg,
-					   int args, const char *argv[] );
+	inline const std::shared_ptr<Directory> &output_dir( void ) const;
 
-	static void init( void );
+	void addTool( const std::shared_ptr<Tool> &t );
+	void mergeVariables( const VariableSet &vs );
+
+	std::shared_ptr<Tool> findTool( const std::string &ext ) const;
+	inline const VariableSet &vars( void ) const;
+
+private:
+	std::shared_ptr<Directory> myDirectory;
+	std::vector< std::shared_ptr<Tool> > myTools;
+	VariableSet myVars;
 };
+
+
+////////////////////////////////////////
+
+
+inline const std::shared_ptr<Directory> &
+TransformSet::output_dir( void ) const
+{
+	return myDirectory;
+}
+
+
+////////////////////////////////////////
+
+
+inline const VariableSet &
+TransformSet::vars( void ) const
+{
+	return myVars;
+}
+
+
+
 
 

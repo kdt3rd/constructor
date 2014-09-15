@@ -22,25 +22,24 @@
 
 #pragma once
 
-#include "Generator.h"
+#include <string>
+#include <vector>
 
 
 ////////////////////////////////////////
 
 
-class MakeGenerator : public Generator
+
+namespace Lua
 {
-public:
-	MakeGenerator( std::string p );
-	virtual ~MakeGenerator( void );
 
-	virtual void targetCall( std::ostream &os,
-							 const std::string &tname );
-	virtual void emit( const std::shared_ptr<Directory> &dest,
-					   const Configuration &cfg,
-					   int args, const char *argv[] );
+void registerExtensions( void );
 
-	static void init( void );
-};
+void startParsing( const std::string &dir );
+
+const std::vector<std::string> &visitedFiles( void );
+
+} // namespace src
+
 
 

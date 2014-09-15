@@ -32,17 +32,22 @@
 class BuildItem : public Dependency<BuildItem>
 {
 public:
-	BuildItem( const std::string &name );
-	BuildItem( std::string &&name );
+	BuildItem( const std::string &name,
+			   const std::shared_ptr<Directory> &srcdir );
+	BuildItem( std::string &&name,
+			   const std::shared_ptr<Directory> &srcdir );
 	virtual ~BuildItem( void );
 
 	virtual const std::string &name( void ) const;
 
+	inline const std::shared_ptr<Directory> &dir( void ) const;
+	inline const std::shared_ptr<Directory> &out_dir( void ) const;
+
+	void setOutputDir( const std::shared_ptr<Directory> &outdir );
+
 	void setTool( const std::shared_ptr<Tool> &t );
 	inline const std::shared_ptr<Tool> &tool( void ) const;
 
-	void addOutput( const std::string &o );
-	void addOutput( std::string &&o );
 	inline const std::vector<std::string> &outputs( void ) const;
 
 private:
@@ -50,6 +55,8 @@ private:
 
 	std::shared_ptr<Tool> myTool;
 	std::vector<std::string> myOutputs;
+	std::shared_ptr<Directory> myDirectory;
+	std::shared_ptr<Directory> myOutDirectory;
 };
 
 
@@ -60,6 +67,39 @@ inline const std::shared_ptr<Tool> &
 BuildItem::tool( void ) const
 {
 	return myTool;
+}
+
+
+////////////////////////////////////////
+
+
+inline
+const std::shared_ptr<Directory> &
+BuildItem::dir( void ) const
+{
+	return myDirectory;
+}
+
+
+////////////////////////////////////////
+
+
+inline
+const std::shared_ptr<Directory> &
+BuildItem::out_dir( void ) const
+{
+	return myOutDirectory;
+}
+
+
+////////////////////////////////////////
+
+
+inline
+const std::vector<std::string> &
+BuildItem::outputs( void ) const
+{
+	return myOutputs;
 }
 
 

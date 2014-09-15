@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "LuaValue.h"
+#include "Variable.h"
 
 
 ////////////////////////////////////////
@@ -35,19 +36,41 @@ class Configuration
 {
 public:
 	Configuration( void );
-	Configuration( Lua::Table &&t );
+	Configuration( const Lua::Table &t );
 	~Configuration( void );
 
-	const std::string &name( void ) const;
+	inline const std::string &name( void ) const;
+	inline const VariableSet &vars( void ) const;
 
 	static const Configuration &getDefault( void );
-	static const Configuration &getActive( void );
 	static std::vector<Configuration> &defined( void );
-	static void requestedConfig( const std::string &name, bool useSubDir );
 	static void registerFunctions( void );
 
 private:
-	Lua::Table myConfigSettings;
+	std::string myName;
+	VariableSet myVariables;
 };
+
+
+////////////////////////////////////////
+
+
+inline
+const std::string &
+Configuration::name( void ) const
+{
+	return myName;
+}
+
+
+////////////////////////////////////////
+
+
+inline
+const VariableSet &
+Configuration::vars( void ) const
+{
+	return myVariables;
+}
 
 

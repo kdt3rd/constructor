@@ -24,6 +24,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 
 ////////////////////////////////////////
@@ -68,12 +69,9 @@ public:
 	// NB: modifying this will modify global state, but doesn't change
 	// any O.S. level current directory, at least currently. if we
 	// support running scripts in the future, this may have to change
-	static Directory &current( void );
-	static void startParsing( const std::string &dir );
-	static const std::vector<std::string> &visited( void );
-	static void registerFunctions( void );
-	static void setBinaryRoot( const std::string &root );
-	static Directory &binary( void );
+	static const std::shared_ptr<Directory> &current( void );
+	static const std::shared_ptr<Directory> &pushd( const std::string &subd );
+	static const std::shared_ptr<Directory> &popd( void );
 
 private:
 	void combinePath( std::vector<std::string> &fullpath ) const;

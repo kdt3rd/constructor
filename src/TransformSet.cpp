@@ -20,27 +20,69 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#pragma once
-
-#include "Generator.h"
+#include "TransformSet.h"
 
 
 ////////////////////////////////////////
 
 
-class MakeGenerator : public Generator
+TransformSet::TransformSet( const std::shared_ptr<Directory> &d )
+		: myDirectory( d )
 {
-public:
-	MakeGenerator( std::string p );
-	virtual ~MakeGenerator( void );
+}
 
-	virtual void targetCall( std::ostream &os,
-							 const std::string &tname );
-	virtual void emit( const std::shared_ptr<Directory> &dest,
-					   const Configuration &cfg,
-					   int args, const char *argv[] );
 
-	static void init( void );
-};
+////////////////////////////////////////
+
+
+TransformSet::~TransformSet( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+void
+TransformSet::addTool( const std::shared_ptr<Tool> &t )
+{
+	myTools.push_back( t );
+}
+
+
+////////////////////////////////////////
+
+
+void
+TransformSet::mergeVariables( const VariableSet &vs )
+{
+	if ( myVars.empty() )
+		myVars = vs;
+	else
+	{
+		for ( auto i: vs )
+			myVars.emplace( std::make_pair( i.first, i.second ) );
+	}
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<Tool>
+TransformSet::findTool( const std::string &ext ) const
+{
+	for ( auto &t: myTools )
+		if ( t->handlesExtension( ext ) )
+			return t;
+	return std::shared_ptr<Tool>();
+}
+
+
+////////////////////////////////////////
+
+
+
+
 
 

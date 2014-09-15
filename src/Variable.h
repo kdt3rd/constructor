@@ -51,7 +51,7 @@ public:
 	void reset( std::string v );
 	void reset( std::vector<std::string> v );
 
-	std::string value( void ) const;
+	const std::string &value( void ) const;
 
 	// if any of the values in the Variable don't begin
 	// with the provided prefix, it is preprended to that
@@ -65,6 +65,7 @@ private:
 
 	std::string myName;
 	std::vector<std::string> myValues;
+	mutable std::string myCachedValue;
 	bool myInherit = false;
 };
 
