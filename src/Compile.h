@@ -47,7 +47,8 @@ protected:
 	applyTransform( const std::string &name,
 					const std::shared_ptr<Directory> &srcdir,
 					std::vector< std::shared_ptr<BuildItem> > &b,
-					const TransformSet &xform ) const;
+					const TransformSet &xform,
+					const std::string &forceTool = std::string() ) const;
 
 	std::vector<ItemPtr> myItems;
 };

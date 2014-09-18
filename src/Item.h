@@ -64,6 +64,7 @@ public:
 	Variable &variable( const std::string &nm );
 	void setVariable( const std::string &nm, const std::string &value,
 					  bool doSplit = false );
+	bool findVariableValueRecursive( std::string &val, const std::string &nm ) const;
 
 	static ItemPtr extract( lua_State *l, int i );
 	static void push( lua_State *l, ItemPtr i );

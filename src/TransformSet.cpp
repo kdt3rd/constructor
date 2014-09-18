@@ -82,6 +82,19 @@ TransformSet::findTool( const std::string &ext ) const
 ////////////////////////////////////////
 
 
+std::shared_ptr<Tool>
+TransformSet::findToolByTag( const std::string &tag ) const
+{
+	for ( auto &t: myTools )
+		if ( t->tag() == tag )
+			return t;
+	return std::shared_ptr<Tool>();
+}
+
+
+////////////////////////////////////////
+
+
 
 
 

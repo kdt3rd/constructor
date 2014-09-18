@@ -45,6 +45,7 @@ class Dependency : public std::enable_shared_from_this<Item>
 {
 public:
 	typedef std::shared_ptr<Item> ItemPtr;
+	typedef std::weak_ptr<Item> WeakItemPtr;
 
 	Dependency( void )
 	{}
@@ -52,6 +53,9 @@ public:
 	{}
 
 	virtual const std::string &name( void ) const = 0;
+
+	inline void setParent( ItemPtr p );
+	inline ItemPtr parent( void ) const;
 
 	inline void addDependency( DependencyType dt, ItemPtr o );
 
@@ -83,7 +87,26 @@ private:
 	}
 
 	std::map<ItemPtr, DependencyType> myDependencies;
+	WeakItemPtr myParent;
 };
+
+
+////////////////////////////////////////
+
+
+template <typename Item>
+inline void
+Dependency<Item>::setParent( ItemPtr p )
+{
+	myParent = p;
+}
+template <typename Item>
+inline typename Dependency<Item>::ItemPtr
+Dependency<Item>::parent( void ) const
+{
+	return myParent.lock();
+}
+
 
 
 ////////////////////////////////////////

@@ -159,6 +159,10 @@ Tool::handlesExtension( const std::string &e ) const
 		if ( me == e )
 			return true;
 
+	for ( auto &ma: myAltExtensions )
+		if ( ma == e )
+			return true;
+
 	return false;
 }
 

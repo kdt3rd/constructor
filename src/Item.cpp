@@ -302,6 +302,28 @@ Item::setVariable( const std::string &nm, const std::string &value,
 ////////////////////////////////////////
 
 
+bool
+Item::findVariableValueRecursive( std::string &val, const std::string &nm ) const
+{
+	auto x = myVariables.find( nm );
+	if ( x == myVariables.end() )
+	{
+		ItemPtr i = parent();
+		if ( i )
+			return i->findVariableValueRecursive( val, nm );
+
+		val.clear();
+		return false;
+	}
+
+	val = x->second.value();
+	return true;
+}
+
+
+////////////////////////////////////////
+
+
 ItemPtr
 Item::extract( lua_State *L, int i )
 {

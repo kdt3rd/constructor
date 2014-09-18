@@ -42,6 +42,7 @@ public:
 	void mergeVariables( const VariableSet &vs );
 
 	std::shared_ptr<Tool> findTool( const std::string &ext ) const;
+	std::shared_ptr<Tool> findToolByTag( const std::string &tag ) const;
 	inline const VariableSet &vars( void ) const;
 
 private:
