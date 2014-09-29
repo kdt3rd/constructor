@@ -25,12 +25,13 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <set>
 
 #include "Rule.h"
 #include "Item.h"
 #include "LuaValue.h"
 
-class Configuration;
+class TransformSet;
 
 
 ////////////////////////////////////////
@@ -46,32 +47,35 @@ public:
 	Tool( std::string t, std::string n );
 	virtual ~Tool( void );
 
-	inline const std::string &tag( void ) const;
-	inline const std::string &name( void ) const;
+	inline const std::string &getTag( void ) const;
+	inline const std::string &getName( void ) const;
 
 	void enableLanguage( const std::string &name );
-	const std::string &language( void ) const;
+	const std::string &getLanguage( void ) const;
 
-	OptionSet &option( const std::string &name );
-	const OptionSet &option( const std::string &name ) const;
-	std::string defaultOption( const std::string &opt ) const;
+	OptionSet &getOption( const std::string &name );
+	const OptionSet &getOption( const std::string &name ) const;
+	std::string getDefaultOption( const std::string &opt ) const;
 	void addOption( const std::string &opt,
 					const std::string &name,
 					const std::vector<std::string> &cmd );
 
-	inline const std::vector<std::string> &outputs( void ) const;
+	inline const std::string &getOutputPrefix( void ) const;
+	inline const std::vector<std::string> &getOutputs( void ) const;
 
-	const std::string &executable( void ) const;
-	ItemPtr generatedExecutable( void ) const;
+	const std::string &getExecutable( void ) const;
+	ItemPtr getGeneratedExecutable( void ) const;
 
 	inline bool hasImplicitDependencies( void ) const;
-	inline const std::string &implicitDependencyFilename( void ) const;
-	inline const std::vector<std::string> &implicitDependencyOptions( void ) const;
+	inline const std::string &getImplicitDependencyFilename( void ) const;
+	inline const std::vector<std::string> &getImplicitDependencyOptions( void ) const;
 
-	inline const std::vector<std::string> &extensions( void ) const;
+	inline const std::vector<std::string> &getExtensions( void ) const;
 	bool handlesExtension( const std::string &e ) const;
 
-	Rule rule( const OptionDefaultSet &scopeOptions, const Configuration &conf ) const;
+	bool handlesTools( const std::set<std::string> &s ) const;
+
+	Rule createRule( const TransformSet &x ) const;
 
 	static std::shared_ptr<Tool> parse( const Lua::Value &v );
 
@@ -85,6 +89,7 @@ private:
 
 	std::vector<std::string> myExtensions;
 	std::vector<std::string> myAltExtensions;
+	std::string myOutputPrefix;
 	std::vector<std::string> myOutputs;
 	std::vector<std::string> myCommand;
 	std::vector<std::string> myInputTools;
@@ -94,6 +99,7 @@ private:
 	std::string myLanguage;
 
 	std::string myImplDepName;
+	std::string myImplDepStyle;
 	std::vector<std::string> myImplDepCmd;
 };
 
@@ -102,10 +108,10 @@ private:
 
 
 inline const std::string &
-Tool::tag( void ) const
+Tool::getTag( void ) const
 { return myTag; }
 inline const std::string &
-Tool::name( void ) const
+Tool::getName( void ) const
 { return myName; }
 
 
@@ -117,11 +123,11 @@ Tool::hasImplicitDependencies( void ) const
 { return ! myImplDepName.empty(); }
 
 inline const std::string &
-Tool::implicitDependencyFilename( void ) const
+Tool::getImplicitDependencyFilename( void ) const
 { return myImplDepName; }
 
 inline const std::vector<std::string> &
-Tool::implicitDependencyOptions( void ) const
+Tool::getImplicitDependencyOptions( void ) const
 { return myImplDepCmd; }
 
 
@@ -129,8 +135,11 @@ Tool::implicitDependencyOptions( void ) const
 
 
 
+inline const std::string &Tool::getOutputPrefix( void ) const
+{ return myOutputPrefix; }
+
 inline const std::vector<std::string> &
-Tool::outputs( void ) const
+Tool::getOutputs( void ) const
 { return myOutputs; }
 
 
@@ -138,5 +147,5 @@ Tool::outputs( void ) const
 
 
 inline const std::vector<std::string> &
-Tool::extensions( void ) const
+Tool::getExtensions( void ) const
 { return myExtensions; }

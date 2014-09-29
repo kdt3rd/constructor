@@ -25,6 +25,9 @@
 #include "Item.h"
 #include "LuaEngine.h"
 #include "StrUtil.h"
+#include "FileUtil.h"
+#include "Debug.h"
+#include "TransformSet.h"
 #include <iostream>
 
 
@@ -37,17 +40,8 @@ int itemGetName( lua_State *L )
 	if ( lua_gettop( L ) != 1 )
 		throw std::runtime_error( "Item:name() expects only one argument - self" );
 	ItemPtr p = Item::extract( L, 1 );
-	const std::string &n = p->name();
+	const std::string &n = p->getName();
 	lua_pushlstring( L, n.c_str(), n.size() );
-	return 1;
-}
-
-int itemGetID( lua_State *L )
-{
-	if ( lua_gettop( L ) != 1 )
-		throw std::runtime_error( "Item:id() expects only one argument - self" );
-	ItemPtr p = Item::extract( L, 1 );
-	lua_pushunsigned( L, p->id() );
 	return 1;
 }
 
@@ -96,7 +90,7 @@ int itemVariables( lua_State *L )
 	ItemPtr p = Item::extract( L, 1 );
 	Lua::Value ret;
 	Lua::Table &t = ret.initTable();
-	for ( auto &v: p->variables() )
+	for ( auto &v: p->getVariables() )
 		t[v.first].initString( std::move( v.second.value() ) );
 
 	ret.push( L );
@@ -114,7 +108,7 @@ int itemClearVariable( lua_State *L )
 	ItemPtr p = Item::extract( L, 1 );
 	std::string nm = Lua::Parm<std::string>::get( L, 2, 2 );
 
-	VariableSet &vars = p->variables();
+	VariableSet &vars = p->getVariables();
 	auto x = vars.find( nm );
 	if ( x != vars.end() )
 		vars.erase( x );
@@ -134,7 +128,7 @@ int itemSetVariable( lua_State *L )
 	if ( N == 4 )
 		envCheck = Lua::Parm<bool>::get( L, N, 4 );
 
-	VariableSet &vars = p->variables();
+	VariableSet &vars = p->getVariables();
 	auto x = vars.find( nm );
 	if ( v.type() == LUA_TNIL )
 	{
@@ -167,7 +161,7 @@ int itemAddToVariable( lua_State *L )
 	if ( v.type() == LUA_TNIL )
 		return 0;
 
-	VariableSet &vars = p->variables();
+	VariableSet &vars = p->getVariables();
 	auto x = vars.find( nm );
 	// should this be an error?
 	if ( x == vars.end() )
@@ -189,7 +183,7 @@ int itemInheritVariable( lua_State *L )
 	ItemPtr p = Item::extract( L, 1 );
 	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
 	bool v = Lua::Parm<bool>::get( L, 3, 3 );
-	VariableSet &vars = p->variables();
+	VariableSet &vars = p->getVariables();
 	auto x = vars.find( nm );
 	// should this be an error?
 	if ( x == vars.end() )
@@ -258,7 +252,7 @@ Item::~Item( void )
 
 
 const std::string &
-Item::name( void ) const 
+Item::getName( void ) const 
 {
 	return myName;
 }
@@ -267,10 +261,34 @@ Item::name( void ) const
 ////////////////////////////////////////
 
 
-void
-Item::transform( std::vector< std::shared_ptr<BuildItem> > &,
-				 const TransformSet & ) const
+std::shared_ptr<BuildItem>
+Item::transform( TransformSet &xform ) const
 {
+	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	if ( ret )
+		return ret;
+
+	std::string forceTool;
+	findVariableValueRecursive( forceTool, "tool" );
+
+	ret = std::make_shared<BuildItem>( getName(), getDir() );
+
+	std::string ext = File::extension( getName() );
+	std::shared_ptr<Tool> t;
+	if ( ! forceTool.empty() )
+		t = xform.findToolByTag( forceTool, ext );
+	else
+		t = xform.findTool( ext );
+
+	if ( t )
+	{
+		DEBUG( getName() << " transformed by tool '" << t->getTag() << "' (" << t->getName() << ")" );
+		ret->setTool( t );
+		ret->setOutputDir( xform.getOutDir() );
+	}
+
+	xform.recordTransform( this, ret );
+	return ret;
 }
 
 
@@ -278,7 +296,7 @@ Item::transform( std::vector< std::shared_ptr<BuildItem> > &,
 
 
 Variable &
-Item::variable( const std::string &nm )
+Item::getVariable( const std::string &nm )
 {
 	auto v = myVariables.emplace( std::make_pair( nm, Variable( nm ) ) );
 	return v.first->second;
@@ -293,9 +311,9 @@ Item::setVariable( const std::string &nm, const std::string &value,
 				   bool doSplit )
 {
 	if ( doSplit )
-		variable( nm ).reset( String::split( value, ' ' ) );
+		getVariable( nm ).reset( String::split( value, ' ' ) );
 	else
-		variable( nm ).reset( value );
+		getVariable( nm ).reset( value );
 }
 
 
@@ -308,7 +326,7 @@ Item::findVariableValueRecursive( std::string &val, const std::string &nm ) cons
 	auto x = myVariables.find( nm );
 	if ( x == myVariables.end() )
 	{
-		ItemPtr i = parent();
+		ItemPtr i = getParent();
 		if ( i )
 			return i->findVariableValueRecursive( val, nm );
 
@@ -363,7 +381,6 @@ static const struct luaL_Reg item_m[] =
 {
 	{ "__tostring", itemGetName },
 	{ "name", itemGetName },
-	{ "id", itemGetID },
 	{ "addDependency", itemAddDependency },
 	{ "depends", itemHasDependency },
 	{ "variables", itemVariables },

@@ -52,10 +52,10 @@ public:
 	virtual ~Dependency( void )
 	{}
 
-	virtual const std::string &name( void ) const = 0;
+	virtual const std::string &getName( void ) const = 0;
 
 	inline void setParent( ItemPtr p );
-	inline ItemPtr parent( void ) const;
+	inline ItemPtr getParent( void ) const;
 
 	inline void addDependency( DependencyType dt, ItemPtr o );
 
@@ -102,7 +102,7 @@ Dependency<Item>::setParent( ItemPtr p )
 }
 template <typename Item>
 inline typename Dependency<Item>::ItemPtr
-Dependency<Item>::parent( void ) const
+Dependency<Item>::getParent( void ) const
 {
 	return myParent.lock();
 }
@@ -120,7 +120,7 @@ Dependency<Item>::addDependency( DependencyType dt, ItemPtr otherObj )
 		return;
 
 	if ( otherObj->hasDependency( this->shared_from_this() ) )
-		throw std::runtime_error( "Attempt to create a circular dependency between '" + name() + "' and '" + otherObj->name() + "'" );
+		throw std::runtime_error( "Attempt to create a circular dependency between '" + getName() + "' and '" + otherObj->getName() + "'" );
 
 	auto cur = myDependencies.find( otherObj );
 	if ( cur == myDependencies.end() )

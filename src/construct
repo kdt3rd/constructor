@@ -1,0 +1,68 @@
+
+local x = Compile(
+	"main.cpp",
+	"Item.cpp",
+	"BuildItem.cpp",
+	"Scope.cpp",
+	"TransformSet.cpp",
+	"Compile.cpp",
+	"Rule.cpp",
+	"Tool.cpp",
+	"Configuration.cpp",
+	"Variable.cpp",
+	"Generator.cpp",
+	"NinjaGenerator.cpp",
+	"MakeGenerator.cpp",
+	"LuaEngine.cpp",
+	"LuaExtensions.cpp",
+	"LuaValue.cpp",
+	"Debug.cpp",
+	"StrUtil.cpp",
+	"OSUtil.cpp",
+	"FileUtil.cpp",
+	"Directory.cpp",
+	"PackageConfig.cpp"
+				 )
+
+local lua_ver = "lua-5.2.3"
+local lua_dir = lua_ver .. file.path.sep .. "src" .. file.path.sep
+local l = Compile(
+	lua_dir .. "lapi.c",
+	lua_dir .. "lcode.c",
+	lua_dir .. "lctype.c",
+	lua_dir .. "ldebug.c",
+	lua_dir .. "ldo.c",
+	lua_dir .. "ldump.c",
+	lua_dir .. "lfunc.c",
+	lua_dir .. "lgc.c",
+	lua_dir .. "llex.c",
+	lua_dir .. "lmem.c",
+	lua_dir .. "lobject.c",
+	lua_dir .. "lopcodes.c",
+	lua_dir .. "lparser.c",
+	lua_dir .. "lstate.c",
+	lua_dir .. "lstring.c",
+	lua_dir .. "ltable.c",
+	lua_dir .. "ltm.c",
+	lua_dir .. "lundump.c",
+	lua_dir .. "lvm.c",
+	lua_dir .. "lzio.c",
+	lua_dir .. "lauxlib.c",
+	lua_dir .. "lbaselib.c",
+	lua_dir .. "lbitlib.c",
+	lua_dir .. "lcorolib.c",
+	lua_dir .. "ldblib.c",
+	lua_dir .. "liolib.c",
+	lua_dir .. "lmathlib.c",
+	lua_dir .. "loslib.c",
+	lua_dir .. "lstrlib.c",
+	lua_dir .. "ltablib.c",
+	lua_dir .. "loadlib.c",
+	lua_dir .. "linit.c"
+				 )
+l:setVariable( "tool", "cxx" )
+
+exe = Executable( "constructor", x, l )
+-- AddDefines( x, "SOME_DEFINE" )
+-- 
+-- a = Library( "foo", x, FindPackage( "QtCore" ) )

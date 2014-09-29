@@ -22,8 +22,11 @@
 
 #pragma once
 
+#include <set>
 #include "Dependency.h"
 #include "Tool.h"
+
+class TransformSet;
 
 
 ////////////////////////////////////////
@@ -38,17 +41,37 @@ public:
 			   const std::shared_ptr<Directory> &srcdir );
 	virtual ~BuildItem( void );
 
-	virtual const std::string &name( void ) const;
+	void setName( const std::string &n );
+	virtual const std::string &getName( void ) const;
+	inline void setUseName( bool v );
+	inline bool useName( void ) const;
 
-	inline const std::shared_ptr<Directory> &dir( void ) const;
-	inline const std::shared_ptr<Directory> &out_dir( void ) const;
+	inline const std::shared_ptr<Directory> &getDir( void ) const;
+	inline const std::shared_ptr<Directory> &getOutDir( void ) const;
 
 	void setOutputDir( const std::shared_ptr<Directory> &outdir );
 
 	void setTool( const std::shared_ptr<Tool> &t );
-	inline const std::shared_ptr<Tool> &tool( void ) const;
+	inline const std::shared_ptr<Tool> &getTool( void ) const;
+	void extractTags( std::set<std::string> &tags ) const;
+	const std::string &getTag( void ) const;
 
-	inline const std::vector<std::string> &outputs( void ) const;
+	inline const std::vector<std::string> &getOutputs( void ) const;
+
+	void setFlag( const std::string &n, const std::string &v );
+	const std::string &getFlag( const std::string &n ) const;
+
+	// "top level" indicates that it should appear
+	// in the list of pseudo targets with a short name for
+	// easy build targeting (i.e. "make foo")
+	inline void setTopLevel( bool tl );
+	inline bool isTopLevelItem( void ) const;
+
+	inline void markAsDependent( void );
+	// basically, this should be true if no one depends on me, to be
+	// used to find non "top level" targets that won't be built
+	// otherwise
+	inline bool isRoot( void ) const;
 
 private:
 	std::string myName;
@@ -57,17 +80,20 @@ private:
 	std::vector<std::string> myOutputs;
 	std::shared_ptr<Directory> myDirectory;
 	std::shared_ptr<Directory> myOutDirectory;
+
+	std::map<std::string, std::string> myFlags;
+
+	bool myIsTopLevel = false;
+	bool myIsDependent = false;
+	bool myUseName = true;
 };
 
 
 ////////////////////////////////////////
 
 
-inline const std::shared_ptr<Tool> &
-BuildItem::tool( void ) const
-{
-	return myTool;
-}
+inline void BuildItem::setUseName( bool v ) { myUseName = v; }
+inline bool BuildItem::useName( void ) const { return myUseName; }
 
 
 ////////////////////////////////////////
@@ -75,7 +101,7 @@ BuildItem::tool( void ) const
 
 inline
 const std::shared_ptr<Directory> &
-BuildItem::dir( void ) const
+BuildItem::getDir( void ) const
 {
 	return myDirectory;
 }
@@ -86,7 +112,7 @@ BuildItem::dir( void ) const
 
 inline
 const std::shared_ptr<Directory> &
-BuildItem::out_dir( void ) const
+BuildItem::getOutDir( void ) const
 {
 	return myOutDirectory;
 }
@@ -95,11 +121,56 @@ BuildItem::out_dir( void ) const
 ////////////////////////////////////////
 
 
+inline const std::shared_ptr<Tool> &
+BuildItem::getTool( void ) const
+{
+	return myTool;
+}
+
+
+////////////////////////////////////////
+
+
 inline
 const std::vector<std::string> &
-BuildItem::outputs( void ) const
+BuildItem::getOutputs( void ) const
 {
 	return myOutputs;
 }
+
+
+////////////////////////////////////////
+
+
+inline void
+BuildItem::setTopLevel( bool tl ) 
+{
+	myIsTopLevel = tl;
+}
+inline bool
+BuildItem::isTopLevelItem( void ) const
+{
+	return myIsTopLevel;
+}
+
+
+////////////////////////////////////////
+
+
+inline void
+BuildItem::markAsDependent( void )
+{
+	myIsDependent = true;
+}
+inline bool
+BuildItem::isRoot( void ) const
+{
+	return myIsDependent;
+}
+
+
+////////////////////////////////////////
+
+
 
 

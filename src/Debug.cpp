@@ -76,6 +76,9 @@ namespace Verbose
 
 bool on( void )
 {
+	if ( ! theVerboseEnable )
+		return Debug::on();
+
 	return theVerboseEnable;
 }
 

@@ -46,7 +46,7 @@ namespace
 
 inline constexpr const char *buildFileName( void )
 {
-	return "build.lua";
+	return "construct";
 }
 
 
@@ -79,7 +79,7 @@ luaFindExecutable( lua_State *L )
 static const std::string &
 pathVarLookup( const std::string &name )
 {
-	const VariableSet &vars = Scope::current().vars();
+	const VariableSet &vars = Scope::current().getVars();
 	auto i = vars.find( name );
 	if ( i != vars.end() )
 		return i->second.value();
@@ -260,9 +260,9 @@ luaAddToolOption( const std::string &t, const std::string &g,
 				  const std::vector<std::string> &cmd )
 {
 	bool found = false;
-	for ( auto &tool: Scope::current().tools() )
+	for ( auto &tool: Scope::current().getTools() )
 	{
-		if ( tool->name() == t )
+		if ( tool->getName() == t )
 		{
 			found = true;
 			tool->addOption( g, name, cmd );
@@ -284,7 +284,7 @@ luaEnableLangs( lua_State *L )
 			size_t len = 0;
 			const char *s = lua_tolstring( L, i, &len );
 			std::string curLang( s, len );
-			for ( auto &t: Scope::current().tools() )
+			for ( auto &t: Scope::current().getTools() )
 				t->enableLanguage( curLang );
 		}
 		else
@@ -296,11 +296,33 @@ luaEnableLangs( lua_State *L )
 }
 
 int
+luaSetOption( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N != 2 )
+	{
+		luaL_error( L, "SetOption expects 2 arguments - a name and a value" );
+		return 1;
+		
+	}
+
+	std::string nm = Lua::Parm<std::string>::get( L, N, 1 );
+	std::string val = Lua::Parm<std::string>::get( L, N, 2 );
+	auto &vars = Scope::current().getVars();
+	auto ne = vars.emplace( std::make_pair( nm, Variable( nm ) ) );
+	ne.first->second.reset( std::move( val ) );
+
+	return 0;
+}
+
+int
 luaSubProj( lua_State *L )
 {
 	Scope::pushScope( Scope::current().newSubScope( false ) );
 	ON_EXIT{ Scope::popScope(); };
-	return SubDir( L );
+	int ret = SubDir( L );
+//	Scope::current().setNameDir( Directory::last() );
+	return ret;
 }
 
 static void
@@ -414,6 +436,7 @@ registerExtensions( void )
 	eng.registerFunction( "AddToolOption", &luaAddToolOption );
 	eng.registerFunction( "AddToolSet", &luaAddToolSet );
 	eng.registerFunction( "EnableLanguages", &luaEnableLangs );
+	eng.registerFunction( "SetOption", &luaSetOption );
 
 	eng.registerFunction( "Compile", &compile );
 	eng.registerFunction( "Executable", &executable );

@@ -23,7 +23,6 @@
 #include "Scope.h"
 #include <stack>
 #include <stdexcept>
-#include "LuaEngine.h"
 #include "Tool.h"
 #include "Debug.h"
 #include "ScopeGuard.h"
@@ -67,10 +66,33 @@ Scope::newSubScope( bool inherits )
 {
 	mySubScopes.emplace_back( std::make_shared<Scope>( shared_from_this() ) );
 	if ( inherits )
-		mySubScopes.back()->grabTools( *this );
+		mySubScopes.back()->grabScope( *this );
 
 	return mySubScopes.back();
 }
+
+
+////////////////////////////////////////
+
+
+//void
+//Scope::setNameDir( const std::shared_ptr<Directory> &d )
+//{
+//	myNameDir = d;
+//}
+
+
+////////////////////////////////////////
+
+
+//std::string
+//Scope::createName( const std::shared_ptr<Directory> &outDir )
+//{
+//	if ( myNameDir )
+//		return myNameDir->( '_' );
+//
+//	return std::string();
+//}
 
 
 ////////////////////////////////////////
@@ -80,7 +102,7 @@ void
 Scope::addTool( const std::shared_ptr<Tool> &t )
 {
 	myTools.push_back( t );
-	myTagMap[t->tag()].push_back( t );
+	myTagMap[t->getTag()].push_back( t );
 }
 
 
@@ -95,7 +117,8 @@ Scope::findTool( const std::string &extension ) const
 			return t;
 
 	if ( myInheritParentScope )
-		return parent()->findTool( extension );
+		return getParent()->findTool( extension );
+
 	return std::shared_ptr<Tool>();
 }
 
@@ -138,14 +161,15 @@ Scope::addItem( const ItemPtr &i )
 
 
 void
-Scope::transform( std::vector< std::shared_ptr<BuildItem> > &items,
-				  const std::shared_ptr<Directory> &outdir,
+Scope::transform( TransformSet &xform,
 				  const Configuration &conf ) const
 {
 	for ( const std::shared_ptr<Scope> &ss: mySubScopes )
-		ss->transform( items, outdir, conf );
-
-	TransformSet xform( outdir );
+	{
+		std::shared_ptr<TransformSet> sx = std::make_shared<TransformSet>( xform.getOutDir() );
+		ss->transform( *sx, conf );
+		xform.addChildScope( sx );
+	}
 
 	for ( auto i: myTagMap )
 	{
@@ -164,10 +188,10 @@ Scope::transform( std::vector< std::shared_ptr<BuildItem> > &items,
 						const std::vector<std::string> &tlist = tsi->second;
 						for ( const std::string &tool: tlist )
 						{
-							if ( tagTool->name() == tool )
+							if ( tagTool->getName() == tool )
 							{
 								if ( found )
-									throw std::runtime_error( "Tool '" + tool + "' conflicts with tool '" + found->name() + "' previously matched to active toolset" );
+									throw std::runtime_error( "Tool '" + tool + "' conflicts with tool '" + found->getName() + "' previously matched to active toolset" );
 
 								found = tagTool;
 							}
@@ -186,7 +210,7 @@ Scope::transform( std::vector< std::shared_ptr<BuildItem> > &items,
 	xform.mergeVariables( conf.vars() );
 
 	for ( const ItemPtr &i: myItems )
-		i->transform( items, xform );
+		i->transform( xform );
 }
 
 
@@ -194,13 +218,15 @@ Scope::transform( std::vector< std::shared_ptr<BuildItem> > &items,
 
 
 void
-Scope::grabTools( Scope &o )
+Scope::grabScope( const Scope &o )
 {
 	myToolSets = o.myToolSets;
 	myTagMap = o.myTagMap;
 	myTools = o.myTools;
 	myEnabledToolsets = o.myEnabledToolsets;
 	myExtensionMap = o.myExtensionMap;
+
+	myVariables = o.myVariables;
 }
 
 

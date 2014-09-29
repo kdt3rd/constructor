@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "FileUtil.h"
 
 
 ////////////////////////////////////////
@@ -66,12 +67,16 @@ public:
 	std::string makefilename( const std::string &fn ) const;
 	std::string relfilename( const std::string &fn ) const;
 
+	std::string relativeTo( const Directory &o,
+							const std::string &fn = std::string() ) const;
+
 	// NB: modifying this will modify global state, but doesn't change
 	// any O.S. level current directory, at least currently. if we
 	// support running scripts in the future, this may have to change
 	static const std::shared_ptr<Directory> &current( void );
 	static const std::shared_ptr<Directory> &pushd( const std::string &subd );
 	static const std::shared_ptr<Directory> &popd( void );
+	static const std::shared_ptr<Directory> &last( void );
 
 private:
 	void combinePath( std::vector<std::string> &fullpath ) const;

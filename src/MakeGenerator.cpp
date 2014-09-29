@@ -22,6 +22,8 @@
 
 #include "MakeGenerator.h"
 #include "FileUtil.h"
+#include "TransformSet.h"
+#include "Scope.h"
 #include <fstream>
 #include <iostream>
 #include <unistd.h>
@@ -73,7 +75,11 @@ MakeGenerator::emit( const std::shared_ptr<Directory> &d,
 					 const Configuration &conf,
 					 int argc, const char *argv[] )
 {
+	TransformSet xform( d );
+	Scope::root().transform( xform, conf );
+
 	std::ofstream f( d->makefilename( "Makefile" ) );
+
 	f <<
 		".PHONY: all clean\n"
 		".ONESHELL:\n"

@@ -21,9 +21,8 @@
 //
 
 #include "Directory.h"
-#include "FileUtil.h"
+
 #include "ScopeGuard.h"
-#include "LuaEngine.h"
 #include "StrUtil.h"
 
 #include <unistd.h>
@@ -58,6 +57,7 @@ static void initCWD( void )
 	theCWDPath = String::split( theCWD, File::pathSeparator() );
 }
 
+std::shared_ptr<Directory> theLastDir;
 static std::stack< std::shared_ptr<Directory> > theLiveDirs;
 
 } // empty namespace
@@ -396,6 +396,25 @@ Directory::relfilename( const std::string &fn ) const
 ////////////////////////////////////////
 
 
+std::string
+Directory::relativeTo( const Directory &o,
+					   const std::string &fn ) const
+{
+	std::string ret;
+	throw std::logic_error( "Not yet implemented" );
+	if ( ! fn.empty() )
+	{
+		if ( ! ret.empty() )
+			ret.push_back( File::pathSeparator() );
+		ret.append( fn );
+	}
+	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
 const std::shared_ptr<Directory> &
 Directory::current( void )
 {
@@ -414,6 +433,7 @@ Directory::pushd( const std::string &d )
 {
 	std::shared_ptr<Directory> newD = std::make_shared<Directory>( *current() );
 	newD->cd( d );
+	theLastDir = current();
 	theLiveDirs.push( newD );
 	return theLiveDirs.top();
 }
@@ -427,10 +447,24 @@ Directory::popd( void )
 {
 	if ( theLiveDirs.empty() )
 		throw std::runtime_error( "Directory pushd / popd mismatch" );
+
+	theLastDir = theLiveDirs.top();
 	theLiveDirs.pop();
+
 	if ( theLiveDirs.empty() )
 		throw std::runtime_error( "Directory pushd / popd mismatch" );
+
 	return theLiveDirs.top();
+}
+
+
+////////////////////////////////////////
+
+
+const std::shared_ptr<Directory> &
+Directory::last( void )
+{
+	return theLastDir;
 }
 
 

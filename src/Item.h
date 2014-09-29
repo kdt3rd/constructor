@@ -50,18 +50,17 @@ public:
 	Item( std::string &&name );
 	virtual ~Item( void );
 
-	inline ID id( void ) const;
-	virtual const std::string &name( void ) const;
+	inline ID getID( void ) const;
+	virtual const std::string &getName( void ) const;
 
 	inline const Directory &dir( void ) const;
-	inline const std::shared_ptr<Directory> &directory( void ) const;
+	inline const std::shared_ptr<Directory> &getDir( void ) const;
 
-	virtual void transform( std::vector< std::shared_ptr<BuildItem> > &b,
-							const TransformSet &xform ) const;
+	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
-	inline VariableSet &variables( void );
-	inline const VariableSet &variables( void ) const;
-	Variable &variable( const std::string &nm );
+	inline VariableSet &getVariables( void );
+	inline const VariableSet &getVariables( void ) const;
+	Variable &getVariable( const std::string &nm );
 	void setVariable( const std::string &nm, const std::string &value,
 					  bool doSplit = false );
 	bool findVariableValueRecursive( std::string &val, const std::string &nm ) const;
@@ -86,7 +85,7 @@ using ItemPtr = Item::ItemPtr;
 
 
 inline Item::ID
-Item::id( void ) const
+Item::getID( void ) const
 {
 	return myID;
 }
@@ -96,12 +95,12 @@ Item::id( void ) const
 
 
 inline VariableSet &
-Item::variables( void )
+Item::getVariables( void )
 {
 	return myVariables;
 }
 inline const VariableSet &
-Item::variables( void ) const
+Item::getVariables( void ) const
 {
 	return myVariables;
 }
@@ -110,16 +109,14 @@ Item::variables( void ) const
 ////////////////////////////////////////
 
 
-inline
-const Directory &
+inline const Directory &
 Item::dir( void ) const
 {
 	return *myDirectory;
 }
-
 inline
 const std::shared_ptr<Directory> &
-Item::directory( void ) const
+Item::getDir( void ) const
 {
 	return myDirectory;
 }

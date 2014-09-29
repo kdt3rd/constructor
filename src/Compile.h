@@ -23,6 +23,7 @@
 #pragma once
 
 #include "Item.h"
+#include "TransformSet.h"
 
 
 ////////////////////////////////////////
@@ -37,18 +38,16 @@ public:
 	void addItem( const ItemPtr &i );
 	void addItem( std::string name );
 
-	virtual void transform( std::vector< std::shared_ptr<BuildItem> > &b,
-							const TransformSet &xform ) const;
+	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
 protected:
 	CompileSet( std::string name );
 
-	void
-	applyTransform( const std::string &name,
+	std::shared_ptr<BuildItem>
+	chainTransform( const std::string &name,
 					const std::shared_ptr<Directory> &srcdir,
-					std::vector< std::shared_ptr<BuildItem> > &b,
-					const TransformSet &xform,
-					const std::string &forceTool = std::string() ) const;
+					TransformSet &xform,
+					const std::string &forceTool ) const;
 
 	std::vector<ItemPtr> myItems;
 };
@@ -59,8 +58,7 @@ public:
 	Executable( std::string name );
 	virtual ~Executable( void );
 
-	virtual void transform( std::vector< std::shared_ptr<BuildItem> > &b,
-							const TransformSet &xform ) const;
+	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 };
 
 class Library : public CompileSet
@@ -69,8 +67,7 @@ public:
 	Library( std::string name );
 	virtual ~Library( void );
 
-	virtual void transform( std::vector< std::shared_ptr<BuildItem> > &b,
-							const TransformSet &xform ) const;
+	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 };
 
 

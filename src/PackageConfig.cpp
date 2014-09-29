@@ -38,6 +38,7 @@
 #include "OSUtil.h"
 #include "ScopeGuard.h"
 #include "LuaEngine.h"
+#include "TransformSet.h"
 #include "Debug.h"
 #include <iomanip>
 #include <fstream>
@@ -214,7 +215,7 @@ PackageConfig::~PackageConfig( void )
 
 
 const std::string &
-PackageConfig::version( void ) const
+PackageConfig::getVersion( void ) const
 {
 	return getAndReturn( "Version" );
 }
@@ -224,7 +225,7 @@ PackageConfig::version( void ) const
 
 
 const std::string &
-PackageConfig::package( void ) const
+PackageConfig::getPackage( void ) const
 {
 	return getAndReturn( "Name" );
 }
@@ -234,7 +235,7 @@ PackageConfig::package( void ) const
 
 
 const std::string &
-PackageConfig::description( void ) const
+PackageConfig::getDescription( void ) const
 {
 	return getAndReturn( "Description" );
 }
@@ -244,7 +245,7 @@ PackageConfig::description( void ) const
 
 
 const std::string &
-PackageConfig::conflicts( void ) const
+PackageConfig::getConflicts( void ) const
 {
 	return getAndReturn( "Conflicts" );
 }
@@ -254,7 +255,7 @@ PackageConfig::conflicts( void ) const
 
 
 const std::string &
-PackageConfig::url( void ) const
+PackageConfig::getURL( void ) const
 {
 	return getAndReturn( "URL" );
 }
@@ -264,7 +265,7 @@ PackageConfig::url( void ) const
 
 
 const std::string &
-PackageConfig::cflags( void ) const
+PackageConfig::getCFlags( void ) const
 {
 	return getAndReturn( "CFlags" );
 }
@@ -274,7 +275,7 @@ PackageConfig::cflags( void ) const
 
 
 const std::string &
-PackageConfig::libs( void ) const
+PackageConfig::getLibs( void ) const
 {
 	return getAndReturn( "Libs" );
 }
@@ -284,7 +285,7 @@ PackageConfig::libs( void ) const
 
 
 const std::string &
-PackageConfig::libsStatic( void ) const
+PackageConfig::getStaticLibs( void ) const
 {
 	return getAndReturn( "Libs.private" );
 }
@@ -294,7 +295,7 @@ PackageConfig::libsStatic( void ) const
 
 
 const std::string &
-PackageConfig::requires( void ) const
+PackageConfig::getRequires( void ) const
 {
 	return getAndReturn( "Requires" );
 }
@@ -304,9 +305,28 @@ PackageConfig::requires( void ) const
 
 
 const std::string &
-PackageConfig::requiresStatic( void ) const
+PackageConfig::getStaticRequires( void ) const
 {
 	return getAndReturn( "Requires.private" );
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<BuildItem>
+PackageConfig::transform( TransformSet &xform ) const
+{
+	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	if ( ret )
+		return ret;
+
+	ret = std::make_shared<BuildItem>( getName(), getDir() );
+	std::cout << "ERROR: Need to set linker flags into build item for external library" << std::endl;
+	//ret->setFlag();
+
+	xform.recordTransform( this, ret );
+	return ret;
 }
 
 
@@ -372,7 +392,7 @@ PackageConfig::parse( void )
 	}
 
 	// now load any dependencies. do we care about private requires?
-	const std::string &req = requires();
+	const std::string &req = getRequires();
 	if ( ! req.empty() )
 	{
 		++theParseDepth;
@@ -386,10 +406,10 @@ PackageConfig::parse( void )
 	// now promote everything to item variables we might care about
 	for ( auto &x: myLocalVars )
 		setVariable( x.first, x.second );
-	setVariable( "version", version() );
-	setVariable( "cflags", cflags(), true );
-	setVariable( "libs", libs(), true );
-	setVariable( "libs.static", libsStatic(), true );
+	setVariable( "version", getVersion() );
+	setVariable( "cflags", getCFlags(), true );
+	setVariable( "libs", getLibs(), true );
+	setVariable( "libs.static", getStaticLibs(), true );
 }
 
 
@@ -448,7 +468,7 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 		}
 		else if ( nm == "Version" )
 		{
-			VERBOSE( std::setw( theParseDepth * 2 ) << std::setfill( ' ' ) << "" << "Found package '" << name() << "', version " << val );
+			VERBOSE( std::setw( theParseDepth * 2 ) << std::setfill( ' ' ) << "" << "Found package '" << getName() << "', version " << val );
 			myValues[nm] = val;
 		}
 		else if ( nm == "Libs.private" || nm == "Libs" )
@@ -732,8 +752,8 @@ PackageConfig::find( const std::string &name, VersionCompare comp, const std::st
 	if ( ret )
 	{
 		if ( ! reqVersion.empty() )
-			DEBUG( "Comparing found version '" << ret->version() << "' to requested version '" << reqVersion << "'" );
-		int rc = String::versionCompare( ret->version(), reqVersion );
+			DEBUG( "Comparing found version '" << ret->getVersion() << "' to requested version '" << reqVersion << "'" );
+		int rc = String::versionCompare( ret->getVersion(), reqVersion );
 		bool zap = false;
 		switch ( comp )
 		{
@@ -748,7 +768,7 @@ PackageConfig::find( const std::string &name, VersionCompare comp, const std::st
 
 		if ( zap )
 		{
-			std::cout << "WARNING: Found package '" << name << "' (" << ret->name() << "), version " << ret->version()
+			std::cout << "WARNING: Found package '" << name << "' (" << ret->getName() << "), version " << ret->getVersion()
 					  << " but failed version check against requested version '" << reqVersion << "'" << std::endl;
 			ret.reset();
 		}
@@ -781,7 +801,7 @@ PackageConfig::makeLibraryReference( const std::string &name,
 	Directory d( path );
 	d.cdUp();
 
-	Variable &libs = ret->variable( "libs" );
+	Variable &libs = ret->getVariable( "libs" );
 	libs.add( "-L" );
 	libs.add( d.fullpath() );
 	libs.add( "-l" + name );
@@ -789,7 +809,7 @@ PackageConfig::makeLibraryReference( const std::string &name,
 	d.cdUp();
 	d.cd( "include" );
 
-	Variable &cflags = ret->variable( "cflags" );
+	Variable &cflags = ret->getVariable( "cflags" );
 	cflags.add( "-I" );
 	cflags.add( d.fullpath() );
 	return ret;

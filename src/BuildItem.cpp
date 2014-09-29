@@ -29,6 +29,15 @@
 ////////////////////////////////////////
 
 
+namespace
+{
+	static std::string theNilStr;
+}
+
+
+////////////////////////////////////////
+
+
 BuildItem::BuildItem( const std::string &name,
 					  const std::shared_ptr<Directory> &srcdir )
 		: myName( name ), myDirectory( srcdir )
@@ -57,8 +66,18 @@ BuildItem::~BuildItem( void )
 ////////////////////////////////////////
 
 
+void
+BuildItem::setName( const std::string &n )
+{
+	myName = n;
+}
+
+
+////////////////////////////////////////
+
+
 const std::string &
-BuildItem::name( void ) const
+BuildItem::getName( void ) const
 {
 	return myName;
 }
@@ -81,14 +100,70 @@ void
 BuildItem::setTool( const std::shared_ptr<Tool> &t )
 {
 	if ( myTool )
-		throw std::runtime_error( "Tool already specified for build item " + name() );
+		throw std::runtime_error( "Tool already specified for build item " + getName() );
 
 	myTool = t;
 	if ( ! myTool )
-		throw std::runtime_error( "Invalid tool specified for build item " + name() );
+		throw std::runtime_error( "Invalid tool specified for build item " + getName() );
 
-	for ( const std::string &o: myTool->outputs() )
-		myOutputs.emplace_back( std::move( File::replaceExtension( name(), o ) ) );
+	for ( const std::string &o: myTool->getOutputs() )
+		myOutputs.emplace_back( myTool->getOutputPrefix() + std::move( File::replaceExtension( getName(), o ) ) );
+
+	if ( myOutputs.empty() )
+		myOutputs.push_back( getName() );
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::extractTags( std::set<std::string> &tags ) const
+{
+	if ( myTool )
+		tags.insert( myTool->getTag() );
+	else
+	{
+		std::vector<ItemPtr> deps = extractDependencies( DependencyType::EXPLICIT );
+		for ( ItemPtr &i: deps )
+			i->extractTags( tags );
+	}
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+BuildItem::getTag( void ) const
+{
+	if ( myTool )
+		return myTool->getTag();
+
+	return theNilStr;
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::setFlag( const std::string &n, const std::string &v )
+{
+	myFlags[n] = v;
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+BuildItem::getFlag( const std::string &n ) const
+{
+	auto i = myFlags.find( n );
+	if ( i != myFlags.end() )
+		return i->second;
+	return theNilStr;
 }
 
 

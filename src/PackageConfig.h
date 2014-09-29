@@ -49,18 +49,20 @@ public:
 	PackageConfig( const std::string &n, const std::string &pkgfile );
 	~PackageConfig( void );
 
-	inline const std::string &filename( void ) const { return myPackageFile; }
+	inline const std::string &getFilename( void ) const { return myPackageFile; }
 
-	const std::string &version( void ) const;
-	const std::string &package( void ) const;
-	const std::string &description( void ) const;
-	const std::string &conflicts( void ) const;
-	const std::string &url( void ) const;
-	const std::string &cflags( void ) const;
-	const std::string &libs( void ) const;
-	const std::string &libsStatic( void ) const;
-	const std::string &requires( void ) const;
-	const std::string &requiresStatic( void ) const;
+	const std::string &getVersion( void ) const;
+	const std::string &getPackage( void ) const;
+	const std::string &getDescription( void ) const;
+	const std::string &getConflicts( void ) const;
+	const std::string &getURL( void ) const;
+	const std::string &getCFlags( void ) const;
+	const std::string &getLibs( void ) const;
+	const std::string &getStaticLibs( void ) const;
+	const std::string &getRequires( void ) const;
+	const std::string &getStaticRequires( void ) const;
+
+	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
 	static std::shared_ptr<PackageConfig> find( const std::string &name,
 												VersionCompare comp = VersionCompare::ANY,

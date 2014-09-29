@@ -29,7 +29,10 @@
 #include "Variable.h"
 #include "Item.h"
 #include "Tool.h"
-#include "BuildItem.h"
+#include "TransformSet.h"
+#include "Directory.h"
+
+class Configuration;
 
 
 ////////////////////////////////////////
@@ -49,15 +52,19 @@ public:
 	Scope( std::shared_ptr<Scope> parent );
 	~Scope( void );
 
-	inline std::shared_ptr<Scope> parent( void ) const;
+	inline std::shared_ptr<Scope> getParent( void ) const;
 	std::shared_ptr<Scope> newSubScope( bool inherits );
-	inline const std::vector< std::shared_ptr<Scope> > &subScopes( void ) const;
 
-	inline VariableSet &vars( void );
-	inline const VariableSet &vars( void ) const;
+//	void setNameDir( const std::shared_ptr<Directory> &d );
+//	std::string createName( const std::shared_ptr<Directory> &outDir );
 
-	inline std::vector< std::shared_ptr<Tool> > &tools( void );
-	inline const std::vector< std::shared_ptr<Tool> > &tools( void ) const;
+	inline const std::vector< std::shared_ptr<Scope> > &getSubScopes( void ) const;
+
+	inline VariableSet &getVars( void );
+	inline const VariableSet &getVars( void ) const;
+
+	inline std::vector< std::shared_ptr<Tool> > &getTools( void );
+	inline const std::vector< std::shared_ptr<Tool> > &getTools( void ) const;
 
 	void addTool( const std::shared_ptr<Tool> &t );
 	std::shared_ptr<Tool> findTool( const std::string &extension ) const;
@@ -68,8 +75,7 @@ public:
 
 	void addItem( const ItemPtr &i );
 
-	void transform( std::vector< std::shared_ptr<BuildItem> > &items,
-					const std::shared_ptr<Directory> &outdir,
+	void transform( TransformSet &xform,
 					const Configuration &conf ) const;
 
 	static Scope &root( void );
@@ -78,12 +84,13 @@ public:
 	static void popScope( void );
 
 private:
-	void grabTools( Scope &o );
+	void grabScope( const Scope &o );
 
 	std::weak_ptr<Scope> myParent;
 	VariableSet myVariables;
 	bool myInheritParentScope = false;
 	std::vector< std::shared_ptr<Scope> > mySubScopes;
+	std::shared_ptr<Directory> myNameDir;
 
 	std::vector<ItemPtr> myItems;
 
@@ -99,7 +106,7 @@ private:
 ////////////////////////////////////////
 
 
-inline const std::vector< std::shared_ptr<Scope> > &Scope::subScopes( void ) const
+inline const std::vector< std::shared_ptr<Scope> > &Scope::getSubScopes( void ) const
 {
 	return mySubScopes;
 }
@@ -115,26 +122,26 @@ inline const std::vector< std::shared_ptr<Scope> > &Scope::subScopes( void ) con
 ////////////////////////////////////////
 
 
-inline std::shared_ptr<Scope> Scope::parent( void ) const { return myParent.lock(); }
+inline std::shared_ptr<Scope> Scope::getParent( void ) const { return myParent.lock(); }
 
 
 ////////////////////////////////////////
 
 
-inline VariableSet &Scope::vars( void ) { return myVariables; }
-inline const VariableSet &Scope::vars( void ) const { return myVariables; }
+inline VariableSet &Scope::getVars( void ) { return myVariables; }
+inline const VariableSet &Scope::getVars( void ) const { return myVariables; }
 
 
 ////////////////////////////////////////
 
 
 inline std::vector< std::shared_ptr<Tool> > &
-Scope::tools( void )
+Scope::getTools( void )
 {
 	return myTools;
 }
 inline const std::vector< std::shared_ptr<Tool> > &
-Scope::tools( void ) const
+Scope::getTools( void ) const
 {
 	return myTools;
 }

@@ -349,20 +349,21 @@ void substituteVariables( std::string &val, bool requireCurly,
 				return;
 			}
 		}
-		else if ( ! requireCurly && ( std::isalnum( val[i] ) || val[i] == '_' ) )
+		else if ( ! requireCurly && ( std::isalpha( val[i] ) || val[i] == '_' ) )
 		{
-			while ( i != val.size() && ( std::isspace( val[i] ) || val[i] == '_' ) )
-				++i;
 			endVar = i;
+			while ( endVar != val.size() && ( std::isalnum( val[endVar] ) || val[endVar] == '_' ) )
+				++endVar;
 		}
 
 		if ( endVar != std::string::npos )
 		{
 			std::string varname = val.substr( i, endVar - i );
 			const std::string &vv = varLookup( varname );
-			val.replace( varStart, endVar - varStart + 1, vv );
+			val.replace( varStart, endVar - varStart, vv );
 			i = endVar;
 		}
+
 		i = val.find_first_of( '$', i );
 	}
 }

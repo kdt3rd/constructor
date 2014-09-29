@@ -13,6 +13,7 @@ SRC:= main.cpp \
 	Scope.cpp \
 	TransformSet.cpp \
 	Compile.cpp \
+	Rule.cpp \
 	Tool.cpp \
 	Configuration.cpp \
 	Variable.cpp \
@@ -54,12 +55,15 @@ all: constructor
 constructor: $(OUTPUT)/constructor
 
 $(OUTPUT)/%.o: src/%.cpp | $(OUTPUT)
+	@echo "[CXX] $<"
 	@$(COMPILER) $(CXXFLAGS) -I $(LUA_DIR) -c -MMD -MF $(OUTPUT)/$*.dep -o $@ $<
 
 $(OUTPUT)/%.o: $(LUA_DIR)/%.c | $(OUTPUT)
+	@echo "[CXX] $<"
 	@$(COMPILER) -x c++ $(CXXFLAGS) -c -MMD -MF $(OUTPUT)/$*.dep -o $@ $<
 
 $(OUTPUT)/constructor: $(SRC:.cpp=.o) $(LUA_OUT:.c=.o)
+	@echo "[LD] constructor"
 	@$(COMPILER) $(CXXFLAGS) -o $(OUTPUT)/constructor $^ $(LDFLAGS)
 
 $(OUTPUT):

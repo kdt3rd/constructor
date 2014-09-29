@@ -22,33 +22,64 @@
 
 #pragma once
 
+#include <memory>
+#include <map>
+#include <set>
+#include <vector>
+
 #include "Tool.h"
 #include "Variable.h"
 #include "Directory.h"
+#include "BuildItem.h"
 
 
 ////////////////////////////////////////
 
+class Item;
 
 class TransformSet
 {
 public:
+	typedef std::vector< std::shared_ptr<BuildItem> > BuildItemList;
+
 	TransformSet( const std::shared_ptr<Directory> &dir );
 	~TransformSet( void );
 
-	inline const std::shared_ptr<Directory> &output_dir( void ) const;
+	inline const std::shared_ptr<Directory> &getOutDir( void ) const;
+
+	void addChildScope( const std::shared_ptr<TransformSet> &cs );
+	inline const std::vector< std::shared_ptr<TransformSet> > &getSubScopes( void ) const;
 
 	void addTool( const std::shared_ptr<Tool> &t );
 	void mergeVariables( const VariableSet &vs );
 
 	std::shared_ptr<Tool> findTool( const std::string &ext ) const;
-	std::shared_ptr<Tool> findToolByTag( const std::string &tag ) const;
-	inline const VariableSet &vars( void ) const;
+	std::shared_ptr<Tool> findToolByTag( const std::string &tag,
+										 const std::string &ext = std::string() ) const;
+	std::shared_ptr<Tool> findToolForSet( const std::string &tag_prefix,
+										  const std::set<std::string> &s ) const;
+
+	inline const VariableSet &getVars( void ) const;
+	const std::string &getVarValue( const std::string &v ) const;
+
+	bool isTransformed( const Item *i ) const;
+	std::shared_ptr<BuildItem> getTransform( const Item *i ) const;
+	void recordTransform( const Item *i,
+						  const std::shared_ptr<BuildItem> &bi );
+	void add( const std::shared_ptr<BuildItem> &bi );
+	void add( const BuildItemList &items );
+
+	inline const BuildItemList &getBuildItems( void ) const;
 
 private:
 	std::shared_ptr<Directory> myDirectory;
 	std::vector< std::shared_ptr<Tool> > myTools;
 	VariableSet myVars;
+
+	std::vector< std::shared_ptr<BuildItem> > myBuildItems;
+	std::map< const Item *, std::shared_ptr<BuildItem> > myTransformMap;
+
+	std::vector< std::shared_ptr<TransformSet> > myChildScopes;
 };
 
 
@@ -56,7 +87,7 @@ private:
 
 
 inline const std::shared_ptr<Directory> &
-TransformSet::output_dir( void ) const
+TransformSet::getOutDir( void ) const
 {
 	return myDirectory;
 }
@@ -66,10 +97,35 @@ TransformSet::output_dir( void ) const
 
 
 inline const VariableSet &
-TransformSet::vars( void ) const
+TransformSet::getVars( void ) const
 {
 	return myVars;
 }
+
+
+////////////////////////////////////////
+
+
+inline const TransformSet::BuildItemList &
+TransformSet::getBuildItems( void ) const
+{
+	return myBuildItems;
+}
+
+
+////////////////////////////////////////
+
+
+inline const std::vector< std::shared_ptr<TransformSet> > &
+TransformSet::getSubScopes( void ) const
+{
+	return myChildScopes;
+}
+
+
+////////////////////////////////////////
+
+
 
 
 

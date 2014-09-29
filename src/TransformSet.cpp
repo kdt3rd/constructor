@@ -22,6 +22,9 @@
 
 #include "TransformSet.h"
 
+#include "Debug.h"
+#include "StrUtil.h"
+
 
 ////////////////////////////////////////
 
@@ -37,6 +40,16 @@ TransformSet::TransformSet( const std::shared_ptr<Directory> &d )
 
 TransformSet::~TransformSet( void )
 {
+}
+
+
+////////////////////////////////////////
+
+
+void
+TransformSet::addChildScope( const std::shared_ptr<TransformSet> &cs )
+{
+	myChildScopes.push_back( cs );
 }
 
 
@@ -83,12 +96,104 @@ TransformSet::findTool( const std::string &ext ) const
 
 
 std::shared_ptr<Tool>
-TransformSet::findToolByTag( const std::string &tag ) const
+TransformSet::findToolByTag( const std::string &tag,
+							 const std::string &ext ) const
 {
 	for ( auto &t: myTools )
-		if ( t->tag() == tag )
+		if ( t->getTag() == tag && t->handlesExtension( ext ) )
 			return t;
+
+	DEBUG( "Tool Tag '" + tag + "' not found that handles extension '" + ext + "', falling back to normal tool search" );
+
+	return findTool( ext );
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<Tool>
+TransformSet::findToolForSet( const std::string &tag_prefix,
+							  const std::set<std::string> &s ) const
+{
+	for ( auto &t: myTools )
+		if ( t->handlesTools( s ) &&
+			 String::startsWith( t->getTag(), tag_prefix ) )
+			return t;
+
 	return std::shared_ptr<Tool>();
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+TransformSet::getVarValue( const std::string &v ) const
+{
+	static std::string theNilVal;
+
+	auto i = myVars.find( v );
+	if ( i != myVars.end() )
+		return i->second.value();
+
+	return theNilVal;
+}
+
+
+////////////////////////////////////////
+
+
+bool
+TransformSet::isTransformed( const Item *i ) const
+{
+	auto bi = myTransformMap.find( i );
+	return bi != myTransformMap.end();
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<BuildItem>
+TransformSet::getTransform( const Item *i ) const
+{
+	auto bi = myTransformMap.find( i );
+	if ( bi != myTransformMap.end() )
+		return bi->second;
+	return std::shared_ptr<BuildItem>();
+}
+
+
+////////////////////////////////////////
+
+
+void
+TransformSet::recordTransform( const Item *i,
+							   const std::shared_ptr<BuildItem> &bi )
+{
+	add( bi );
+	myTransformMap[i] = bi;
+}
+
+
+////////////////////////////////////////
+
+
+void
+TransformSet::add( const std::shared_ptr<BuildItem> &bi )
+{
+	myBuildItems.push_back( bi );
+}
+
+
+////////////////////////////////////////
+
+
+void
+TransformSet::add( const std::vector< std::shared_ptr<BuildItem> > &items )
+{
+	myBuildItems.insert( myBuildItems.end(), items.begin(), items.end() );
 }
 
 

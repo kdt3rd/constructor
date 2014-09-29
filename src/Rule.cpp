@@ -28,7 +28,21 @@
 
 
 Rule::Rule( std::string tag, std::string desc )
-		: Item( std::move( tag ) ), myDesc( std::move( desc ) )
+		: myTag( std::move( tag ) ), myDesc( std::move( desc ) )
+{
+}
+
+
+////////////////////////////////////////
+
+
+Rule::Rule( Rule &&r )
+		: myTag( std::move( r.myTag ) ), myDesc( std::move( r.myDesc ) ),
+		  myDepFile( std::move( r.myDepFile ) ),
+		  myDepStyle( std::move( r.myDepStyle ) ),
+		  myJobPool( std::move( r.myJobPool ) ),
+		  myCommand( std::move( r.myCommand ) ),
+		  myOutputRestat( r.myOutputRestat )
 {
 }
 
@@ -44,8 +58,25 @@ Rule::~Rule( void )
 ////////////////////////////////////////
 
 
+Rule &
+Rule::operator=( Rule && r )
+{
+	myTag = std::move( r.myTag );
+	myDesc = std::move( r.myDesc );
+	myDepFile = std::move( r.myDepFile );
+	myDepStyle = std::move( r.myDepStyle );
+	myJobPool = std::move( r.myJobPool );
+	myCommand = std::move( r.myCommand );
+	myOutputRestat = r.myOutputRestat;
+	return *this;
+}
+
+
+////////////////////////////////////////
+
+
 void
-Rule::command( const std::string &c )
+Rule::setCommand( const std::string &c )
 {
 	myCommand = String::shell_split( c );
 }
@@ -55,7 +86,7 @@ Rule::command( const std::string &c )
 
 
 void
-Rule::command( const std::vector<std::string> &c )
+Rule::setCommand( const std::vector<std::string> &c )
 {
 	myCommand = c;
 }
@@ -65,7 +96,17 @@ Rule::command( const std::vector<std::string> &c )
 
 
 void
-Rule::addCommand( const std::vector<std::string> &c )
+Rule::setCommand( std::vector<std::string> &&c )
+{
+	myCommand = std::move( c );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Rule::addToCommand( const std::vector<std::string> &c )
 {
 	myCommand.insert( myCommand.end(), c.begin(), c.end() );
 }
@@ -75,7 +116,7 @@ Rule::addCommand( const std::vector<std::string> &c )
 
 
 std::string
-Rule::command( void ) const
+Rule::getCommand( void ) const
 {
 	std::string ret;
 	for ( const std::string &i: myCommand )
@@ -93,7 +134,4 @@ Rule::command( void ) const
 
 
 ////////////////////////////////////////
-
-
-
 

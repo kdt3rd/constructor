@@ -1,0 +1,312 @@
+function BinaryToCString( data, out, pre )
+	local str = ( pre or "" ) .. "\""
+    for i = 1, #data do
+       	str = str .. string.format( '\\x%02X', data:byte(i) )
+        if i % 16 == 0 then
+			table.insert( out, str .. "\"" )
+			str = ( pre or "" ) .. "\""
+		end
+    end
+	if #str > 0 then
+		table.insert( out, str .. "\"" )
+	end
+end
+
+function CreateFile( filename, text )
+	local file = BuildFile( filename )
+	if file.diff( file, text ) then
+		local fh = io.open( file, "w+" )
+		for i = 1, #text do
+			fh:write( text[i], '\n' )
+		end
+		fh:close()
+	end
+	return file
+end
+--AddTool{ tag="simp_rsrc",
+--		 name="constructor",
+--		 exe=Argv0,
+--		 cmd={"$exe", "-resource", "$out", "$in"}
+--		 restat=true
+--	   }
+
+function SimpleResourceFile( outname, srcs, xformFunc, prefix, suffix )
+	local file = BuildFile( outname )
+	if EvaluatingFile == file then
+		text = {}
+		if prefix then
+			for i, p in pairs( prefix ) do
+				table.insert( text, p )
+			end
+		end
+		for i, file in pairs( srcs ) do
+			local data = io.open( SourceFile( file ), "r" )
+			data = data:read( "*a" )
+			xformFunc( text, data )
+		end
+		if suffix then
+			for i, s in pairs( suffix ) do
+				table.insert( text, s )
+			end
+		end
+	else
+		GenerateFile( outname, "simp_rsrc", srcs )
+	end
+end
+
+cc = file.find_exe( "clang" )
+if cc then
+	AddTool{ tag="cc",
+			 name="clang",
+			 exe=cc,
+			 input_extensions={ ".c" },
+			 alt_extensions={},
+			 output_extensions={ ".o" },
+			 options={
+				 warnings={ none={"-w"},
+							default={},
+							some={"-Wall"},
+							strict={"-Weverything"},
+							error={"-Wall", "-Werror"},
+				 },
+				 optimization={ debug = {"-g"},
+								optimize = {"-O3"},
+								size = {"-Os"},
+								optdebug = {"-g", "-O3"},
+				 },
+				 language={C={}, C99={"-std=c99"}},
+				 threads={on={"-pthread"},
+						  off={}},
+			 },
+			 option_defaults={
+				 optimization="optimize",
+				 warnings="default",
+				 language="C",
+				 threads="off",
+			 },
+			 implicit_dependencies={
+				 file="$out.d",
+				 cmd={"-MMD", "-MF", "$out.d"},
+				 style="gcc",
+			 },
+			 cmd={"$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "-c", "-o", "$out", "$in"},
+			 description="CC  $out",
+		   }
+	AddTool{ tag="ld",
+			 name="clang_linker",
+			 exe=cc,
+			 input_tools={ "cc", "static_lib", "dynamic_lib" },
+			 options={
+				 optimization={ debug = {"-g"},
+								optimize = {"-O3"},
+								size = {"-Os"},
+								optdebug = {"$debug", "$optimize"},
+				 },
+				 language={C={}, C99={"-std=c99"}},
+				 threads={on={"-pthread"},
+						  off={}},
+			 },
+			 option_defaults={
+				 language="C",
+				 optimization="optimize",
+				 threads="off",
+			 },
+			 cmd={"$exe", "$threads", "$language", "$optimization", "$cflags", "-o", "$out", "$in"},
+			 description="LD  $out",
+		   }
+end
+
+cc = file.find_exe( "clang++" )
+if cc then
+	AddTool{ tag="cxx",
+			 name="clang++",
+			 exe=cc,
+			 input_extensions={ ".cpp", ".cc" },
+			 alt_extensions={ ".c", ".C" },
+			 output_extensions={ ".o" },
+			 options={
+				 warnings={ none={"-w"},
+							default={},
+							some={"-Wall"},
+							strict={"-Weverything"},
+							error={"-Wall", "-Werror"},
+				 },
+				 optimization={ debug = {"-g"},
+								optimize = {"-O3"},
+								size = {"-Os"},
+								optdebug = {"-g", "-O3"},
+				 },
+				 language={["c++"]={"-x", "c++"}, ["c++11"]={"-x", "c++", "-std=c++11"}},
+				 threads={on={"-pthread"},
+						  off={}},
+			 },
+			 option_defaults={
+				 optimization="optimize",
+				 warnings="default",
+				 language="c++",
+				 threads="off",
+			 },
+			 implicit_dependencies={
+				 file="$out.d",
+				 cmd={"-MMD", "-MF", "$out.d"},
+				 style="gcc",
+			 },
+			 cmd={"$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "-c", "-o", "$out", "$in"},
+			 description="CXX $out",
+		   }
+	AddTool{ tag="ld_cxx",
+			 name="clang++_linker",
+			 exe=cc,
+			 input_tools={ "cc", "cxx", "static_lib", "static_lib_cxx", "dynamic_lib", "dynamic_lib_cxx" },
+			 options={
+				 optimization={ debug = {"-g"},
+								optimize = {"-O3"},
+								size = {"-Os"},
+								optdebug = {"-g", "-O3"},
+				 },
+				 language={C={}, C99={"-std=c99"}},
+				 threads={on={"-pthread"},
+						  off={}},
+			 },
+			 option_defaults={
+				 optimization="optimize",
+				 threads="off",
+				 language="C",
+			 },
+			 cmd={"$exe", "$threads", "$language", "$optimization", "$cflags", "-o", "$out", "$in"},
+			 description="LD  $out",
+		   }
+end
+
+ar = file.find_exe( "ar" )
+if ar then
+	AddTool{ tag="static_lib",
+			 name="ar",
+			 exe=ar,
+			 input_tools={ "cc" },
+			 output_extensions={ ".a" },
+			 output_prefix="lib",
+			 options={
+			 },
+			 cmd={"rm", "$out", "&&"< "$exe", "rcs", "$out", "$in"},
+			 description="AR $out",
+	}
+	AddTool{ tag="static_lib_cxx",
+			 name="ar_cxx",
+			 exe=ar,
+			 input_tools={ "cc", "cxx" },
+			 output_extensions={ ".a" },
+			 output_prefix="lib",
+			 options={
+			 },
+			 cmd={"rm", "$out", "&&"< "$exe", "rcs", "$out", "$in"},
+			 description="AR $out",
+	}
+end
+
+-- for things like Qt, rather than adding a tool that processes
+-- .h files by default for moc, make it an explicit step by having
+-- a wrapper function around compile that sets the explicit moc
+-- tool, then make the moc tool have a .h such that it doesn't
+-- try to run moc on every header
+
+-- cc = FindExecutable( "gcc" )
+-- if cc then
+-- 	AddTool{ tag="cc",
+-- 			 name="gcc",
+-- 			 exe=cc,
+-- 			 input_extensions={ ".c" },
+-- 			 output_extensions={ ".o" },
+-- 			 warnings={ none={"-w"},
+-- 						some={"-Wall"},
+-- 						"error"={"-Wall", "-Werror"},
+-- 						strict={"-Wall"},
+-- 			 },
+-- 			 optimizations={ "debug" = {"-g"},
+-- 							 "optimize" = {"-O3"},
+-- 							 "size" = {"-Os"},
+-- 							 "optdebug" = {"-g", "-O3"},
+-- 			 },
+-- 			 languages={"C"={}, "C99"={"-std=c99"}},
+-- 			 default_language="C",
+-- 			 dependencies={"-MMD", "-MF", "$out.d"},
+-- 		   }
+-- end
+-- AddTool{ name="clang++"
+-- 		 exe=FindExecutable( "clang++" ),
+-- 		 input_extensions={ ".cpp" },
+-- 		 output_extensions={ ".o" }
+-- 		 languages={"C++"={}, "C++11"={"-std=c++11", "-stdlib=libc++"}},
+-- 		 default_language="C++",
+-- 		 dependencies={"-MMD", "-MF", "$out.d"}
+-- 	   }
+-- 
+-- lime = Executable( "lime", Compile( "main.cpp" ) )
+-- AddTool{ name="lime",
+-- 		 exe=lime,
+-- 		 input_extensions={ ".lime" },
+-- 		 output_extensions={ ".cpp", ".h" },
+-- 	   }
+-- 		 
+-- AddToolset{ name="cross",
+-- 			tools={ "mingw-gcc", "mingw-g++" }
+-- 		  }
+-- 
+
+doxygen = file.find_exe( "doxygen" )
+if doxygen then
+	AddTool{ tag="doxygen",
+			 name="doxygen",
+			 exe=doxygen,
+			 options={
+			 },
+			 option_defaults={
+			 },
+			 cmd={file.find_exe( "env" ), 
+				  "DOX_OUTPUT_DIR=$out",
+				  "DOX_SOURCE_DIR=$srcdir",
+				  "$exe", "$in"},
+			 description="DOC $out",
+	}
+end
+
+AddToolOption( "clang", "optimization", "heavy", {"-O3", "-mtune=native", "-sse4"} )
+
+
+BuildConfiguration{ name="selfRelease", optimization="heavy" }
+BuildConfiguration{ name="selfBuild", optimization="optdebug" }
+BuildConfiguration{ name="selfDebug", optimization="debug" }
+--BuildConfiguration{ name="selfWin64", opt="optimize", toolset="cross" }
+DefaultConfiguration( "selfBuild" )
+
+-- --SetWarningLevel( "none" )
+-- --SetWarningLevel( "some" )
+-- --SetWarningLevel( "error" )
+-- SetDefaultWarningLevel( "strict" )
+EnableLanguages( "c++11" )
+SetOption( "threads", "on" )
+-- 
+
+
+--print( "   node: " .. node() )
+--print( "     os: " .. system() )
+--print( "release: " .. release() )
+--print( "version: " .. version() )
+--print( "machine: " .. machine() )
+--print( "is64bit: " .. tostring(is64bit()) )
+
+--ls = file.find_exe( "ls" )
+--if ls then
+--	print( "good, found ls: " .. ls )
+--end
+
+--if PackageExists( "QtOpenGL", "=4.8.6" ) then
+--	print( "Wahoo, QtOpenGL 4.8.6 exists!" )
+--end
+
+x = ExternalLibrary( "QtOpenGL" )
+if x then
+	print( "Found " .. x:name() .. " prefix " .. x:variables()["prefix"] )
+end
+
+constructor = SubDir( "src" )

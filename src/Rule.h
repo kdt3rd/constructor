@@ -22,6 +22,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 
 ////////////////////////////////////////
 
@@ -30,26 +33,37 @@ class Rule
 {
 public:
 	Rule( std::string tag, std::string desc );
-	virtual ~Rule( void );
+	Rule( Rule &&r );
+	~Rule( void );
+
+	Rule &operator=( Rule &&r );
+
+	inline const std::string &getName( void ) const;
+	inline const std::string &getDescription( void ) const;
 
 	inline void setDependencyFile( const std::string &dname );
-	inline const std::string &dependencyFile( void ) const;
+	inline const std::string &getDependencyFile( void ) const;
+
+	inline void setDependencyStyle( const std::string &dname );
+	inline const std::string &getDependencyStyle( void ) const;
 
 	inline void setJobPool( const std::string &jname );
-	inline const std::string &jobPool( void ) const;
+	inline const std::string &getJobPool( void ) const;
 
 	inline void setOutputRestat( bool r );
-	inline bool outputRestat( void ) const;
+	inline bool isOutputRestat( void ) const;
 
-	void command( const std::string &c );
-	void command( const std::vector<std::string> &c );
-	void addCommand( const std::vector<std::string> &c );
+	void setCommand( const std::string &c );
+	void setCommand( const std::vector<std::string> &c );
+	void setCommand( std::vector<std::string> &&c );
+	void addToCommand( const std::vector<std::string> &c );
 
-	inline const std::vector<std::string> &rawCommand( void ) const;
+	inline const std::vector<std::string> &getRawCommand( void ) const;
 
-	std::string command( void ) const;
+	std::string getCommand( void ) const;
+
 	template <typename VF>
-	inline std::string command( VF &&f ) const
+	inline std::string getCommand( VF &&f ) const
 	{
 		std::string ret;
 		for ( const std::string &i: myCommand )
@@ -64,16 +78,31 @@ public:
 		return std::move( ret );
 	}
 
-	inline const std::string &description( void ) const;
 
 private:
 	std::string myTag;
 	std::string myDesc;
 	std::string myDepFile;
+	std::string myDepStyle;
 	std::string myJobPool;
 	std::vector<std::string> myCommand;
 	bool myOutputRestat = false;
 };
+
+
+////////////////////////////////////////
+
+
+inline const std::string &
+Rule::getName( void ) const 
+{
+	return myTag;
+}
+inline const std::string &
+Rule::getDescription( void ) const 
+{
+	return myDesc;
+}
 
 
 ////////////////////////////////////////
@@ -85,9 +114,24 @@ Rule::setDependencyFile( const std::string &dname )
 	myDepFile = dname;
 }
 inline const std::string &
-Rule::dependencyFile( void ) const
+Rule::getDependencyFile( void ) const
 {
 	return myDepFile;
+}
+
+
+////////////////////////////////////////
+
+
+inline void
+Rule::setDependencyStyle( const std::string &dname )
+{
+	myDepStyle = dname;
+}
+inline const std::string &
+Rule::getDependencyStyle( void ) const
+{
+	return myDepStyle;
 }
 
 
@@ -100,7 +144,7 @@ Rule::setJobPool( const std::string &jname )
 	myJobPool = jname;
 }
 inline const std::string &
-Rule::jobPool( void ) const
+Rule::getJobPool( void ) const
 {
 	return myJobPool;
 }
@@ -115,7 +159,7 @@ Rule::setOutputRestat( bool r )
 	myOutputRestat = r;
 }
 inline bool
-Rule::outputRestat( void ) const
+Rule::isOutputRestat( void ) const
 {
 	return myOutputRestat;
 }
@@ -125,18 +169,8 @@ Rule::outputRestat( void ) const
 
 
 inline const std::vector<std::string> &
-Rule::rawCommand( void ) const 
+Rule::getRawCommand( void ) const 
 {
 	return myCommand;
-}
-
-
-////////////////////////////////////////
-
-
-inline const std::string &
-Rule::description( void ) const 
-{
-	return myDesc;
 }
 

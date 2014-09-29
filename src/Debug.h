@@ -23,6 +23,8 @@
 #pragma once
 
 #include <iostream>
+#include <sstream>
+#include <stdexcept>
 
 
 ////////////////////////////////////////
@@ -43,3 +45,13 @@ void enable( bool d );
 
 #define DEBUG( x ) if ( Debug::on() ) { std::cout << x << std::endl; }
 #define VERBOSE( x ) if ( Verbose::on() ) { std::cout << x << std::endl; }
+
+#define PRECONDITION( x, msg )							\
+	{													\
+		if ( !( x ) )									\
+		{												\
+			std::stringstream msgBuf;					\
+			msgBuf << msg;								\
+			throw std::runtime_error( msgBuf.str() );	\
+		}												\
+	}

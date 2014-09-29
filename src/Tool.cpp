@@ -23,6 +23,9 @@
 #include "Tool.h"
 #include "LuaEngine.h"
 #include "Scope.h"
+#include "Debug.h"
+#include "StrUtil.h"
+#include "TransformSet.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -69,7 +72,7 @@ Tool::enableLanguage( const std::string &nm )
 
 
 const std::string &
-Tool::language( void ) const
+Tool::getLanguage( void ) const
 {
 	if ( myLanguage.empty() )
 	{
@@ -98,7 +101,7 @@ Tool::language( void ) const
 
 
 Tool::OptionSet &
-Tool::option( const std::string &name )
+Tool::getOption( const std::string &name )
 {
 	return myOptions[name];
 }
@@ -108,11 +111,11 @@ Tool::option( const std::string &name )
 
 
 const Tool::OptionSet &
-Tool::option( const std::string &nm ) const
+Tool::getOption( const std::string &nm ) const
 {
 	auto o = myOptions.find( nm );
 	if ( o == myOptions.end() )
-		throw std::runtime_error( "Option '" + nm + "' does not exist in tool '" + name() + "'" );
+		throw std::runtime_error( "Option '" + nm + "' does not exist in tool '" + getName() + "'" );
 
 	return o->second;
 }
@@ -122,7 +125,7 @@ Tool::option( const std::string &nm ) const
 
 
 std::string
-Tool::defaultOption( const std::string &opt ) const
+Tool::getDefaultOption( const std::string &opt ) const
 {
 	std::string ret;
 	auto x = myOptionDefaults.find( opt );
@@ -143,9 +146,29 @@ Tool::addOption( const std::string &opt,
 {
 	auto o = myOptions.find( opt );
 	if ( o == myOptions.end() )
-		throw std::runtime_error( "Option '" + opt + "' does not exist in tool '" + name() + "'" );
+		throw std::runtime_error( "Option '" + opt + "' does not exist in tool '" + getName() + "'" );
 
 	o->second[nm] = cmd;
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+Tool::getExecutable( void ) const
+{
+	return myExeName;
+}
+
+
+////////////////////////////////////////
+
+
+ItemPtr
+Tool::getGeneratedExecutable( void ) const
+{
+	return myExePointer;
 }
 
 
@@ -155,6 +178,9 @@ Tool::addOption( const std::string &opt,
 bool
 Tool::handlesExtension( const std::string &e ) const
 {
+	if ( e.empty() )
+		return myExtensions.empty() && myAltExtensions.empty();
+
 	for ( auto &me: myExtensions )
 		if ( me == e )
 			return true;
@@ -164,6 +190,151 @@ Tool::handlesExtension( const std::string &e ) const
 			return true;
 
 	return false;
+}
+
+
+////////////////////////////////////////
+
+
+bool
+Tool::handlesTools( const std::set<std::string> &s ) const
+{
+	if ( s.empty() )
+		return false;
+
+	for ( auto &i: s )
+	{
+		bool found = false;
+		for ( auto &t: myInputTools )
+		{
+			if ( t == i )
+			{
+				found = true;
+				break;
+			}
+		}
+
+		if ( ! found )
+			return false;
+	}
+
+	return true;
+}
+
+
+////////////////////////////////////////
+
+
+namespace
+{
+
+struct ToolSubst
+{
+	const Tool &myTool;
+	const TransformSet &myXformSet;
+	std::string myExecutable;
+	std::string myLastVar;
+
+	ToolSubst( const Tool &t, const TransformSet &x )
+			: myTool( t ), myXformSet( x )
+	{
+		ItemPtr ei = myTool.getGeneratedExecutable();
+		if ( ei )
+		{
+			std::shared_ptr<BuildItem> bi = myXformSet.getTransform( ei.get() );
+			if ( ! bi )
+				throw std::runtime_error( "Unable to find transformed build tool" );
+
+			PRECONDITION( bi->getOutputs().size() == 1,
+						  "Expecting executable build item to only have 1 output" );
+			myExecutable = bi->getOutDir()->makefilename( bi->getOutputs()[0] );
+		}
+		else
+			myExecutable = myTool.getExecutable();
+	}
+
+	const std::string &operator()( const std::string &v )
+	{
+		if ( v == "exe" )
+			return myExecutable;
+
+		myLastVar.clear();
+		try
+		{
+			const Tool::OptionSet &os = myTool.getOption( v );
+
+			std::string opt;
+			if ( v == "language" )
+			{
+				opt = myTool.getLanguage();
+			}
+			else
+			{
+				opt = myTool.getDefaultOption( v );
+				std::string overOpt = myXformSet.getVarValue( v );
+				if ( ! overOpt.empty() )
+					opt = overOpt;
+			}
+
+			auto x = os.find( opt );
+			if ( x != os.end() )
+			{
+				std::stringstream rval;
+				bool notfirst = false;
+				for ( std::string oss: x->second )
+				{
+					if ( notfirst )
+						rval << ' ';
+					String::substituteVariables( oss, false, *this );
+					rval << oss;
+					notfirst = true;
+				}
+				myLastVar = rval.str();
+				return myLastVar;
+			}
+		}
+		catch ( ... )
+		{
+		}
+
+		myLastVar.push_back( '$' );
+		myLastVar.append( v );
+		return myLastVar;
+	}
+};
+
+}
+
+
+////////////////////////////////////////
+
+
+Rule
+Tool::createRule( const TransformSet &xset ) const
+{
+	Rule ret( getTag(), myDescription );
+
+	ToolSubst x( *this, xset );
+	std::vector<std::string> cmd;
+	for ( std::string ci: myCommand )
+	{
+		String::substituteVariables( ci, false, x );
+		cmd.emplace_back( std::move( ci ) );
+	}
+	for ( std::string ci: myImplDepCmd )
+	{
+		String::substituteVariables( ci, false, x );
+		cmd.emplace_back( std::move( ci ) );
+	}
+	ret.setCommand( std::move( cmd ) );
+
+	ret.setDependencyFile( myImplDepName );
+	ret.setDependencyStyle( myImplDepStyle );
+	VERBOSE( "Need to handle job pool and output restat in tool definition" );
+//	ret.setJobPool();
+//	ret.setOutputRestat();
+
+	return std::move( ret );
 }
 
 
@@ -181,10 +352,10 @@ Tool::parse( const Lua::Value &v )
 	std::vector<std::string> inpTools;
 	std::vector<std::string> outpExt;
 	ItemPtr exePtr;
-	std::string exe;
+	std::string exe, outputPrefix;
 	OptionGroup opts;
 	OptionDefaultSet optDefaults;
-	std::string impFile;
+	std::string impFile, impStyle;
 	std::vector<std::string> impCmd;
 	std::vector<std::string> cmd;
 	for ( auto &i: t )
@@ -226,6 +397,10 @@ Tool::parse( const Lua::Value &v )
 		{
 			outpExt = i.second.toStringList();
 		}
+		else if ( k == "output_prefix" )
+		{
+			outputPrefix = i.second.asString();
+		}
 		else if ( k == "input_tools" )
 		{
 			inpTools = i.second.toStringList();
@@ -261,6 +436,7 @@ Tool::parse( const Lua::Value &v )
 			auto &id = i.second.asTable();
 			auto idfn = id.find( "file" );
 			auto idcmd = id.find( "cmd" );
+			auto idst = id.find( "style" );
 
 			if ( idfn == id.end() )
 				throw std::runtime_error( "Expecting a file name definition for implicit_dependencies" );
@@ -268,6 +444,8 @@ Tool::parse( const Lua::Value &v )
 			impFile = idfn->second.asString();
 			if ( idcmd != id.end() )
 				impCmd = idcmd->second.toStringList();
+			if ( idst != id.end() )
+				impStyle = idst->second.asString();
 		}
 		else if ( k == "cmd" )
 		{
@@ -282,11 +460,13 @@ Tool::parse( const Lua::Value &v )
 	ret->myExtensions = inpExt;
 	ret->myAltExtensions = altExt;
 	ret->myOutputs = outpExt;
+	ret->myOutputPrefix = outputPrefix;
 	ret->myCommand = cmd;
 	ret->myInputTools = inpTools;
 	ret->myOptions = opts;
 	ret->myOptionDefaults = optDefaults;
 	ret->myImplDepName = impFile;
+	ret->myImplDepStyle = impStyle;
 	ret->myImplDepCmd = impCmd;
 
 	return ret;

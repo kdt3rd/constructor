@@ -50,6 +50,14 @@ void substituteVariables( std::string &a, bool requireCurly, const std::map<std:
 void substituteVariables( std::string &a, bool requireCurly,
 						  const std::function<const std::string &(const std::string&)> &varLookup );
 
+inline bool
+startsWith( const std::string &s, const std::string &prefix )
+{
+	std::string::size_type p = s.find( prefix );
+	return p == 0;
+}
+
+	
 } // namespace String
 
 
