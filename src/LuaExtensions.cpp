@@ -355,7 +355,7 @@ recurseAndAdd( std::shared_ptr<CompileSet> &ret,
 		throw std::runtime_error( "Unhandled argument type to Compile" );
 }
 
-int
+static int
 compile( lua_State *L )
 {
 	int N = lua_gettop( L );
@@ -374,7 +374,7 @@ compile( lua_State *L )
 	return 1;
 }
 
-int
+static int
 executable( lua_State *L )
 {
 	int N = lua_gettop( L );
@@ -391,7 +391,7 @@ executable( lua_State *L )
 	return 1;
 }
 
-int
+static int
 library( lua_State *L )
 {
 	int N = lua_gettop( L );
@@ -406,6 +406,30 @@ library( lua_State *L )
 	Scope::current().addItem( ret );
 	Item::push( L, ret );
 	return 1;
+}
+
+static int
+include( lua_State *L )
+{
+	auto &vars = Scope::current().getVars();
+	auto incPath = vars.find( "includes" );
+	if ( incPath == vars.end() )
+		incPath = vars.emplace( std::make_pair( "includes", Variable( "includes" ) ) ).first;
+
+	Variable &v = incPath->second;
+
+	int N = lua_gettop( L );
+	for ( int i = 1; i <= N; ++i )
+	{
+		std::string iname = Lua::Parm<std::string>::get( L, N, 1 );
+
+		if ( File::isAbsolute( iname.c_str() ) )
+			v.add( std::move( iname ) );
+		else
+			v.add( Directory::current()->makefilename( iname ) );
+	}
+
+	return 0;
 }
 
 } // empty namespace
@@ -441,6 +465,7 @@ registerExtensions( void )
 	eng.registerFunction( "Compile", &compile );
 	eng.registerFunction( "Executable", &executable );
 	eng.registerFunction( "Library", &library );
+	eng.registerFunction( "Include", &include );
 
 	{
 		eng.pushLibrary( "file" );

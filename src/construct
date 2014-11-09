@@ -62,7 +62,8 @@ local l = Compile(
 				 )
 l:setVariable( "tool", "cxx" )
 
-exe = Executable( "constructor", x, l )
+lua = Library( "conslua", l )
+exe = Executable( "constructor", x, lua )
 -- AddDefines( x, "SOME_DEFINE" )
 -- 
 -- a = Library( "foo", x, FindPackage( "QtCore" ) )

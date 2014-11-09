@@ -45,6 +45,8 @@ public:
 	inline void inherit( bool yesno );
 	inline bool inherit( void ) const;
 
+	void setPrependString( const std::string &prefix );
+
 	void clear( void );
 	void add( std::string v );
 	void add( std::vector<std::string> v );

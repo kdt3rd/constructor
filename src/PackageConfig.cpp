@@ -189,6 +189,26 @@ FindPackage( lua_State *L )
 	return 1;
 }
 
+static int
+FindPackageRequired( lua_State *L )
+{
+	int N = lua_gettop( L );
+	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
+	std::string ver = Lua::Parm<std::string>::get( L, N, 2 );
+
+	auto p = getPackage( name, ver );
+	if ( ! p )
+	{
+		if ( ! ver.empty() )
+			throw std::runtime_error( "ERROR: Package '" + name + "' and required version " + ver + " not found" );
+		else
+			throw std::runtime_error( "ERROR: Package '" + name + "' not found" );
+	}
+
+	Item::push( L, getPackage( name, ver ) );
+	return 1;
+}
+
 } // empty namespace
 
 
@@ -494,8 +514,10 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 			myValues[nm] = val;
 		}
 		else
-			std::cerr << "WARNING: Ignoring unknown package config tag: '" << nm << "', value: " << val << std::endl;
-
+		{
+			DEBUG( "WARNING: Ignoring unknown package config tag: '" << nm << "', value: " << val );
+			myValues[nm] = val;
+		}
 	}
 	else if ( separator == '=' )
 	{
@@ -826,6 +848,7 @@ PackageConfig::registerFunctions( void )
 	Lua::Engine &eng = Lua::Engine::singleton();
 	eng.registerFunction( "ExternalLibraryExists", &PackageExists );
 	eng.registerFunction( "ExternalLibrary", &FindPackage );
+	eng.registerFunction( "RequiredExternalLibrary", &FindPackageRequired );
 }
 
 

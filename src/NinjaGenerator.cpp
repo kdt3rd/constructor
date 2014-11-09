@@ -121,6 +121,13 @@ emitRules( std::ostream &os, const TransformSet &x )
 static void
 emitVariables( std::ostream &os, const TransformSet &x )
 {
+	const VariableSet &vars = x.getVars();
+	for ( auto i: vars )
+	{
+		os << '\n' << i.first << "=" << i.second.value();
+	}
+	if ( ! vars.empty() )
+		os << '\n';
 }
 
 static void
