@@ -44,7 +44,7 @@
 ////////////////////////////////////////
 
 
-static void
+[[noreturn]] static void
 emitGenerators( int es )
 {
 	std::cout << "Available build generators:\n\n";
@@ -58,7 +58,7 @@ emitGenerators( int es )
 ////////////////////////////////////////
 
 
-static void
+[[noreturn]] static void
 usageAndExit( const char *argv0, int es )
 {
 	std::cout << argv0 << " [-C <configname>] [-G <generator>] [path]\n\n"
@@ -259,12 +259,7 @@ main( int argc, const char *argv[] )
 //			std::cout << "Using default generator: " << generator->name() << std::endl;
 		}
 
-		PackageConfig::registerFunctions();
-		Item::registerFunctions();
-		CompileSet::registerFunctions();
-		Configuration::registerFunctions();
 		Lua::registerExtensions();
-
 		Lua::startParsing( subdir );
 
 		for ( const Configuration &c: Configuration::defined() )

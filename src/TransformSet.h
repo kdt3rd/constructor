@@ -46,6 +46,9 @@ public:
 	~TransformSet( void );
 
 	inline const std::shared_ptr<Directory> &getOutDir( void ) const;
+	inline const std::shared_ptr<Directory> &getBinDir( void ) const;
+	inline const std::shared_ptr<Directory> &getLibDir( void ) const;
+	inline const std::shared_ptr<Directory> &getArtifactDir( void ) const;
 
 	void addChildScope( const std::shared_ptr<TransformSet> &cs );
 	inline const std::vector< std::shared_ptr<TransformSet> > &getSubScopes( void ) const;
@@ -73,6 +76,9 @@ public:
 
 private:
 	std::shared_ptr<Directory> myDirectory;
+	std::shared_ptr<Directory> myBinDirectory;
+	std::shared_ptr<Directory> myLibDirectory;
+	std::shared_ptr<Directory> myArtifactDirectory;
 	std::vector< std::shared_ptr<Tool> > myTools;
 	VariableSet myVars;
 
@@ -90,6 +96,24 @@ inline const std::shared_ptr<Directory> &
 TransformSet::getOutDir( void ) const
 {
 	return myDirectory;
+}
+
+inline const std::shared_ptr<Directory> &
+TransformSet::getBinDir( void ) const
+{
+	return myBinDirectory;
+}
+
+inline const std::shared_ptr<Directory> &
+TransformSet::getLibDir( void ) const
+{
+	return myLibDirectory;
+}
+
+inline const std::shared_ptr<Directory> &
+TransformSet::getArtifactDir( void ) const
+{
+	return myArtifactDirectory;
 }
 
 

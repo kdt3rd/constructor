@@ -60,7 +60,8 @@ local l = Compile(
 	lua_dir .. "loadlib.c",
 	lua_dir .. "linit.c"
 				 )
-l:setVariable( "tool", "cxx" )
+l:forceTool( ".c", "cxx" )
+l:overrideToolSetting( "warnings", "some" )
 
 lua = Library( "conslua", l )
 exe = Executable( "constructor", x, lua )

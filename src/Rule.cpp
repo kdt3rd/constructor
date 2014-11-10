@@ -22,6 +22,15 @@
 
 #include "Rule.h"
 #include "StrUtil.h"
+#include "Debug.h"
+
+
+////////////////////////////////////////
+
+
+Rule::Rule( void )
+{
+}
 
 
 ////////////////////////////////////////
@@ -42,6 +51,7 @@ Rule::Rule( Rule &&r )
 		  myDepStyle( std::move( r.myDepStyle ) ),
 		  myJobPool( std::move( r.myJobPool ) ),
 		  myCommand( std::move( r.myCommand ) ),
+		  myVariables( std::move( r.myVariables ) ),
 		  myOutputRestat( r.myOutputRestat )
 {
 }
@@ -59,6 +69,28 @@ Rule::~Rule( void )
 
 
 Rule &
+Rule::operator=( const Rule &r )
+{
+	if ( &r != this )
+	{
+		myTag = r.myTag;
+		myDesc = r.myDesc;
+		myDepFile = r.myDepFile;
+		myDepStyle = r.myDepStyle;
+		myJobPool = r.myJobPool;
+		myCommand = r.myCommand;
+		myVariables = r.myVariables;
+		myOutputRestat = r.myOutputRestat;
+	}
+
+	return *this;
+}
+
+
+////////////////////////////////////////
+
+
+Rule &
 Rule::operator=( Rule && r )
 {
 	myTag = std::move( r.myTag );
@@ -67,6 +99,7 @@ Rule::operator=( Rule && r )
 	myDepStyle = std::move( r.myDepStyle );
 	myJobPool = std::move( r.myJobPool );
 	myCommand = std::move( r.myCommand );
+	myVariables = std::move( r.myVariables );
 	myOutputRestat = r.myOutputRestat;
 	return *this;
 }
@@ -109,6 +142,16 @@ void
 Rule::addToCommand( const std::vector<std::string> &c )
 {
 	myCommand.insert( myCommand.end(), c.begin(), c.end() );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Rule::setVariable( const std::string &n, const std::string &v )
+{
+	myVariables[n] = v;
 }
 
 

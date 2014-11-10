@@ -289,7 +289,7 @@ compare( const char *pathA, const char *pathB )
 		if ( nA == 0 )
 			break;
 
-		if ( memcmp( aBuf, bBuf, nA ) != 0 )
+		if ( memcmp( aBuf, bBuf, static_cast<size_t>( nA ) ) != 0 )
 			return true;
 
 		offset += nA;
@@ -400,6 +400,7 @@ find( std::vector<std::string> progs,
 	  const std::vector<std::string> &extensions )
 {
 	std::map<std::string, std::string> ret;
+	typedef std::vector<std::string>::iterator::difference_type diff_type;
 	std::string filepath;
 	for ( const auto &p: path )
 	{
@@ -417,7 +418,7 @@ find( std::vector<std::string> progs,
 					if ( d.exists( filepath, name ) )
 					{
 						ret[name] = filepath;
-						progs.erase( progs.begin() + i );
+						progs.erase( progs.begin() + static_cast<diff_type>( i ) );
 						--i;
 						continue;
 					}
@@ -427,7 +428,7 @@ find( std::vector<std::string> progs,
 						if ( d.exists( filepath, name + e ) )
 						{
 							ret[name] = filepath;
-							progs.erase( progs.begin() + i );
+							progs.erase( progs.begin() + static_cast<diff_type>( i ) );
 							--i;
 							break;
 						}

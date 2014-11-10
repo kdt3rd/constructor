@@ -35,6 +35,17 @@ namespace String
 ////////////////////////////////////////
 
 
+const std::string &
+empty( void )
+{
+	static const std::string theEmptyStr;
+	return theEmptyStr;
+}
+
+
+////////////////////////////////////////
+
+
 void
 split_append( std::vector<std::string> &l, const std::string &s, const char sep )
 {
@@ -211,6 +222,26 @@ strip( std::string &s )
 ////////////////////////////////////////
 
 
+void
+sanitize( std::string &s )
+{
+	if ( s.empty() )
+		return;
+
+	if ( ! std::isalnum( s[0] ) )
+		s.insert( s.begin(), '_' );
+
+	for ( auto &i: s )
+	{
+		if ( ! std::isalnum( i ) )
+			i = '_';
+	}
+}
+
+
+////////////////////////////////////////
+
+
 int
 versionCompare( const std::string &a, const std::string &b )
 {
@@ -297,15 +328,13 @@ namespace {
 const std::string &
 mapLookup( const std::string &name, const std::map<std::string, std::string> &varTable )
 {
-	static std::string emptyVal;
-
 	auto i = varTable.find( name );
 	if ( i != varTable.end() )
 		return i->second;
 
 	std::cout << "WARNING: Variable '" << name << "' undefined" << std::endl;
 
-	return emptyVal;
+	return String::empty();
 }
 } // empty namespace
 

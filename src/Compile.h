@@ -46,8 +46,7 @@ protected:
 	std::shared_ptr<BuildItem>
 	chainTransform( const std::string &name,
 					const std::shared_ptr<Directory> &srcdir,
-					TransformSet &xform,
-					const std::string &forceTool ) const;
+					TransformSet &xform ) const;
 
 	std::vector<ItemPtr> myItems;
 };

@@ -53,12 +53,18 @@ public:
 	void enableLanguage( const std::string &name );
 	const std::string &getLanguage( void ) const;
 
+	const std::string &getCommandPrefix( const std::string &varname ) const;
+
 	OptionSet &getOption( const std::string &name );
 	const OptionSet &getOption( const std::string &name ) const;
+	bool hasOption( const std::string &name ) const;
 	std::string getDefaultOption( const std::string &opt ) const;
+	std::string getOptionValue( const std::string &opt, const std::string &choice ) const;
+	std::string getOptionVariable( const std::string &opt ) const;
 	void addOption( const std::string &opt,
 					const std::string &name,
 					const std::vector<std::string> &cmd );
+	inline const OptionGroup &allOptions( void ) const;
 
 	inline const std::string &getOutputPrefix( void ) const;
 	inline const std::vector<std::string> &getOutputs( void ) const;
@@ -75,7 +81,7 @@ public:
 
 	bool handlesTools( const std::set<std::string> &s ) const;
 
-	Rule createRule( const TransformSet &x ) const;
+	Rule createRule( const TransformSet &x, bool useBraces = false ) const;
 
 	static std::shared_ptr<Tool> parse( const Lua::Value &v );
 
@@ -93,6 +99,8 @@ private:
 	std::vector<std::string> myOutputs;
 	std::vector<std::string> myCommand;
 	std::vector<std::string> myInputTools;
+
+	OptionDefaultSet myFlagPrefixes;
 
 	OptionGroup myOptions;
 	OptionDefaultSet myOptionDefaults;
@@ -129,6 +137,15 @@ Tool::getImplicitDependencyFilename( void ) const
 inline const std::vector<std::string> &
 Tool::getImplicitDependencyOptions( void ) const
 { return myImplDepCmd; }
+
+
+////////////////////////////////////////
+
+
+inline const Tool::OptionGroup &
+Tool::allOptions( void ) const
+{ return myOptions; }
+
 
 
 ////////////////////////////////////////

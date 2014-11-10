@@ -51,8 +51,8 @@ struct gen_sequence<0, S...>
 class FunctionBase
 {
 public:
-	inline FunctionBase( void ) {}
-	virtual ~FunctionBase( void ) {}
+	FunctionBase( void );
+	virtual ~FunctionBase( void );
 
 	virtual int process( lua_State *l ) = 0;
 };

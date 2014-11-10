@@ -90,10 +90,22 @@ Tool::getLanguage( void ) const
 			}
 		}
 
-		static std::string nilStr;
-		return nilStr;
+		return String::empty();
 	}
 	return myLanguage;
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+Tool::getCommandPrefix( const std::string &varname ) const
+{
+	auto o = myFlagPrefixes.find( varname );
+	if ( o != myFlagPrefixes.end() )
+		return o->second;
+	return String::empty();
 }
 
 
@@ -124,6 +136,16 @@ Tool::getOption( const std::string &nm ) const
 ////////////////////////////////////////
 
 
+bool
+Tool::hasOption( const std::string &name ) const
+{
+	return myOptions.find( name ) != myOptions.end();
+}
+
+
+////////////////////////////////////////
+
+
 std::string
 Tool::getDefaultOption( const std::string &opt ) const
 {
@@ -133,6 +155,48 @@ Tool::getDefaultOption( const std::string &opt ) const
 		ret = x->second;
 
 	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
+std::string
+Tool::getOptionValue( const std::string &opt, const std::string &choice ) const
+{
+	auto i = myOptions.find( opt );
+	if ( i == myOptions.end() )
+		return std::string();
+
+	auto x = i->second.find( choice );
+	if ( x != i->second.end() )
+	{
+		std::stringstream rval;
+		bool notfirst = false;
+		for ( const std::string &oss: x->second )
+		{
+			if ( notfirst )
+				rval << ' ';
+			rval << oss;
+			notfirst = true;
+		}
+		return rval.str();
+	}
+	return std::string();
+}
+
+
+////////////////////////////////////////
+
+
+std::string
+Tool::getOptionVariable( const std::string &opt ) const
+{
+	std::string varname = getTag();
+	varname.push_back( '_' );
+	varname.append( opt );
+	String::sanitize( varname );
+	return std::move( varname );
 }
 
 
@@ -234,9 +298,10 @@ struct ToolSubst
 	const TransformSet &myXformSet;
 	std::string myExecutable;
 	std::string myLastVar;
+	bool myUseBraces;
 
-	ToolSubst( const Tool &t, const TransformSet &x )
-			: myTool( t ), myXformSet( x )
+	ToolSubst( const Tool &t, const TransformSet &x, bool useBraces )
+			: myTool( t ), myXformSet( x ), myUseBraces( useBraces )
 	{
 		ItemPtr ei = myTool.getGeneratedExecutable();
 		if ( ei )
@@ -259,46 +324,16 @@ struct ToolSubst
 			return myExecutable;
 
 		myLastVar.clear();
-		try
-		{
-			const Tool::OptionSet &os = myTool.getOption( v );
-
-			std::string opt;
-			if ( v == "language" )
-			{
-				opt = myTool.getLanguage();
-			}
-			else
-			{
-				opt = myTool.getDefaultOption( v );
-				std::string overOpt = myXformSet.getVarValue( v );
-				if ( ! overOpt.empty() )
-					opt = overOpt;
-			}
-
-			auto x = os.find( opt );
-			if ( x != os.end() )
-			{
-				std::stringstream rval;
-				bool notfirst = false;
-				for ( std::string oss: x->second )
-				{
-					if ( notfirst )
-						rval << ' ';
-					String::substituteVariables( oss, false, *this );
-					rval << oss;
-					notfirst = true;
-				}
-				myLastVar = rval.str();
-				return myLastVar;
-			}
-		}
-		catch ( ... )
-		{
-		}
-
 		myLastVar.push_back( '$' );
-		myLastVar.append( v );
+		if ( myUseBraces )
+			myLastVar.push_back( '{' );
+		if ( myTool.hasOption( v ) )
+			myLastVar.append( myTool.getOptionVariable( v ) );
+		else
+			myLastVar.append( v );
+		if ( myUseBraces )
+			myLastVar.push_back( '}' );
+
 		return myLastVar;
 	}
 };
@@ -310,11 +345,15 @@ struct ToolSubst
 
 
 Rule
-Tool::createRule( const TransformSet &xset ) const
+Tool::createRule( const TransformSet &xset, bool useBraces ) const
 {
-	Rule ret( getTag(), myDescription );
+	ToolSubst x( *this, xset, useBraces );
 
-	ToolSubst x( *this, xset );
+	std::string desc = myDescription;
+	String::substituteVariables( desc, false, x );
+	
+	Rule ret( getTag(), desc );
+
 	std::vector<std::string> cmd;
 	for ( std::string ci: myCommand )
 	{
@@ -327,6 +366,34 @@ Tool::createRule( const TransformSet &xset ) const
 		cmd.emplace_back( std::move( ci ) );
 	}
 	ret.setCommand( std::move( cmd ) );
+
+	for ( auto &i: myOptions )
+	{
+		std::string opt;
+		if ( i.first == "language" )
+			opt = getLanguage();
+		else
+		{
+			opt = xset.getVarValue( i.first );
+			if ( opt.empty() )
+				opt = getDefaultOption( i.first );
+		}
+
+		auto io = i.second.find( opt );
+		if ( io != i.second.end() )
+		{
+			std::stringstream rval;
+			bool notfirst = false;
+			for ( const std::string &oss: io->second )
+			{
+				if ( notfirst )
+					rval << ' ';
+				rval << oss;
+				notfirst = true;
+			}
+			ret.setVariable( getOptionVariable( i.first ), rval.str() );
+		}
+	}
 
 	ret.setDependencyFile( myImplDepName );
 	ret.setDependencyStyle( myImplDepStyle );
@@ -355,6 +422,7 @@ Tool::parse( const Lua::Value &v )
 	std::string exe, outputPrefix;
 	OptionGroup opts;
 	OptionDefaultSet optDefaults;
+	OptionDefaultSet flagPrefixes;
 	std::string impFile, impStyle;
 	std::vector<std::string> impCmd;
 	std::vector<std::string> cmd;
@@ -431,6 +499,16 @@ Tool::parse( const Lua::Value &v )
 				optDefaults[od.first.tag] = od.second.asString();
 			}
 		}
+		else if ( k == "flag_prefixes" )
+		{
+			for ( auto &od: i.second.asTable() )
+			{
+				if ( od.first.type == Lua::KeyType::INDEX )
+					throw std::runtime_error( "Expecting hash map of variable name to command line flag prefix" );
+
+				flagPrefixes[od.first.tag] = od.second.asString();
+			}
+		}
 		else if ( k == "implicit_dependencies" )
 		{
 			auto &id = i.second.asTable();
@@ -463,6 +541,7 @@ Tool::parse( const Lua::Value &v )
 	ret->myOutputPrefix = outputPrefix;
 	ret->myCommand = cmd;
 	ret->myInputTools = inpTools;
+	ret->myFlagPrefixes = flagPrefixes;
 	ret->myOptions = opts;
 	ret->myOptionDefaults = optDefaults;
 	ret->myImplDepName = impFile;

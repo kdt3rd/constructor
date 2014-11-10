@@ -152,11 +152,10 @@ const std::string &
 getenv( const std::string &v )
 {
 	std::call_once( theNeedInit, &init );
-	static std::string theEmptyVal;
 	auto i = theEnv.find( v );
 	if ( i != theEnv.end() )
 		return i->second;
-	return theEmptyVal;
+	return String::empty();
 }
 
 } // namespace OS

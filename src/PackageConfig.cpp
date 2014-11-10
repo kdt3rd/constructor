@@ -37,7 +37,6 @@
 #include "Directory.h"
 #include "OSUtil.h"
 #include "ScopeGuard.h"
-#include "LuaEngine.h"
 #include "TransformSet.h"
 #include "Debug.h"
 #include <iomanip>
@@ -94,7 +93,7 @@ init( void )
                 name_max = 255;
 #endif
 			}
-			allocSize = std::max( sizeof(struct dirent), size_t( offsetof(struct dirent, d_name) + name_max + 1 ) );
+			allocSize = std::max( sizeof(struct dirent), size_t( offsetof(struct dirent, d_name) + static_cast<size_t>( name_max ) + 1 ) );
 			rdBuf.reset( new uint8_t[allocSize] );
 
 			struct dirent *curDir = reinterpret_cast<struct dirent *>( rdBuf.get() );
@@ -124,89 +123,6 @@ init( void )
 			}
 		}
 	}
-}
-
-
-std::shared_ptr<PackageConfig>
-getPackage( const std::string &name, const std::string &reqVersion )
-{
-	VersionCompare vc = VersionCompare::ANY;
-	std::shared_ptr<PackageConfig> x;
-	if ( ! reqVersion.empty() )
-	{
-		std::string::size_type verPos = reqVersion.find_first_not_of( "<>=!" );
-		if ( verPos == std::string::npos )
-			throw std::runtime_error( "Invalid version specification, missing version number" );
-		std::string vercmp;
-		std::string ver;
-		if ( verPos > 0 )
-		{
-			vercmp = reqVersion.substr( 0, verPos );
-			ver = reqVersion.substr( verPos );
-		}
-		else
-			ver = reqVersion;
-
-		String::strip( vercmp );
-		String::strip( ver );
-
-		if ( vercmp.empty() || vercmp == "=" )
-			vc = VersionCompare::EQUAL;
-		else if ( vercmp == "!=" )
-			vc = VersionCompare::NOT_EQUAL;
-		else if ( vercmp == "<" )
-			vc = VersionCompare::LESS;
-		else if ( vercmp == "<=" )
-			vc = VersionCompare::LESS_EQUAL;
-		else if ( vercmp == ">" )
-			vc = VersionCompare::GREATER;
-		else if ( vercmp == ">=" )
-			vc = VersionCompare::GREATER_EQUAL;
-
-		return PackageConfig::find( name, vc, ver );
-	}
-
-	return PackageConfig::find( name, vc, reqVersion );
-}
-
-
-static bool
-PackageExists( const std::string &name, const std::string &reqVersion )
-{
-	if ( getPackage( name, reqVersion ) )
-		return true;
-	return false;
-}
-
-static int
-FindPackage( lua_State *L )
-{
-	int N = lua_gettop( L );
-	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
-	std::string ver = Lua::Parm<std::string>::get( L, N, 2 );
-
-	Item::push( L, getPackage( name, ver ) );
-	return 1;
-}
-
-static int
-FindPackageRequired( lua_State *L )
-{
-	int N = lua_gettop( L );
-	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
-	std::string ver = Lua::Parm<std::string>::get( L, N, 2 );
-
-	auto p = getPackage( name, ver );
-	if ( ! p )
-	{
-		if ( ! ver.empty() )
-			throw std::runtime_error( "ERROR: Package '" + name + "' and required version " + ver + " not found" );
-		else
-			throw std::runtime_error( "ERROR: Package '" + name + "' not found" );
-	}
-
-	Item::push( L, getPackage( name, ver ) );
-	return 1;
 }
 
 } // empty namespace
@@ -341,9 +257,15 @@ PackageConfig::transform( TransformSet &xform ) const
 	if ( ret )
 		return ret;
 
-	ret = std::make_shared<BuildItem>( getName(), getDir() );
-	std::cout << "ERROR: Need to set linker flags into build item for external library" << std::endl;
-	//ret->setFlag();
+	if ( myPackageFile.empty() )
+		ret = std::make_shared<BuildItem>( getName(), getDir() );
+	else
+	{
+		ret = std::make_shared<BuildItem>( getName(), std::shared_ptr<Directory>() );
+		ret->addExternalOutput( myPackageFile );
+	}
+	ret->addToVariable( "cflags", getCFlags() );
+	ret->addToVariable( "ldflags", getLibs() );
 
 	xform.recordTransform( this, ret );
 	return ret;
@@ -353,15 +275,33 @@ PackageConfig::transform( TransformSet &xform ) const
 ////////////////////////////////////////
 
 
+void
+PackageConfig::forceTool( const std::string &, const std::string & )
+{
+	throw std::runtime_error( "Invalid request to force a tool on a Package" );
+}
+
+
+////////////////////////////////////////
+
+
+void
+PackageConfig::overrideToolSetting( const std::string &, const std::string & )
+{
+	throw std::runtime_error( "Invalid request to override a tool setting on a Package" );
+}
+
+
+////////////////////////////////////////
+
+
 const std::string &
 PackageConfig::getAndReturn( const char *tag ) const
 {
-	static std::string theNullStr;
-
 	auto i = myValues.find( tag );
 	if ( i != myValues.end() )
 		return i->second;
-	return theNullStr;
+	return myNilValue;
 }
 
 
@@ -657,9 +597,6 @@ PackageConfig::extractOtherModules( const std::string &val, bool required )
 					curState = ModNameParseState::LOOKING;
 				}
 				break;
-			default:
-				throw std::logic_error( "Unknown module parse state" );
-				break;
 		}
 
 		if ( curState == ModNameParseState::LOOKING &&
@@ -680,8 +617,8 @@ PackageConfig::extractOtherModules( const std::string &val, bool required )
 				}
 				else
 				{
-					std::string ver = val.substr( verStart, verEnd - verStart );
-					std::string verC = val.substr( opStart, opEnd - opStart );
+					ver = val.substr( verStart, verEnd - verStart );
+					verC = val.substr( opStart, opEnd - opStart );
 					VersionCompare vc = VersionCompare::ANY;
 					if ( verC == "=" )
 						vc = VersionCompare::EQUAL;
@@ -720,6 +657,52 @@ PackageConfig::extractOtherModules( const std::string &val, bool required )
 	}
 
 	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<PackageConfig>
+PackageConfig::find( const std::string &name,
+					 const std::string &reqVersion )
+{
+	VersionCompare vc = VersionCompare::ANY;
+	if ( ! reqVersion.empty() )
+	{
+		std::string::size_type verPos = reqVersion.find_first_not_of( "<>=!" );
+		if ( verPos == std::string::npos )
+			throw std::runtime_error( "Invalid version specification, missing version number" );
+		std::string vercmp;
+		std::string ver;
+		if ( verPos > 0 )
+		{
+			vercmp = reqVersion.substr( 0, verPos );
+			ver = reqVersion.substr( verPos );
+		}
+		else
+			ver = reqVersion;
+
+		String::strip( vercmp );
+		String::strip( ver );
+
+		if ( vercmp.empty() || vercmp == "=" )
+			vc = VersionCompare::EQUAL;
+		else if ( vercmp == "!=" )
+			vc = VersionCompare::NOT_EQUAL;
+		else if ( vercmp == "<" )
+			vc = VersionCompare::LESS;
+		else if ( vercmp == "<=" )
+			vc = VersionCompare::LESS_EQUAL;
+		else if ( vercmp == ">" )
+			vc = VersionCompare::GREATER;
+		else if ( vercmp == ">=" )
+			vc = VersionCompare::GREATER_EQUAL;
+
+		return find( name, vc, ver );
+	}
+
+	return find( name, vc, reqVersion );
 }
 
 
@@ -779,13 +762,13 @@ PackageConfig::find( const std::string &name, VersionCompare comp, const std::st
 		bool zap = false;
 		switch ( comp )
 		{
+			case VersionCompare::NOT_EQUAL: zap = ( rc == 0 ); break;
 			case VersionCompare::EQUAL: zap = ( rc != 0 ); break;
 			case VersionCompare::LESS: zap = ( rc >= 0 ); break;
 			case VersionCompare::LESS_EQUAL: zap = ( rc > 0 ); break;
 			case VersionCompare::GREATER:zap = ( rc <= 0 ); break;
 			case VersionCompare::GREATER_EQUAL: zap = ( rc < 0 ); break;
 			case VersionCompare::ANY: break;
-			default: break;
 		}
 
 		if ( zap )
@@ -835,20 +818,6 @@ PackageConfig::makeLibraryReference( const std::string &name,
 	cflags.add( "-I" );
 	cflags.add( d.fullpath() );
 	return ret;
-}
-
-
-
-////////////////////////////////////////
-
-
-void
-PackageConfig::registerFunctions( void )
-{
-	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.registerFunction( "ExternalLibraryExists", &PackageExists );
-	eng.registerFunction( "ExternalLibrary", &FindPackage );
-	eng.registerFunction( "RequiredExternalLibrary", &FindPackageRequired );
 }
 
 

@@ -37,14 +37,13 @@ class Configuration
 public:
 	Configuration( void );
 	Configuration( const Lua::Table &t );
-	~Configuration( void );
 
 	inline const std::string &name( void ) const;
 	inline const VariableSet &vars( void ) const;
 
 	static const Configuration &getDefault( void );
+	static void setDefault( std::string name );
 	static std::vector<Configuration> &defined( void );
-	static void registerFunctions( void );
 
 private:
 	std::string myName;

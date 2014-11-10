@@ -23,6 +23,7 @@
 #pragma once
 
 #include <set>
+#include <map>
 #include "Dependency.h"
 #include "Tool.h"
 
@@ -50,6 +51,7 @@ public:
 	inline const std::shared_ptr<Directory> &getOutDir( void ) const;
 
 	void setOutputDir( const std::shared_ptr<Directory> &outdir );
+	void addExternalOutput( const std::string &fn );
 
 	void setTool( const std::shared_ptr<Tool> &t );
 	inline const std::shared_ptr<Tool> &getTool( void ) const;
@@ -60,6 +62,16 @@ public:
 
 	void setFlag( const std::string &n, const std::string &v );
 	const std::string &getFlag( const std::string &n ) const;
+
+	void setVariables( VariableSet v );
+	void setVariable( const std::string &name, const std::string &val );
+	void addToVariable( const std::string &name, const std::string &val );
+	void addToVariableAtEnd( const std::string &name, const std::string &val );
+	void addToVariable( const std::string &name, const Variable &val );
+	void addToVariableAtEnd( const std::string &name, const Variable &val );
+
+	const Variable &getVariable( const std::string &name ) const;
+	inline const VariableSet &getVariables( void ) const;
 
 	// "top level" indicates that it should appear
 	// in the list of pseudo targets with a short name for
@@ -82,6 +94,7 @@ private:
 	std::shared_ptr<Directory> myOutDirectory;
 
 	std::map<std::string, std::string> myFlags;
+	VariableSet myVariables;
 
 	bool myIsTopLevel = false;
 	bool myIsDependent = false;
@@ -136,6 +149,16 @@ const std::vector<std::string> &
 BuildItem::getOutputs( void ) const
 {
 	return myOutputs;
+}
+
+
+////////////////////////////////////////
+
+
+inline const VariableSet &
+BuildItem::getVariables( void ) const
+{
+	return myVariables;
 }
 
 

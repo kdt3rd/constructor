@@ -32,6 +32,8 @@
 #include "Directory.h"
 #include "Scope.h"
 #include "Compile.h"
+#include "Configuration.h"
+#include "PackageConfig.h"
 
 #include <map>
 #include <mutex>
@@ -47,6 +49,41 @@ namespace
 inline constexpr const char *buildFileName( void )
 {
 	return "construct";
+}
+
+
+////////////////////////////////////////
+
+
+static ItemPtr
+extractItem( lua_State *L, int i )
+{
+	void *ud = luaL_checkudata( L, i, "Constructor.Item" );
+	if ( ! ud )
+		throw std::runtime_error( "User Data item is not a constructor item" );
+	return *( reinterpret_cast<ItemPtr *>( ud ) );
+}
+
+
+
+////////////////////////////////////////
+
+
+static void
+pushItem( lua_State *L, ItemPtr i )
+{
+	if ( ! i )
+	{
+		lua_pushnil( L );
+		return;
+	}
+
+	void *sptr = lua_newuserdata( L, sizeof(ItemPtr) );
+	if ( ! sptr )
+		throw std::runtime_error( "Unable to create item userdata" );
+
+	luaL_setmetatable( L, "Constructor.Item" );
+	new (sptr) ItemPtr( std::move( i ) );
 }
 
 
@@ -341,7 +378,7 @@ recurseAndAdd( std::shared_ptr<CompileSet> &ret,
 			throw std::runtime_error( "String argument, but unable to extract string" );
 	}
 	else if ( lua_isuserdata( L, i ) )
-		ret->addItem( Item::extract( L, i ) );
+		ret->addItem( extractItem( L, i ) );
 	else if ( lua_istable( L, i ) )
 	{
 		lua_pushnil( L );
@@ -370,7 +407,7 @@ compile( lua_State *L )
 		recurseAndAdd( ret, L, i );
 
 	Scope::current().addItem( ret );
-	Item::push( L, ret );
+	pushItem( L, ret );
 	return 1;
 }
 
@@ -387,7 +424,7 @@ executable( lua_State *L )
 		recurseAndAdd( ret, L, i );
 
 	Scope::current().addItem( ret );
-	Item::push( L, ret );
+	pushItem( L, ret );
 	return 1;
 }
 
@@ -404,7 +441,7 @@ library( lua_State *L )
 		recurseAndAdd( ret, L, i );
 
 	Scope::current().addItem( ret );
-	Item::push( L, ret );
+	pushItem( L, ret );
 	return 1;
 }
 
@@ -432,6 +469,316 @@ include( lua_State *L )
 	return 0;
 }
 
+static int
+itemGetName( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 )
+		throw std::runtime_error( "Item:name() expects only one argument - self" );
+	ItemPtr p = extractItem( L, 1 );
+	const std::string &n = p->getName();
+	lua_pushlstring( L, n.c_str(), n.size() );
+	return 1;
+}
+
+static int
+itemAddDependency( lua_State *L )
+{
+	if ( lua_gettop( L ) != 3 )
+		throw std::runtime_error( "Item:addDependency() expects 3 arguments - self, dependencyType, dependency" );
+	ItemPtr p = extractItem( L, 1 );
+	size_t len = 0;
+	const char *dtp = lua_tolstring( L, 2, &len );
+	if ( dtp )
+	{
+		std::string dt( dtp, len );
+		ItemPtr d = extractItem( L, 3 );
+		if ( dt == "explicit" )
+			p->addDependency( DependencyType::EXPLICIT, d );
+		else if ( dt == "implicit" )
+			p->addDependency( DependencyType::IMPLICIT, d );
+		else if ( dt == "order" )
+			p->addDependency( DependencyType::ORDER, d );
+		else if ( dt == "chain" )
+			p->addDependency( DependencyType::CHAIN, d );
+		else
+			throw std::runtime_error( "Invalid dependency type: expect explicit, implicit, order, or chain" );
+	}
+	else
+		throw std::runtime_error( "Unable to extract string in addDependency" );
+	return 0;
+}
+
+static int
+itemHasDependency( lua_State *L )
+{
+	if ( lua_gettop( L ) != 2 )
+		throw std::runtime_error( "Item:addDependency() expects 2 arguments - self and dependency check" );
+	ItemPtr p = extractItem( L, 1 );
+	ItemPtr d = extractItem( L, 2 );
+	bool hd = p->hasDependency( d );
+	lua_pushboolean( L, hd ? 1 : 0 );
+	return 1;
+}
+
+static int
+itemVariables( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 )
+		throw std::runtime_error( "Item:variables() expects 1 argument - self" );
+	ItemPtr p = extractItem( L, 1 );
+	Lua::Value ret;
+	Lua::Table &t = ret.initTable();
+	for ( auto &v: p->getVariables() )
+		t[v.first].initString( std::move( v.second.value() ) );
+
+	ret.push( L );
+	return 1;
+}
+
+static int
+itemClearVariable( lua_State *L )
+{
+	if ( lua_gettop( L ) != 2 )
+		throw std::runtime_error( "Item:clearVariable() expects 2 arguments - self, variable name" );
+	ItemPtr p = extractItem( L, 1 );
+	std::string nm = Lua::Parm<std::string>::get( L, 2, 2 );
+
+	VariableSet &vars = p->getVariables();
+	auto x = vars.find( nm );
+	if ( x != vars.end() )
+		vars.erase( x );
+	return 0;
+}
+
+static int
+itemSetVariable( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 3 )
+		throw std::runtime_error( "Item:setVariable() expects 3 or 4 arguments - self, variable name, variable value, bool env check (nil)" );
+	ItemPtr p = extractItem( L, 1 );
+	std::string nm = Lua::Parm<std::string>::get( L, N, 2 );
+	Lua::Value v;
+	v.load( L, 3 );
+	bool envCheck = false;
+	if ( N == 4 )
+		envCheck = Lua::Parm<bool>::get( L, N, 4 );
+
+	VariableSet &vars = p->getVariables();
+	auto x = vars.find( nm );
+	if ( v.type() == LUA_TNIL )
+	{
+		if ( x != vars.end() )
+			vars.erase( x );
+		return 0;
+	}
+
+	if ( x == vars.end() )
+		x = vars.emplace( std::make_pair( nm, Variable( nm, envCheck ) ) ).first;
+
+	if ( v.type() == LUA_TTABLE )
+		x->second.reset( std::move( v.toStringList() ) );
+	else if ( v.type() == LUA_TSTRING )
+		x->second.reset( v.asString() );
+	else
+		throw std::runtime_error( "Item:setVariable() - unhandled variable value type, expect nil, table or string" );
+
+	return 0;
+}
+
+static int
+itemAddToVariable( lua_State *L )
+{
+	if ( lua_gettop( L ) != 3 )
+		throw std::runtime_error( "Item:addToVariable() expects 3 arguments - self, variable name, variable value to add" );
+	ItemPtr p = extractItem( L, 1 );
+	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
+	Lua::Value v;
+	v.load( L, 3 );
+	if ( v.type() == LUA_TNIL )
+		return 0;
+
+	VariableSet &vars = p->getVariables();
+	auto x = vars.find( nm );
+	// should this be an error?
+	if ( x == vars.end() )
+		x = vars.emplace( std::make_pair( nm, Variable( nm ) ) ).first;
+
+	if ( v.type() == LUA_TTABLE )
+		x->second.add( v.toStringList() );
+	else if ( v.type() == LUA_TSTRING )
+		x->second.add( v.asString() );
+	else
+		throw std::runtime_error( "Item:addToVariable() - unhandled variable value type, expect nil, table or string" );
+	return 0;
+}
+
+static int
+itemInheritVariable( lua_State *L )
+{
+	if ( lua_gettop( L ) != 3 )
+		throw std::runtime_error( "Item:inheritVariable() expects 3 arguments - self, variable name, boolean" );
+	ItemPtr p = extractItem( L, 1 );
+	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
+	bool v = Lua::Parm<bool>::get( L, 3, 3 );
+	VariableSet &vars = p->getVariables();
+	auto x = vars.find( nm );
+	// should this be an error?
+	if ( x == vars.end() )
+		x = vars.emplace( std::make_pair( nm, Variable( nm ) ) ).first;
+
+	x->second.inherit( v );
+	return 0;
+}
+
+static int
+itemForceTool( lua_State *L )
+{
+	if ( lua_gettop( L ) != 3 )
+		throw std::runtime_error( "Item:forceTool() expects 3 arguments - self, extension, tool name" );
+	ItemPtr p = extractItem( L, 1 );
+	p->forceTool( Lua::Parm<std::string>::get( L, 3, 2 ),
+				  Lua::Parm<std::string>::get( L, 3, 3 ) );
+
+	return 0;
+}
+
+static int
+itemOverrideToolSetting( lua_State *L )
+{
+	if ( lua_gettop( L ) != 3 )
+		throw std::runtime_error( "Item:overrideToolSetting() expects 3 arguments - self, tool setting name, setting value" );
+	ItemPtr p = extractItem( L, 1 );
+	p->overrideToolSetting( Lua::Parm<std::string>::get( L, 3, 2 ),
+							Lua::Parm<std::string>::get( L, 3, 3 ) );
+
+	return 0;
+}
+
+
+////////////////////////////////////////
+
+
+static int
+itemCreate( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 || ! lua_isstring( L, 1 ) )
+		throw std::runtime_error( "Item.new expects a single argument - a name" );
+
+	size_t len = 0;
+	const char *p = lua_tolstring( L, 1, &len );
+	if ( p )
+	{
+		ItemPtr np = std::make_shared<Item>( std::string( p, len ) );
+		pushItem( L, np );
+	}
+	else
+		throw std::runtime_error( "Unable to extract item name" );
+
+	return 1;
+}
+
+static const struct luaL_Reg item_m[] =
+{
+	{ "__tostring", itemGetName },
+	{ "name", itemGetName },
+	{ "addDependency", itemAddDependency },
+	{ "depends", itemHasDependency },
+	{ "variables", itemVariables },
+	{ "clearVariable", itemClearVariable },
+	{ "setVariable", itemSetVariable },
+	{ "addToVariable", itemAddToVariable },
+	{ "inheritVariable", itemInheritVariable },
+	{ "forceTool", itemForceTool },
+	{ "overrideToolSetting", itemOverrideToolSetting },
+	{ nullptr, nullptr }
+};
+
+static const struct luaL_Reg item_class_f[] =
+{
+	{ "new", itemCreate },
+	{ nullptr, nullptr }
+};
+
+int
+defineConfiguration( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 || ! lua_istable( L, 1 ) )
+		throw std::runtime_error( "Expected 1 argument - a table - to BuildConfiguration" );
+	Lua::Value v( L, 1 );
+	Configuration::defined().emplace_back( Configuration( v.extractTable() ) );
+
+	return 0;
+}
+
+int
+setDefaultConfig( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 || ! lua_isstring( L, 1 ) )
+		throw std::runtime_error( "Expected 1 argument - a string - to DefaultConfiguration" );
+
+	const char *s = lua_tolstring( L, 1, NULL );
+	bool found = false;
+	for ( const Configuration &c: Configuration::defined() )
+	{
+		if ( c.name() == s )
+		{
+			found = true;
+			break;
+		}
+	}
+	if ( ! found )
+		throw std::runtime_error( "Configuration '" + std::string( s ) + "' not defined yet, please call BuildConfiguration first" );
+	Configuration::setDefault( s );
+
+	return 0;
+}
+
+
+////////////////////////////////////////
+
+
+
+
+static bool
+packageExists( const std::string &name, const std::string &reqVersion )
+{
+	if ( PackageConfig::find( name, reqVersion ) )
+		return true;
+	return false;
+}
+
+static int
+packageFind( lua_State *L )
+{
+	int N = lua_gettop( L );
+	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
+	std::string ver = Lua::Parm<std::string>::get( L, N, 2 );
+
+	pushItem( L, PackageConfig::find( name, ver ) );
+	return 1;
+}
+
+static int
+packageFindRequired( lua_State *L )
+{
+	int N = lua_gettop( L );
+	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
+	std::string ver = Lua::Parm<std::string>::get( L, N, 2 );
+
+	auto p = PackageConfig::find( name, ver );
+	if ( ! p )
+	{
+		if ( ! ver.empty() )
+			throw std::runtime_error( "ERROR: Package '" + name + "' and required version " + ver + " not found" );
+		else
+			throw std::runtime_error( "ERROR: Package '" + name + "' not found" );
+	}
+
+	pushItem( L, p );
+	return 1;
+}
+	
 } // empty namespace
 
 
@@ -499,6 +846,14 @@ registerExtensions( void )
 		eng.registerFunction( "node", &OS::node );
 	}
 	
+	eng.registerClass( "Item", item_class_f, item_m );
+
+	eng.registerFunction( "BuildConfiguration", &defineConfiguration );
+	eng.registerFunction( "DefaultConfiguration", &setDefaultConfig );
+
+	eng.registerFunction( "ExternalLibraryExists", &packageExists );
+	eng.registerFunction( "ExternalLibrary", &packageFind );
+	eng.registerFunction( "RequiredExternalLibrary", &packageFindRequired );
 }
 
 

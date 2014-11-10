@@ -26,27 +26,9 @@
 ////////////////////////////////////////
 
 
-namespace
-{
-static bool theDebugEnable = false;
-static bool theVerboseEnable = false;
-}
-
-
-////////////////////////////////////////
-
-
 namespace Debug
 {
-
-
-////////////////////////////////////////
-
-
-bool on( void )
-{
-	return theDebugEnable;
-}
+bool theDebugEnabled = false;
 
 
 ////////////////////////////////////////
@@ -54,7 +36,7 @@ bool on( void )
 
 void enable( bool d )
 {
-	theDebugEnable = d;
+	theDebugEnabled = d;
 }
 
 
@@ -69,18 +51,7 @@ void enable( bool d )
 
 namespace Verbose
 {
-
-
-////////////////////////////////////////
-
-
-bool on( void )
-{
-	if ( ! theVerboseEnable )
-		return Debug::on();
-
-	return theVerboseEnable;
-}
+bool theVerboseEnabled = false;
 
 
 ////////////////////////////////////////
@@ -88,7 +59,7 @@ bool on( void )
 
 void enable( bool d )
 {
-	theVerboseEnable = d;
+	theVerboseEnabled = d;
 }
 
 

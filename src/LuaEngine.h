@@ -115,11 +115,12 @@ private:
 	Engine( void );
 	~Engine( void );
 
-	lua_State *L;
-	int myErrFunc;
 	std::vector<BoundFunction> mFuncs;
 	std::vector< std::shared_ptr<FunctionBase> > mCPPFuncs;
 	std::stack< std::pair<std::string, bool> > myCurLib;
+
+	lua_State *L;
+	int myErrFunc;
 };
 
 } // namespace Lua

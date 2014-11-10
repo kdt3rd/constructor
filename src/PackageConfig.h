@@ -63,14 +63,17 @@ public:
 	const std::string &getStaticRequires( void ) const;
 
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
+	virtual void forceTool( const std::string &ext, const std::string &t );
+	virtual void overrideToolSetting( const std::string &s, const std::string &n );
 
+	static std::shared_ptr<PackageConfig> find( const std::string &name,
+												const std::string &reqVersion );
 	static std::shared_ptr<PackageConfig> find( const std::string &name,
 												VersionCompare comp = VersionCompare::ANY,
 												const std::string &reqVersion = std::string() );
 	static std::shared_ptr<PackageConfig> makeLibraryReference( const std::string &name,
 																const std::string &path );
 
-	static void registerFunctions( void );
 private:
 	const std::string &getAndReturn( const char *tag ) const;
 
@@ -82,5 +85,6 @@ private:
 	std::string myPackageFile;
 	std::map<std::string, std::string> myLocalVars;
 	std::map<std::string, std::string> myValues;
+	std::string myNilValue;
 };
 

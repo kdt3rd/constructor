@@ -21,7 +21,6 @@
 //
 
 #include "Configuration.h"
-#include "LuaEngine.h"
 #include <iostream>
 #include "Directory.h"
 
@@ -34,49 +33,6 @@ namespace
 
 static std::vector<Configuration> theConfigs;
 static std::string theDefaultConfig;
-
-//static void
-//updateBinaryPath( const Configuration &c )
-//{
-//	Directory theDir;
-//	if ( theUseConfigDir )
-//		theDir.cd( c.name() );
-//	Directory::setBinaryRoot( theDir.fullpath() );
-//}
-
-int
-defineConfiguration( lua_State *L )
-{
-	if ( lua_gettop( L ) != 1 || ! lua_istable( L, 1 ) )
-		throw std::runtime_error( "Expected 1 argument - a table - to BuildConfiguration" );
-	Lua::Value v( L, 1 );
-	theConfigs.emplace_back( Configuration( v.extractTable() ) );
-
-	return 0;
-}
-
-int
-setDefaultConfig( lua_State *L )
-{
-	if ( lua_gettop( L ) != 1 || ! lua_isstring( L, 1 ) )
-		throw std::runtime_error( "Expected 1 argument - a string - to DefaultConfiguration" );
-
-	const char *s = lua_tolstring( L, 1, NULL );
-	bool found = false;
-	for ( const Configuration &c: theConfigs )
-	{
-		if ( c.name() == s )
-		{
-			found = true;
-			break;
-		}
-	}
-	if ( ! found )
-		throw std::runtime_error( "Configuration '" + std::string( s ) + "' not defined yet, please call BuildConfiguration first" );
-	theDefaultConfig = s;
-
-	return 0;
-}
 
 } // empty namespace
 
@@ -125,14 +81,6 @@ Configuration::Configuration( const Lua::Table &t )
 ////////////////////////////////////////
 
 
-Configuration::~Configuration( void )
-{
-}
-
-
-////////////////////////////////////////
-
-
 const Configuration &
 Configuration::getDefault( void )
 {
@@ -154,22 +102,20 @@ Configuration::getDefault( void )
 ////////////////////////////////////////
 
 
-std::vector<Configuration> &
-Configuration::defined( void )
+void
+Configuration::setDefault( std::string c )
 {
-	return theConfigs;
+	theDefaultConfig = std::move( c );
 }
 
 
 ////////////////////////////////////////
 
 
-void
-Configuration::registerFunctions( void )
+std::vector<Configuration> &
+Configuration::defined( void )
 {
-	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.registerFunction( "BuildConfiguration", &defineConfiguration );
-	eng.registerFunction( "DefaultConfiguration", &setDefaultConfig );
+	return theConfigs;
 }
 
 

@@ -27,6 +27,7 @@
 #include <map>
 #include <string>
 #include <memory>
+#include <set>
 #include "LuaEngine.h"
 #include "Variable.h"
 #include "Dependency.h"
@@ -35,6 +36,7 @@
 class Item;
 class TransformSet;
 class BuildItem;
+class Tool;
 
 /// @brief base class for everything else in the system
 ///
@@ -58,24 +60,33 @@ public:
 
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
+	virtual void forceTool( const std::string &ext, const std::string &t );
+	virtual void overrideToolSetting( const std::string &s, const std::string &n );
+
 	inline VariableSet &getVariables( void );
 	inline const VariableSet &getVariables( void ) const;
 	Variable &getVariable( const std::string &nm );
 	void setVariable( const std::string &nm, const std::string &value,
 					  bool doSplit = false );
 	bool findVariableValueRecursive( std::string &val, const std::string &nm ) const;
-
-	static ItemPtr extract( lua_State *l, int i );
-	static void push( lua_State *l, ItemPtr i );
-	static void registerFunctions( void );
+	void extractVariables( VariableSet &vs ) const;
+	void extractVariablesExcept( VariableSet &vs, const std::string &v ) const;
+	void extractVariablesExcept( VariableSet &vs, const std::set<std::string> &vl ) const;
 
 protected:
+	virtual std::shared_ptr<Tool> getTool( TransformSet &xform ) const;
+	virtual std::shared_ptr<Tool> getTool( TransformSet &xform, const std::string &ext ) const;
+	bool hasToolOverride( const std::string &opt, std::string &val ) const;
+
 	VariableSet myVariables;
 
 private:
 	ID myID;
 	std::string myName;
 	std::shared_ptr<Directory> myDirectory;
+
+	std::map<std::string, std::string> myForceTool;
+	std::map<std::string, std::string> myOverrideToolOptions;
 };
 
 using ItemPtr = Item::ItemPtr;

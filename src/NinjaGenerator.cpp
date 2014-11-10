@@ -97,8 +97,11 @@ emitRules( std::ostream &os, const TransformSet &x )
 	{
 		if ( t )
 		{
-			Rule r = t->createRule( x );
-			os << "\n\nrule " << r.getName() << '\n';
+			const Rule &r = t->createRule( x );
+			os << '\n';
+			for ( auto &v: r.getVariables() )
+				os << v.first << '=' << v.second << '\n';
+			os << "\nrule " << r.getName() << '\n';
 			os << " command = " << r.getCommand() << '\n';
 			os << " description = " << r.getDescription() << '\n';
 			const std::string &dFile = r.getDependencyFile();
@@ -134,8 +137,16 @@ static void
 addOutputList( std::ostream &os, const std::shared_ptr<BuildItem> &bi )
 {
 	auto outd = bi->getOutDir();
-	for ( const std::string &bo: bi->getOutputs() )
-		os << ' ' << escape_path( outd->makefilename( bo ) );
+	if ( outd )
+	{
+		for ( const std::string &bo: bi->getOutputs() )
+			os << ' ' << escape_path( outd->makefilename( bo ) );
+	}
+	else
+	{
+		for ( const std::string &bo: bi->getOutputs() )
+			os << ' ' << escape_path( bo );
+	}
 
 	if ( ! bi->getTool() )
 	{
@@ -180,7 +191,14 @@ emitTargets( std::ostream &os, const TransformSet &x )
 				for ( auto &d: deps )
 					addOutputList( os, d );
 			}
-			
+
+			auto &bivars = bi->getVariables();
+			for ( auto &bv: bivars )
+			{
+				std::string outv = bv.second.prepended_value( t->getCommandPrefix( bv.first ) );
+				os << "\n  " << bv.first << "=" << outv;
+			}
+
 			if ( bi->isTopLevelItem() )
 			{
 				PRECONDITION( bi->getOutputs().size() == 1,
@@ -215,8 +233,8 @@ emitScope( std::ostream &os,
 		os << "\nsubninja " << sfn << '\n';
 	}
 
-	emitRules( os, x );
 	emitVariables( os, x );
+	emitRules( os, x );
 	emitTargets( os, x );
 }
 

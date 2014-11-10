@@ -47,8 +47,10 @@ Variable::Variable( std::string n, bool checkEnv )
 ////////////////////////////////////////
 
 
-Variable::~Variable( void )
+Variable::Variable( const std::string &n, const std::string &val )
+		: myName( n )
 {
+	myValues.push_back( val );
 }
 
 
@@ -92,6 +94,77 @@ Variable::add( std::vector<std::string> v )
         v.clear();
 	}
 	myCachedValue.clear();
+}
+
+
+////////////////////////////////////////
+
+
+void
+Variable::addIfMissing( const std::string &v )
+{
+	if ( v.empty() )
+		return;
+
+	for ( const std::string &i: myValues )
+	{
+		if ( i == v )
+			return;
+	}
+
+	myValues.push_back( v );
+	myCachedValue.clear();
+}
+
+
+////////////////////////////////////////
+
+
+void
+Variable::addIfMissing( const std::vector<std::string> &v )
+{
+	for ( const std::string &i: v )
+		addIfMissing( i );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Variable::moveToEnd( const std::string &v )
+{
+	if ( v.empty() )
+		return;
+
+	auto i = myValues.begin();
+	while ( true )
+	{
+		if ( i == myValues.end() )
+			break;
+
+		if ( (*i) == v )
+		{
+			myValues.erase( i );
+			i = myValues.begin();
+			continue;
+		}
+		++i;
+	}
+
+	myValues.push_back( v );
+	myCachedValue.clear();
+}
+
+
+////////////////////////////////////////
+
+
+void
+Variable::moveToEnd( const std::vector<std::string> &v )
+{
+	for ( const std::string &i: v )
+		moveToEnd( i );
 }
 
 
@@ -168,6 +241,18 @@ Variable::prepended_value( const std::string &prefix ) const
 
 	return std::move( ret );
 }
+
+
+////////////////////////////////////////
+
+
+const Variable &
+Variable::nil( void )
+{
+	static const Variable theNilVal = Variable( std::string() );
+	return theNilVal;
+}
+
 
 
 ////////////////////////////////////////

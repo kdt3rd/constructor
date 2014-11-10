@@ -38,7 +38,7 @@
 namespace Lua
 {
 
-enum class KeyType
+enum class KeyType : intptr_t
 {
 	INDEX,
 	STRING
@@ -50,7 +50,7 @@ struct Key
 {
 	Key( void );
 	Key( lua_State *L, int idx );
-	Key( size_t idx );
+	Key( lua_Unsigned idx );
 	Key( String t );
 	Key( const char *t );
 	Key( const Key &k );
@@ -62,12 +62,12 @@ struct Key
 
 	void push( lua_State *L ) const;
 
-	KeyType type = KeyType::INDEX;
 	union
 	{
-		size_t index = 0;
+		lua_Unsigned index = 0;
 		String tag;
 	};
+	KeyType type = KeyType::INDEX;
 };
 
 class Value
@@ -87,7 +87,7 @@ public:
 	// pushes a new stack item to send to lua
 	void push( lua_State *L ) const;
 
-	int type( void ) const { return myType; }
+	int type( void ) const { return static_cast<int>( myType ); }
 	Table &initTable( void );
 	void initBool( bool v );
 	void initNil( void );
@@ -112,7 +112,8 @@ private:
 	inline void checkType( int expType ) const;
 	void destroyData( void );
 
-	int myType = LUA_TNIL;
+	// declare as intptr_t so alignment works
+	intptr_t myType = LUA_TNIL;
 	union
 	{
 		bool b;

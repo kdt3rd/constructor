@@ -23,6 +23,7 @@
 #pragma once
 
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <stdexcept>
 
@@ -33,13 +34,15 @@
 
 namespace Debug
 {
-bool on( void );
+extern bool theDebugEnabled;
+inline bool on( void ) { return theDebugEnabled; }
 void enable( bool d );
 }
 
 namespace Verbose
 {
-bool on( void );
+extern bool theVerboseEnabled;
+inline bool on( void ) { return theVerboseEnabled || Debug::on(); }
 void enable( bool d );
 }
 

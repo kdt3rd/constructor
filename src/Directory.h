@@ -36,13 +36,15 @@ class Directory
 public:
 	Directory( void );
 	Directory( const std::string &root );
-	Directory( std::string &&root );
 	Directory( const Directory &d );
 	Directory( Directory &&d );
 	Directory &operator=( const Directory &d );
 	Directory &operator=( Directory &&d );
 
+	void extractDirFromFile( const std::string &fn );
+
 	Directory reroot( const std::string &newroot ) const;
+	std::shared_ptr<Directory> reroot( const std::shared_ptr<Directory> &newroot ) const;
 	void rematch( const Directory &d );
 
 	void cd( const std::string &name );
@@ -56,6 +58,8 @@ public:
 
 	// only the path elements that have been cd-ed to
 	std::string relpath( void ) const;
+
+	void promoteFull( void );
 
 	// returns the first name found
 	bool find( std::string &concatpath, const std::vector<std::string> &names ) const;
@@ -83,7 +87,6 @@ private:
 	bool checkRootPath( void ) const;
 	void updateFullPath( void );
 
-	std::string myRoot;
 	std::vector<std::string> mySubDirs;
 	std::vector<std::string> myFullDirs;
 	std::string myCurFullPath;

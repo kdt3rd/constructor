@@ -88,7 +88,6 @@ private:
 
 	std::weak_ptr<Scope> myParent;
 	VariableSet myVariables;
-	bool myInheritParentScope = false;
 	std::vector< std::shared_ptr<Scope> > mySubScopes;
 	std::shared_ptr<Directory> myNameDir;
 
@@ -100,6 +99,8 @@ private:
 	std::vector< std::shared_ptr<Tool> > myTools;
 	std::vector<std::string> myEnabledToolsets;
 	std::map<std::string, std::vector<std::shared_ptr<Tool> > > myExtensionMap;
+
+	bool myInheritParentScope = false;
 };
 
 

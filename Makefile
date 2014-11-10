@@ -2,8 +2,9 @@
 .DEFAULT: all
 .ONESHELL:
 
-.phony: clean all constructor
+.phony: clean all install constructor
 
+PREFIX:=${HOME}
 OUTPUT:= Build
 
 #SRC:= item.cpp main.cpp variable.cpp
@@ -68,6 +69,10 @@ $(OUTPUT)/constructor: $(SRC:.cpp=.o) $(LUA_OUT:.c=.o)
 
 $(OUTPUT):
 	mkdir $(OUTPUT)
+
+install: $(OUTPUT)/constructor
+	@echo "Installing to ${PREFIX}"
+	@cp $(OUTPUT)/constructor ${PREFIX}/bin
 
 clean:
 	rm -rf $(OUTPUT)

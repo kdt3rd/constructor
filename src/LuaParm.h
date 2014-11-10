@@ -66,7 +66,7 @@ struct ParmAdapt<int>
 {
 	static inline int get( lua_State *l, int i )
 	{
-		return lua_tointeger( l, i );
+		return static_cast<int>( lua_tointeger( l, i ) );
 	}
 
 	static inline int check_and_get( lua_State *l, int i )
@@ -98,7 +98,7 @@ struct ParmAdapt<size_t>
 
 	static inline void put( lua_State *l, size_t v )
 	{
-		lua_pushunsigned( l, v );
+		lua_pushunsigned( l, static_cast<lua_Unsigned>( v ) );
 	}
 };
 
@@ -215,7 +215,7 @@ struct ParmAdapt< std::vector<std::string> >
 
 	static inline void put( lua_State *l, const std::vector<std::string> &v )
 	{
-		lua_createtable( l, v.size(), 0 );
+		lua_createtable( l, static_cast<int>( v.size() ), 0 );
 		for ( size_t i = 0; i != v.size(); ++i )
 		{
 			ParmAdapt<std::string>::put( l, v[i] );

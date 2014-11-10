@@ -24,6 +24,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 
 ////////////////////////////////////////
@@ -32,10 +33,12 @@
 class Rule
 {
 public:
+	Rule( void );
 	Rule( std::string tag, std::string desc );
 	Rule( Rule &&r );
 	~Rule( void );
 
+	Rule &operator=( const Rule &r );
 	Rule &operator=( Rule &&r );
 
 	inline const std::string &getName( void ) const;
@@ -58,6 +61,8 @@ public:
 	void setCommand( std::vector<std::string> &&c );
 	void addToCommand( const std::vector<std::string> &c );
 
+	void setVariable( const std::string &n, const std::string &v );
+	inline const std::map<std::string, std::string> &getVariables( void ) const;
 	inline const std::vector<std::string> &getRawCommand( void ) const;
 
 	std::string getCommand( void ) const;
@@ -86,6 +91,7 @@ private:
 	std::string myDepStyle;
 	std::string myJobPool;
 	std::vector<std::string> myCommand;
+	std::map<std::string, std::string> myVariables;
 	bool myOutputRestat = false;
 };
 
@@ -162,6 +168,16 @@ inline bool
 Rule::isOutputRestat( void ) const
 {
 	return myOutputRestat;
+}
+
+
+////////////////////////////////////////
+
+
+inline const std::map<std::string, std::string> &
+Rule::getVariables( void ) const
+{
+	return myVariables;
 }
 
 

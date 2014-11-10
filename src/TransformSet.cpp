@@ -32,6 +32,18 @@
 TransformSet::TransformSet( const std::shared_ptr<Directory> &d )
 		: myDirectory( d )
 {
+	PRECONDITION( myDirectory, "Invalid output directory specified" );
+
+	myDirectory->promoteFull();
+	myBinDirectory = std::make_shared<Directory>( *d );
+	myBinDirectory->cd( "bin" );
+	myBinDirectory->promoteFull();
+	myLibDirectory = std::make_shared<Directory>( *d );
+	myLibDirectory->cd( "lib" );
+	myLibDirectory->promoteFull();
+	myArtifactDirectory = std::make_shared<Directory>( *d );
+	myArtifactDirectory->cd( "build" );
+	myArtifactDirectory->promoteFull();
 }
 
 
@@ -131,13 +143,11 @@ TransformSet::findToolForSet( const std::string &tag_prefix,
 const std::string &
 TransformSet::getVarValue( const std::string &v ) const
 {
-	static std::string theNilVal;
-
 	auto i = myVars.find( v );
 	if ( i != myVars.end() )
 		return i->second.value();
 
-	return theNilVal;
+	return String::empty();
 }
 
 

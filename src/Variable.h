@@ -38,18 +38,21 @@ class Variable
 {
 public:
 	Variable( std::string n, bool checkEnv = false );
-	~Variable( void );
+	Variable( const std::string &n, const std::string &val );
 
 	inline const std::string &name( void ) const;
 
 	inline void inherit( bool yesno );
 	inline bool inherit( void ) const;
 
-	void setPrependString( const std::string &prefix );
-
+	inline bool empty( void ) const;
 	void clear( void );
 	void add( std::string v );
 	void add( std::vector<std::string> v );
+	void addIfMissing( const std::string &v );
+	void addIfMissing( const std::vector<std::string> &v );
+	void moveToEnd( const std::string &v );
+	void moveToEnd( const std::vector<std::string> &v );
 	void reset( std::string v );
 	void reset( std::vector<std::string> v );
 
@@ -62,6 +65,7 @@ public:
 
 	inline const std::vector<std::string> &values( void ) const;
 
+	static const Variable &nil( void );
 private:
 	std::string replace_vars( const std::string &v );
 
@@ -102,6 +106,16 @@ inline bool
 Variable::inherit( void ) const
 {
 	return myInherit;
+}
+
+
+////////////////////////////////////////
+
+
+inline bool
+Variable::empty( void ) const
+{
+	return myValues.empty();
 }
 
 

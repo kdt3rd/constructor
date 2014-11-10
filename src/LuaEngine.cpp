@@ -97,10 +97,10 @@ public:
 		struct stat sb;
 		if ( ::fstat( fd, &sb ) == 0 )
 		{
-			myBuf.resize( sb.st_size, '\0' );
+			myBuf.resize( static_cast<size_t>( sb.st_size ), '\0' );
 			do
 			{
-				if ( ::read( fd, myBuf.data(), sb.st_size ) != sb.st_size )
+				if ( ::read( fd, myBuf.data(), myBuf.size() ) != sb.st_size )
 				{
 					if ( errno == EINTR )
 						continue;
@@ -109,7 +109,7 @@ public:
 											 std::string( "Unable to read contents of " ) + filename );
 				}
 			} while ( false );
-			myLeft = sb.st_size;
+			myLeft = myBuf.size();
 		}
 		else
 			throw std::system_error( errno, std::system_category(),
@@ -153,6 +153,22 @@ fileReader( lua_State *, void *ud, size_t *sz )
 
 namespace Lua
 {
+
+
+////////////////////////////////////////
+
+
+FunctionBase::FunctionBase( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+FunctionBase::~FunctionBase( void )
+{
+}
 
 
 ////////////////////////////////////////
@@ -252,7 +268,7 @@ Engine::registerFunction( const char *name, int (*funcPtr)( lua_State * ) )
 void
 Engine::registerFunction( const char *name, const BoundFunction &f )
 {
-	int i = mFuncs.size();
+	int i = static_cast<int>( mFuncs.size() );
 	if ( myCurLib.empty() )
 	{
 		lua_pushinteger( L, i );
@@ -453,7 +469,7 @@ Engine::singleton( void )
 int
 Engine::errorCB( lua_State *L )
 {
-	int level;
+	lua_Integer level;
 	int arg = 0;
 	lua_State *L1 = L;
 	if ( lua_isthread( L, 1 ) )
@@ -476,7 +492,7 @@ Engine::errorCB( lua_State *L )
 	else
 		lua_pushliteral(L, "\n");
 	lua_pushliteral(L, "stack traceback:");
-	while ( lua_getstack( L1, level++, &ar ) )
+	while ( lua_getstack( L1, static_cast<int>( level++ ), &ar ) )
 	{
 		lua_pushliteral( L, "\n\t" );
 		lua_getinfo( L1, "Snl", &ar );

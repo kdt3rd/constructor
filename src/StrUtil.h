@@ -35,6 +35,8 @@
 namespace String
 {
 
+const std::string &empty( void );
+
 void split_append( std::vector<std::string> &l, const std::string &s, const char sep );
 std::vector<std::string> split( const std::string &s, const char sep );
 std::vector<std::string> split_space_or_sep( const std::string &s, const char sep );
@@ -43,6 +45,8 @@ std::vector<std::string> split_space_or_sep( const std::string &s, const char se
 std::vector<std::string> shell_split( const std::string &s );
 
 void strip( std::string &s );
+// replaces all non-alpha-numeric values w/ _
+void sanitize( std::string &s );
 
 int versionCompare( const std::string &a, const std::string &b );
 

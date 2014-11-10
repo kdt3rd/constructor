@@ -102,13 +102,6 @@ CompileSet::transform( TransformSet &xform ) const
 		chainsToCheck.push( ci );
 	}
 
-	// what do we do about forcing a tool or not? Currently
-	// we just use what the compile set has itself for the
-	// chain items
-	std::string forceTool;
-	forceTool.clear();
-	findVariableValueRecursive( forceTool, "tool" );
-
 	while ( ! chainsToCheck.empty() )
 	{
 		// now we need to chain build until we can no more such
@@ -135,7 +128,7 @@ CompileSet::transform( TransformSet &xform ) const
 			for ( const std::string &bo: i->getOutputs() )
 			{
 				std::shared_ptr<BuildItem> si = chainTransform(
-					bo, i->getOutDir(), xform, forceTool );
+					bo, i->getOutDir(), xform );
 				if ( si )
 				{
 					chainsToCheck.push( si );
@@ -160,15 +153,10 @@ CompileSet::transform( TransformSet &xform ) const
 std::shared_ptr<BuildItem>
 CompileSet::chainTransform( const std::string &name,
 							const std::shared_ptr<Directory> &srcdir,
-							TransformSet &xform,
-							const std::string &forceTool ) const
+							TransformSet &xform ) const
 {
 	std::string ext = File::extension( name );
-	std::shared_ptr<Tool> t;
-	if ( ! forceTool.empty() )
-		t = xform.findToolByTag( forceTool, ext );
-	else
-		t = xform.findTool( ext );
+	std::shared_ptr<Tool> t = getTool( xform, ext );
 
 	std::shared_ptr<BuildItem> ret;
 	if ( t )
@@ -222,7 +210,22 @@ Executable::transform( TransformSet &xform ) const
 		std::shared_ptr<BuildItem> xi = i->transform( xform );
 		xi->markAsDependent();
 
-		if ( dynamic_cast<const Executable *>( i.get() ) )
+		const Library *libDep = dynamic_cast<const Library *>( i.get() );
+		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
+		if ( libDep || pkg )
+		{
+			ret->addDependency( DependencyType::IMPLICIT, xi );
+			ret->addToVariable( "cflags", xi->getVariable( "cflags" ) );
+			ret->addToVariable( "ldflags", xi->getVariable( "ldflags" ) );
+			if ( libDep )
+			{
+				ret->addToVariable( "libs", libDep->getName() );
+				ret->addToVariable( "libdirs", xi->getOutDir()->fullpath() );
+			}
+			ret->addToVariable( "libs", xi->getVariable( "libs" ) );
+			ret->addToVariable( "libdirs", xi->getVariable( "libdirs" ) );
+		}
+		else if ( dynamic_cast<const Executable *>( i.get() ) )
 		{
 			// executables can't depend on other exes, make this
 			// an order only dependency
@@ -287,16 +290,28 @@ Library::transform( TransformSet &xform ) const
 
 	ret = std::make_shared<BuildItem>( getName(), getDir() );
 	ret->setUseName( false );
-	ret->setOutputDir( xform.getOutDir() );
+	ret->setOutputDir( xform.getLibDir() );
 	ret->setTopLevel( true );
-	
+
+	Variable outlibs( "libs" ), outlibdirs( "libdirs" );
 	std::set<std::string> tags;
 	for ( const ItemPtr &i: myItems )
 	{
 		std::shared_ptr<BuildItem> xi = i->transform( xform );
 		xi->markAsDependent();
 
-		if ( dynamic_cast<const Executable *>( i.get() ) )
+		const Library *libDep = dynamic_cast<const Library *>( i.get() );
+		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
+
+		if ( libDep || pkg )
+		{
+			ret->addDependency( DependencyType::IMPLICIT, xi );
+			ret->addToVariable( "cflags", xi->getVariable( "cflags" ) );
+			ret->addToVariable( "ldflags", xi->getVariable( "ldflags" ) );
+			outlibs.moveToEnd( xi->getVariable( "libs" ).values() );
+			outlibdirs.moveToEnd( xi->getVariable( "libdirs" ).values() );
+		}
+		else if ( dynamic_cast<const Executable *>( i.get() ) )
 		{
 			// executables can't depend on other exes, make this
 			// an order only dependency
@@ -308,6 +323,7 @@ Library::transform( TransformSet &xform ) const
 			xi->extractTags( tags );
 			ret->addDependency( DependencyType::EXPLICIT, xi );
 		}
+
 	}
 
 	std::string libType;
@@ -319,6 +335,7 @@ Library::transform( TransformSet &xform ) const
 		libType = "static";
 		VERBOSE( "No library type declared for '" << getName() << "', defaulting to static" );
 	}
+
 	std::shared_ptr<Tool> t = xform.findToolForSet( libType, tags );
 	if ( ! t )
 	{
@@ -334,6 +351,14 @@ Library::transform( TransformSet &xform ) const
 		throw std::runtime_error( msgbuf.str() );
 	}
 	ret->setTool( t );
+
+	if ( libType == "static" )
+	{
+		if ( ! outlibs.empty() )
+			ret->addToVariable( "libs", outlibs );
+		if ( ! outlibdirs.empty() )
+			ret->addToVariable( "libdirs", outlibdirs );
+	}
 
 	xform.recordTransform( this, ret );
 	return ret;

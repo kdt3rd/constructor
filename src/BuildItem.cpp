@@ -23,16 +23,8 @@
 #include "BuildItem.h"
 #include <stdexcept>
 #include "FileUtil.h"
+#include "StrUtil.h"
 #include <iostream>
-
-
-////////////////////////////////////////
-
-
-namespace
-{
-	static std::string theNilStr;
-}
 
 
 ////////////////////////////////////////
@@ -97,6 +89,16 @@ BuildItem::setOutputDir( const std::shared_ptr<Directory> &d )
 
 
 void
+BuildItem::addExternalOutput( const std::string &fn )
+{
+	myOutputs.push_back( fn );
+}
+
+
+////////////////////////////////////////
+
+
+void
 BuildItem::setTool( const std::shared_ptr<Tool> &t )
 {
 	if ( myTool )
@@ -140,7 +142,7 @@ BuildItem::getTag( void ) const
 	if ( myTool )
 		return myTool->getTag();
 
-	return theNilStr;
+	return String::empty();
 }
 
 
@@ -157,13 +159,81 @@ BuildItem::setFlag( const std::string &n, const std::string &v )
 ////////////////////////////////////////
 
 
+void
+BuildItem::setVariables( VariableSet v )
+{
+	myVariables = std::move( v );
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::setVariable( const std::string &name, const std::string &val )
+{
+	auto i = myVariables.find( name );
+	if ( i != myVariables.end() )
+		i->second.reset( val );
+	else
+		myVariables.emplace( std::make_pair( name, Variable( name, val ) ) );
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::addToVariable( const std::string &name, const std::string &val )
+{
+	if ( val.empty() )
+		return;
+
+	auto i = myVariables.find( name );
+	if ( i != myVariables.end() )
+		i->second.moveToEnd( val );
+	else
+		myVariables.emplace( std::make_pair( name, Variable( name, val ) ) );
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::addToVariable( const std::string &name, const Variable &val )
+{
+	auto i = myVariables.find( name );
+	if ( i != myVariables.end() )
+		i->second.moveToEnd( val.values() );
+	else
+		myVariables.emplace( std::make_pair( name, Variable( val ) ) );
+}
+
+
+////////////////////////////////////////
+
+
+const Variable &
+BuildItem::getVariable( const std::string &name ) const
+{
+	auto i = myVariables.find( name );
+	if ( i != myVariables.end() )
+		return i->second;
+	return Variable::nil();
+}
+
+
+////////////////////////////////////////
+
+
 const std::string &
 BuildItem::getFlag( const std::string &n ) const
 {
 	auto i = myFlags.find( n );
 	if ( i != myFlags.end() )
 		return i->second;
-	return theNilStr;
+	return String::empty();
 }
 
 

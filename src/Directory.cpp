@@ -33,7 +33,8 @@
 #include <stdlib.h>
 #include <sstream>
 #include <iostream>
-#include <vector>
+#include <list>
+#include <iterator>
 #include <stack>
 #include <mutex>
 
@@ -70,9 +71,8 @@ Directory::Directory( void )
 {
 	std::call_once( theNeedCWDInit, &initCWD );
 
-	myRoot = theCWD;
 	myFullDirs = theCWDPath;
-	myCurFullPath = myRoot;
+	myCurFullPath = theCWD;
 }
 
 
@@ -80,21 +80,9 @@ Directory::Directory( void )
 
 
 Directory::Directory( const std::string &root )
-		: myRoot( root )
 {
-	myFullDirs = String::split( myRoot, File::pathSeparator() );
-	myCurFullPath = myRoot;
-}
-
-
-////////////////////////////////////////
-
-
-Directory::Directory( std::string &&root )
-		: myRoot( std::move( root ) )
-{
-	myFullDirs = String::split( myRoot, File::pathSeparator() );
-	myCurFullPath = myRoot;
+	myFullDirs = String::split( root, File::pathSeparator() );
+	myCurFullPath = root;
 }
 
 
@@ -102,7 +90,7 @@ Directory::Directory( std::string &&root )
 
 
 Directory::Directory( const Directory &d )
-		: myRoot( d.myRoot ), mySubDirs( d.mySubDirs ),
+		: mySubDirs( d.mySubDirs ),
 		  myFullDirs( d.myFullDirs ),
 		  myCurFullPath( d.myCurFullPath )
 {
@@ -113,8 +101,7 @@ Directory::Directory( const Directory &d )
 
 
 Directory::Directory( Directory &&d )
-		: myRoot( std::move( d.myRoot ) ),
-		  mySubDirs( std::move( d.mySubDirs ) ),
+		: mySubDirs( std::move( d.mySubDirs ) ),
 		  myFullDirs( std::move( d.myFullDirs ) ),
 		  myCurFullPath( std::move( d.myCurFullPath ) )
 {
@@ -129,7 +116,6 @@ Directory::operator=( const Directory &d )
 {
 	if ( this != &d )
 	{
-		myRoot = d.myRoot;
 		mySubDirs = d.mySubDirs;
 		myFullDirs = d.myFullDirs;
 		myCurFullPath = d.myCurFullPath;
@@ -146,12 +132,25 @@ Directory::operator=( Directory &&d )
 {
 	if ( this != &d )
 	{
-		myRoot = std::move( d.myRoot );
 		mySubDirs = std::move( d.mySubDirs );
 		myFullDirs = std::move( d.myFullDirs );
 		myCurFullPath = std::move( d.myCurFullPath );
 	}
 	return *this;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Directory::extractDirFromFile( const std::string &fn )
+{
+	myFullDirs = String::split( fn, File::pathSeparator() );
+	if ( ! myFullDirs.empty() )
+		myFullDirs.pop_back();
+	mySubDirs.clear();
+	updateFullPath();
 }
 
 
@@ -168,6 +167,19 @@ Directory::reroot( const std::string &newroot ) const
 	ret.mySubDirs = mySubDirs;
 	ret.updateFullPath();
 	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<Directory>
+Directory::reroot( const std::shared_ptr<Directory> &newroot ) const
+{
+	std::shared_ptr<Directory> ret = std::make_shared<Directory>( *newroot );
+	ret->mySubDirs = mySubDirs;
+	ret->updateFullPath();
+	return ret;
 }
 
 
@@ -289,6 +301,18 @@ Directory::relpath( void ) const
 
 
 void
+Directory::promoteFull( void )
+{
+	for ( auto &d: mySubDirs )
+		myFullDirs.emplace_back( std::move( d ) );
+	mySubDirs.clear();
+}
+
+
+////////////////////////////////////////
+
+
+void
 Directory::updateFullPath( void )
 {
 	std::vector<std::string> pathElements;
@@ -400,14 +424,60 @@ std::string
 Directory::relativeTo( const Directory &o,
 					   const std::string &fn ) const
 {
+	std::vector<const std::string *> mynonCommonSubdirs;
+	mynonCommonSubdirs.reserve( myFullDirs.size() + mySubDirs.size() );
+	for ( const std::string &i: myFullDirs )
+		mynonCommonSubdirs.push_back( &i );
+	for ( const std::string &i: mySubDirs )
+		mynonCommonSubdirs.push_back( &i );
+
+	std::vector<const std::string *> relPath;
+	relPath.reserve( o.myFullDirs.size() + o.mySubDirs.size() );
+	for ( const std::string &i: o.myFullDirs )
+		relPath.push_back( &i );
+	for ( const std::string &i: o.mySubDirs )
+		relPath.push_back( &i );
+
+	size_t subdirI = 0;
+	size_t relI = 0;
+	while ( true )
+	{
+		if ( subdirI == mynonCommonSubdirs.size() || relI == relPath.size() )
+			break;
+		if ( *(mynonCommonSubdirs[subdirI]) != *(relPath[relI]) )
+			break;
+
+		++subdirI;
+		++relI;
+	}
+
 	std::string ret;
-	throw std::logic_error( "Not yet implemented" );
+	bool notfirst = false;
+	while ( relI < relPath.size() )
+	{
+		if ( notfirst )
+			ret.push_back( File::pathSeparator() );
+		ret.append( ".." );
+		++relI;
+		notfirst = true;
+	}
+	notfirst = false;
+	while ( subdirI < mynonCommonSubdirs.size() )
+	{
+		if ( notfirst )
+			ret.push_back( File::pathSeparator() );
+		ret.append( *(mynonCommonSubdirs[subdirI]) );
+		++subdirI;
+		notfirst = true;
+	}
+
 	if ( ! fn.empty() )
 	{
 		if ( ! ret.empty() )
 			ret.push_back( File::pathSeparator() );
 		ret.append( fn );
 	}
+
 	return std::move( ret );
 }
 

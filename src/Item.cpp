@@ -23,7 +23,6 @@
 //
 
 #include "Item.h"
-#include "LuaEngine.h"
 #include "StrUtil.h"
 #include "FileUtil.h"
 #include "Debug.h"
@@ -33,187 +32,8 @@
 
 ////////////////////////////////////////
 
+
 namespace {
-
-int itemGetName( lua_State *L )
-{
-	if ( lua_gettop( L ) != 1 )
-		throw std::runtime_error( "Item:name() expects only one argument - self" );
-	ItemPtr p = Item::extract( L, 1 );
-	const std::string &n = p->getName();
-	lua_pushlstring( L, n.c_str(), n.size() );
-	return 1;
-}
-
-int itemAddDependency( lua_State *L )
-{
-	if ( lua_gettop( L ) != 3 )
-		throw std::runtime_error( "Item:addDependency() expects 3 arguments - self, dependencyType, dependency" );
-	ItemPtr p = Item::extract( L, 1 );
-	size_t len = 0;
-	const char *dtp = lua_tolstring( L, 2, &len );
-	if ( dtp )
-	{
-		std::string dt( dtp, len );
-		ItemPtr d = Item::extract( L, 3 );
-		if ( dt == "explicit" )
-			p->addDependency( DependencyType::EXPLICIT, d );
-		else if ( dt == "implicit" )
-			p->addDependency( DependencyType::IMPLICIT, d );
-		else if ( dt == "order" )
-			p->addDependency( DependencyType::ORDER, d );
-		else if ( dt == "chain" )
-			p->addDependency( DependencyType::CHAIN, d );
-		else
-			throw std::runtime_error( "Invalid dependency type: expect explicit, implicit, order, or chain" );
-	}
-	else
-		throw std::runtime_error( "Unable to extract string in addDependency" );
-	return 0;
-}
-
-int itemHasDependency( lua_State *L )
-{
-	if ( lua_gettop( L ) != 2 )
-		throw std::runtime_error( "Item:addDependency() expects 2 arguments - self and dependency check" );
-	ItemPtr p = Item::extract( L, 1 );
-	ItemPtr d = Item::extract( L, 2 );
-	bool hd = p->hasDependency( d );
-	lua_pushboolean( L, hd ? 1 : 0 );
-	return 1;
-}
-
-int itemVariables( lua_State *L )
-{
-	if ( lua_gettop( L ) != 1 )
-		throw std::runtime_error( "Item:variables() expects 1 argument - self" );
-	ItemPtr p = Item::extract( L, 1 );
-	Lua::Value ret;
-	Lua::Table &t = ret.initTable();
-	for ( auto &v: p->getVariables() )
-		t[v.first].initString( std::move( v.second.value() ) );
-
-	ret.push( L );
-	return 1;
-}
-
-
-////////////////////////////////////////
-
-
-int itemClearVariable( lua_State *L )
-{
-	if ( lua_gettop( L ) != 2 )
-		throw std::runtime_error( "Item:clearVariable() expects 2 arguments - self, variable name" );
-	ItemPtr p = Item::extract( L, 1 );
-	std::string nm = Lua::Parm<std::string>::get( L, 2, 2 );
-
-	VariableSet &vars = p->getVariables();
-	auto x = vars.find( nm );
-	if ( x != vars.end() )
-		vars.erase( x );
-	return 0;
-}
-
-int itemSetVariable( lua_State *L )
-{
-	int N = lua_gettop( L );
-	if ( N < 3 )
-		throw std::runtime_error( "Item:setVariable() expects 3 or 4 arguments - self, variable name, variable value, bool env check (nil)" );
-	ItemPtr p = Item::extract( L, 1 );
-	std::string nm = Lua::Parm<std::string>::get( L, N, 2 );
-	Lua::Value v;
-	v.load( L, 3 );
-	bool envCheck = false;
-	if ( N == 4 )
-		envCheck = Lua::Parm<bool>::get( L, N, 4 );
-
-	VariableSet &vars = p->getVariables();
-	auto x = vars.find( nm );
-	if ( v.type() == LUA_TNIL )
-	{
-		if ( x != vars.end() )
-			vars.erase( x );
-		return 0;
-	}
-
-	if ( x == vars.end() )
-		x = vars.emplace( std::make_pair( nm, Variable( nm, envCheck ) ) ).first;
-
-	if ( v.type() == LUA_TTABLE )
-		x->second.reset( std::move( v.toStringList() ) );
-	else if ( v.type() == LUA_TSTRING )
-		x->second.reset( v.asString() );
-	else
-		throw std::runtime_error( "Item:setVariable() - unhandled variable value type, expect nil, table or string" );
-
-	return 0;
-}
-
-int itemAddToVariable( lua_State *L )
-{
-	if ( lua_gettop( L ) != 3 )
-		throw std::runtime_error( "Item:addToVariable() expects 3 arguments - self, variable name, variable value to add" );
-	ItemPtr p = Item::extract( L, 1 );
-	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
-	Lua::Value v;
-	v.load( L, 3 );
-	if ( v.type() == LUA_TNIL )
-		return 0;
-
-	VariableSet &vars = p->getVariables();
-	auto x = vars.find( nm );
-	// should this be an error?
-	if ( x == vars.end() )
-		x = vars.emplace( std::make_pair( nm, Variable( nm ) ) ).first;
-
-	if ( v.type() == LUA_TTABLE )
-		x->second.add( v.toStringList() );
-	else if ( v.type() == LUA_TSTRING )
-		x->second.add( v.asString() );
-	else
-		throw std::runtime_error( "Item:addToVariable() - unhandled variable value type, expect nil, table or string" );
-	return 0;
-}
-
-int itemInheritVariable( lua_State *L )
-{
-	if ( lua_gettop( L ) != 3 )
-		throw std::runtime_error( "Item:inheritVariable() expects 3 arguments - self, variable name, boolean" );
-	ItemPtr p = Item::extract( L, 1 );
-	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
-	bool v = Lua::Parm<bool>::get( L, 3, 3 );
-	VariableSet &vars = p->getVariables();
-	auto x = vars.find( nm );
-	// should this be an error?
-	if ( x == vars.end() )
-		x = vars.emplace( std::make_pair( nm, Variable( nm ) ) ).first;
-
-	x->second.inherit( v );
-	return 0;
-}
-
-
-////////////////////////////////////////
-
-
-int itemCreate( lua_State *L )
-{
-	if ( lua_gettop( L ) != 1 || ! lua_isstring( L, 1 ) )
-		throw std::runtime_error( "Item.new expects a single argument - a name" );
-
-	size_t len = 0;
-	const char *p = lua_tolstring( L, 1, &len );
-	if ( p )
-	{
-		ItemPtr np = std::make_shared<Item>( std::string( p, len ) );
-		Item::push( L, np );
-	}
-	else
-		throw std::runtime_error( "Unable to extract item name" );
-
-	return 1;
-}
 
 static Item::ID theLastID = 1;
 
@@ -268,27 +88,50 @@ Item::transform( TransformSet &xform ) const
 	if ( ret )
 		return ret;
 
-	std::string forceTool;
-	findVariableValueRecursive( forceTool, "tool" );
-
 	ret = std::make_shared<BuildItem>( getName(), getDir() );
 
-	std::string ext = File::extension( getName() );
-	std::shared_ptr<Tool> t;
-	if ( ! forceTool.empty() )
-		t = xform.findToolByTag( forceTool, ext );
-	else
-		t = xform.findTool( ext );
+	VariableSet buildvars;
+	extractVariables( buildvars );
+	ret->setVariables( std::move( buildvars ) );
+
+	std::shared_ptr<Tool> t = getTool( xform );
 
 	if ( t )
 	{
 		DEBUG( getName() << " transformed by tool '" << t->getTag() << "' (" << t->getName() << ")" );
 		ret->setTool( t );
-		ret->setOutputDir( xform.getOutDir() );
+		ret->setOutputDir( getDir()->reroot( xform.getArtifactDir() ) );
+		std::string overOpt;
+		for ( auto &i: t->allOptions() )
+		{
+			if ( hasToolOverride( i.first, overOpt ) )
+				ret->setVariable( t->getOptionVariable( i.first ),
+								  t->getOptionValue( i.first, overOpt ) );
+		}
 	}
 
 	xform.recordTransform( this, ret );
 	return ret;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Item::forceTool( const std::string &ext, const std::string &t )
+{
+	myForceTool[ext] = t;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Item::overrideToolSetting( const std::string &s, const std::string &n )
+{
+	myOverrideToolOptions[s] = n;
 }
 
 
@@ -342,66 +185,102 @@ Item::findVariableValueRecursive( std::string &val, const std::string &nm ) cons
 ////////////////////////////////////////
 
 
-ItemPtr
-Item::extract( lua_State *L, int i )
+void
+Item::extractVariables( VariableSet &vs ) const
 {
-	void *ud = luaL_checkudata( L, i, "Constructor.Item" );
-	if ( ! ud )
-		throw std::runtime_error( "User Data item is not a constructor item" );
-	return *( reinterpret_cast<ItemPtr *>( ud ) );
+	ItemPtr i = getParent();
+	if ( i )
+		i->extractVariables( vs );
+	for ( auto x = myVariables.begin(); x != myVariables.end(); ++x )
+		vs.emplace( std::make_pair( x->first, x->second ) );
 }
-
 
 
 ////////////////////////////////////////
 
 
 void
-Item::push( lua_State *L, ItemPtr i )
+Item::extractVariablesExcept( VariableSet &vs, const std::string &v ) const
 {
-	if ( ! i )
+	ItemPtr i = getParent();
+	if ( i )
+		i->extractVariablesExcept( vs, v );
+	for ( auto x = myVariables.begin(); x != myVariables.end(); ++x )
 	{
-		lua_pushnil( L );
-		return;
+		if ( x->first != v )
+			vs.emplace( std::make_pair( x->first, x->second ) );
+	}
+}
+
+
+////////////////////////////////////////
+
+
+void
+Item::extractVariablesExcept( VariableSet &vs, const std::set<std::string> &vl ) const
+{
+	ItemPtr i = getParent();
+	if ( i )
+		i->extractVariablesExcept( vs, vl );
+	for ( auto x = myVariables.begin(); x != myVariables.end(); ++x )
+	{
+		if ( vl.find( x->first ) == vl.end() )
+			vs.emplace( std::make_pair( x->first, x->second ) );
+	}
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<Tool>
+Item::getTool( TransformSet &xform ) const
+{
+	std::string ext = File::extension( getName() );
+	return getTool( xform, ext );
+}
+	
+
+////////////////////////////////////////
+
+
+std::shared_ptr<Tool>
+Item::getTool( TransformSet &xform, const std::string &ext ) const
+{
+	auto x = myForceTool.find( ext );
+	if ( x != myForceTool.end() )
+	{
+		DEBUG( "Overriding tool for extension '" << ext << "' to '" << x->second << "'" );
+		return xform.findToolByTag( x->second, ext );
 	}
 
-	void *sptr = lua_newuserdata( L, sizeof(ItemPtr) );
-	if ( ! sptr )
-		throw std::runtime_error( "Unable to create item userdata" );
+	ItemPtr i = getParent();
+	if ( i )
+		return i->getTool( xform, ext );
 
-	luaL_setmetatable( L, "Constructor.Item" );
-	new (sptr) ItemPtr( std::move( i ) );
+	return xform.findTool( ext );
 }
 
 
 ////////////////////////////////////////
 
 
-static const struct luaL_Reg item_m[] =
+bool
+Item::hasToolOverride( const std::string &opt, std::string &val ) const
 {
-	{ "__tostring", itemGetName },
-	{ "name", itemGetName },
-	{ "addDependency", itemAddDependency },
-	{ "depends", itemHasDependency },
-	{ "variables", itemVariables },
-	{ "clearVariable", itemClearVariable },
-	{ "setVariable", itemSetVariable },
-	{ "addToVariable", itemAddToVariable },
-	{ "inheritVariable", itemInheritVariable },
-	{ nullptr, nullptr }
-};
+	auto x = myOverrideToolOptions.find( opt );
+	if ( x != myOverrideToolOptions.end() )
+	{
+		val = x->second;
+		return true;
+	}
 
-static const struct luaL_Reg class_f[] =
-{
-	{ "new", itemCreate },
-	{ nullptr, nullptr }
-};
-	
-void
-Item::registerFunctions( void )
-{
-	Lua::Engine &eng = Lua::Engine::singleton();
-	eng.registerClass( "Item", class_f, item_m );
+	ItemPtr i = getParent();
+	if ( i )
+		return i->hasToolOverride( opt, val );
+
+	val.clear();
+	return false;
 }
 
 

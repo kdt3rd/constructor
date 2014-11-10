@@ -69,8 +69,8 @@ Key::Key( lua_State *L, int idx )
 ////////////////////////////////////////
 
 
-Key::Key( size_t idx )
-		: type( KeyType::INDEX ), index( idx )
+Key::Key( lua_Unsigned idx )
+		: index( idx ), type( KeyType::INDEX )
 {
 }
 
@@ -79,7 +79,7 @@ Key::Key( size_t idx )
 
 
 Key::Key( String t )
-		: type( KeyType::STRING ), tag( std::move( t ) )
+		: tag( std::move( t ) ), type( KeyType::STRING )
 {
 }
 
@@ -88,7 +88,7 @@ Key::Key( String t )
 
 
 Key::Key( const char *t )
-		: type( KeyType::STRING ), tag( t )
+		: tag( t ), type( KeyType::STRING )
 {
 }
 
@@ -261,7 +261,6 @@ Value::Value( const Value &v )
 		case LUA_TTHREAD: p = v.p; break;
 		default:
 			throw std::runtime_error( "Unknown lua type" );
-			break;
 	}
 }
 
@@ -285,7 +284,6 @@ Value::Value( Value &&v )
 		case LUA_TTHREAD: p = v.p; break;
 		default:
 			throw std::runtime_error( "Unknown lua type" );
-			break;
 	}
 }
 
@@ -314,7 +312,6 @@ Value::operator=( const Value &v )
 			case LUA_TTHREAD: p = v.p; break;
 			default:
 				throw std::runtime_error( "Unknown lua type" );
-				break;
 		}
 	}
 	return *this;
@@ -345,7 +342,6 @@ Value::operator=( Value &&v )
 			case LUA_TTHREAD: p = v.p; break;
 			default:
 				throw std::runtime_error( "Unknown lua type" );
-				break;
 		}
 	}
 	return *this;
@@ -405,7 +401,6 @@ Value::load( lua_State *L, int idx )
 			break;
 		default:
 			throw std::runtime_error( "Unknown lua type" );
-			break;
 	}
 }
 
@@ -443,7 +438,6 @@ Value::push( lua_State *L ) const
 		}
 		case LUA_TFUNCTION:
 			throw std::runtime_error( "Support for storing C functions not yet implemented" );
-			break;
 		case LUA_TUSERDATA:
 			throw std::runtime_error( "Unable to store user data" );
 		case LUA_TLIGHTUSERDATA:
@@ -451,10 +445,8 @@ Value::push( lua_State *L ) const
 			break;
 		case LUA_TTHREAD:
 			throw std::runtime_error( "Support for storing lua thread not yet implemented" );
-			break;
 		default:
 			throw std::runtime_error( "Unknown lua type" );
-			break;
 	}
 }
 

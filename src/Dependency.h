@@ -158,6 +158,7 @@ std::vector<typename Dependency<Item>::ItemPtr>
 Dependency<Item>::extractDependencies( DependencyType dt ) const
 {
 	std::vector<ItemPtr> retval;
+	typedef typename std::vector<ItemPtr>::iterator::difference_type difference_type;
 
 	if ( dt == DependencyType::CHAIN )
 	{
@@ -176,7 +177,7 @@ Dependency<Item>::extractDependencies( DependencyType dt ) const
 				{
 					if ( retval[i] == retval[j] )
 					{
-						retval.erase( retval.begin() + j );
+						retval.erase( retval.begin() + static_cast<difference_type>( j ) );
 						j = i;
 					}
 				}
