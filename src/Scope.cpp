@@ -28,6 +28,7 @@
 #include "ScopeGuard.h"
 #include "Configuration.h"
 #include "TransformSet.h"
+#include "DefaultTools.h"
 
 
 ////////////////////////////////////////
@@ -269,137 +270,10 @@ Scope::addDefaultTools( void )
 {
 #ifdef WIN32
 	throw std::runtime_error( "Not yet implemented" );
+	bool didReg = DefaultTools::checkAndAddCl( *this, true );
 #else
-	std::map<std::string, std::string> exes = File::findExecutables(
-		{
-			"clang",
-			"clang++",
-			"gcc",
-			"g++",
-			"ar",
-		} );
-
-	std::vector<std::string> cTools;
-	std::vector<std::string> gTools;
-	for ( const auto &e: exes )
-	{
-		const std::string &name = e.first;
-		const std::string &exe = e.second;
-		std::shared_ptr<Tool> t;
-		if ( name == "clang" )
-		{
-			t = std::make_shared<Tool>( "cc", name );
-			cTools.push_back( name );
-			t->myExtensions = { ".c" };
-			t->myOutputs = { ".o" };
-			t->myExeName = exe;
-			t->myOptions = 
-				{
-					{ "warnings", { { "none", { "-w" } },
-									{ "default", {} },
-									{ "some", { "-Wall" } },
-									{ "strict", { "-Weverything", "-g", "-O3" } }, } },
-									{ "error", { "-Weverything"  } }, } },
-					{ "optimization", { { "debug", { "-g" } },
-										{ "optimize", { "-g", "-O3" } },
-										{ "size", { "-g", "-Os" } },
-										{ "optdebug", { "-g", "-O3" } }, } },
-					{
-						"language", 
-						{
-							{ "C", {} },
-							{ "C99", { "-std=c99" } },
-							{ "C++11", { "-std=c++11" } },
-							{ "C", {} },
-						}
-					}
-				};
-					
-			t->myDescription = " CC $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "-c", "-o", "$out", "$in" };
-
-			addTool( t );
-		}
-		else if ( name == "clang++" )
-		{
-			t = std::make_shared<Tool>( "cxx", name );
-			cTools.push_back( name );
-			t->myExtensions = { ".cpp", ".cc" };
-			t->myAltExtensions = { ".c", ".C" };
-			t->myOutputs = { ".o" };
-			t->myExeName = exe;
-			t->myDescription = "CXX $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "-c", "-o", "$out", "$in" };
-
-			addTool( t );
-		}
-		else if ( name == "gcc" )
-		{
-			t = std::make_shared<Tool>( "cc", name );
-			gTools.push_back( name );
-			t->myExtensions = { ".c" };
-			t->myOutputs = { ".o" };
-			t->myExeName = exe;
-			t->myDescription = " CC $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "-c", "-o", "$out", "$in" };
-
-			addTool( t );
-		}
-		else if ( name == "g++" )
-		{
-			t = std::make_shared<Tool>( "cxx", name );
-			gTools.push_back( name );
-			t->myOutputs = { ".o" };
-			t->myExeName = exe;
-			t->myDescription = "CXX $out";
-			t->myExtensions = { ".cpp", ".cc" };
-			t->myAltExtensions = { ".c", ".C" };
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "-c", "-o", "$out", "$in" };
-
-			addTool( t );
-		}
-		else if ( name == "ar" )
-		{
-			t = std::make_shared<Tool>( "static_lib", name );
-			t->myExtensions = { ".c", ".cpp" };
-			t->myExeName = exe;
-			t->myInputTools = { "cc" };
-			t->myOutputPrefix = { "lib" };
-			t->myOutputs = { ".a" };
-			t->myCommand = { "rm", "-f", "$out", "&&", "$exe", "rcs", "$out", "$in"};
-			t->myDescription = " AR $out";
-
-			addTool( t );
-			t = std::make_shared<Tool>( "static_lib_cxx", name );
-			t->myExeName = exe;
-			t->myInputTools = { "cc", "cxx" };
-			t->myOutputPrefix = { "lib" };
-			t->myOutputs = { ".a" };
-			t->myCommand = { "rm", "-f", "$out", "&&", "$exe", "rcs", "$out", "$in"};
-			t->myDescription = " AR $out";
-			addTool( t );
-		}
-	}
-
-	bool regToolset = false;
-	if ( ! cTools.empty() )
-	{
-		addToolSet( "clang", cTools );
-		useToolSet( "clang" );
-		if ( ! regToolset )
-		{
-			regToolset = true;
-		}
-	}
-	if ( ! gTools.empty() )
-	{
-		addToolSet( "gcc", gTools );
-		if ( ! regToolset )
-		{
-			useToolSet( "gcc" );
-			regToolset = true;
-		}
-	}
+	bool didReg = DefaultTools::checkAndAddClang( *this, true );
+	didReg = DefaultTools::checkAndAddGCC( *this, ! didReg );
 #endif
 }
 

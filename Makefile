@@ -16,6 +16,7 @@ SRC:= main.cpp \
 	Compile.cpp \
 	Rule.cpp \
 	Tool.cpp \
+	DefaultTools.cpp \
 	Configuration.cpp \
 	Variable.cpp \
 	Generator.cpp \
