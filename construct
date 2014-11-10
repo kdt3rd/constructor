@@ -186,32 +186,6 @@ if cc then
 		   }
 end
 
-ar = file.find_exe( "ar" )
-if ar then
-	AddTool{ tag="static_lib",
-			 name="ar",
-			 exe=ar,
-			 input_tools={ "cc" },
-			 output_extensions={ ".a" },
-			 output_prefix="lib",
-			 options={
-			 },
-			 cmd={"rm", "-f", "$out", "&&", "$exe", "rcs", "$out", "$in"},
-			 description="AR $out",
-	}
-	AddTool{ tag="static_lib_cxx",
-			 name="ar_cxx",
-			 exe=ar,
-			 input_tools={ "cc", "cxx" },
-			 output_extensions={ ".a" },
-			 output_prefix="lib",
-			 options={
-			 },
-			 cmd={"rm", "-f", "$out", "&&", "$exe", "rcs", "$out", "$in"},
-			 description="AR $out",
-	}
-end
-
 -- for things like Qt, rather than adding a tool that processes
 -- .h files by default for moc, make it an explicit step by having
 -- a wrapper function around compile that sets the explicit moc

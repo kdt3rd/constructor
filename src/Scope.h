@@ -49,7 +49,7 @@ class Configuration;
 class Scope : public std::enable_shared_from_this<Scope>
 {
 public:
-	Scope( std::shared_ptr<Scope> parent );
+	Scope( std::shared_ptr<Scope> parent = std::shared_ptr<Scope>() );
 	~Scope( void );
 
 	inline std::shared_ptr<Scope> getParent( void ) const;
@@ -85,6 +85,7 @@ public:
 
 private:
 	void grabScope( const Scope &o );
+	void addDefaultTools( void );
 
 	std::weak_ptr<Scope> myParent;
 	VariableSet myVariables;

@@ -86,6 +86,8 @@ public:
 	static std::shared_ptr<Tool> parse( const Lua::Value &v );
 
 private:
+	friend class Scope;
+
 	std::string myTag;
 	std::string myName;
 	std::string myDescription;

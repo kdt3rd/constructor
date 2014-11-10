@@ -46,6 +46,13 @@
 namespace 
 {
 
+static std::vector<std::string> theToolModulePath;
+static std::vector<std::string> theSubDirFiles;
+
+
+////////////////////////////////////////
+
+
 inline constexpr const char *buildFileName( void )
 {
 	return "construct";
@@ -199,8 +206,6 @@ luaJoinPath( lua_State *L )
 	return 1;
 }
 
-static std::vector<std::string> theSubDirFiles;
-
 static int
 SubDir( lua_State *L )
 {
@@ -310,7 +315,98 @@ luaAddToolOption( const std::string &t, const std::string &g,
 		throw std::runtime_error( "Unable to find tool '" + t + "' in current scope" );
 }
 
+
+////////////////////////////////////////
+
+
+static int
+luaAddToolModulePath( lua_State *L )
+{
+	int N = lua_gettop( L );
+
+	for ( int i = 1; i <= N; ++i )
+	{
+		if ( lua_isnil( L, i ) )
+			continue;
+
+		if ( lua_isstring( L, i ) )
+		{
+			size_t len = 0;
+			const char *s = lua_tolstring( L, i, &len );
+			std::string curP( s, len );
+			theToolModulePath.emplace_back( std::move( curP ) );
+		}
+		else
+		{
+			std::cout << "WARNING: ignoring non-string argument in tool module path" << std::endl;
+		}
+	}
+
+	return 0;
+}
+
+
+////////////////////////////////////////
+
+
+static int
+luaSetToolModulePath( lua_State *L )
+{
+	theToolModulePath.clear();
+	luaAddToolModulePath( L );
+	return 0;
+}
+
+
+////////////////////////////////////////
+
+
 int
+luaLoadToolModule( lua_State *L )
+{
+	int N = lua_gettop( L );
+
+	for ( int i = 1; i <= N; ++i )
+	{
+		if ( lua_isnil( L, i ) )
+			continue;
+
+		if ( lua_isstring( L, i ) )
+		{
+			size_t len = 0;
+			const char *s = lua_tolstring( L, i, &len );
+			std::string curP( s, len );
+			std::string luaFile;
+			bool found = false;
+			if ( theToolModulePath.empty() )
+			{
+				Directory curD;
+				std::vector<std::string> tmpPath = { curD.fullpath() };
+				found = File::find( luaFile, curP + ".construct", tmpPath );
+			}
+			else
+				found = File::find( luaFile, curP + ".construct", theToolModulePath );
+
+			if ( found )
+			{
+				Lua::Engine::singleton().runFile( luaFile.c_str() );
+				theSubDirFiles.push_back( luaFile );
+			}
+			else
+			{
+				throw std::runtime_error( "Unable to find constructor module '" + curP + "' in tool module path" );
+			}
+		}
+		else
+		{
+			std::cout << "WARNING: ignoring non-string argument in loading tool module path" << std::endl;
+		}
+	}
+
+	return 0;
+}
+
+static int
 luaEnableLangs( lua_State *L )
 {
 	int N = lua_gettop( L );
@@ -332,7 +428,7 @@ luaEnableLangs( lua_State *L )
 	return 0;
 }
 
-int
+static int
 luaSetOption( lua_State *L )
 {
 	int N = lua_gettop( L );
@@ -352,7 +448,7 @@ luaSetOption( lua_State *L )
 	return 0;
 }
 
-int
+static int
 luaSubProj( lua_State *L )
 {
 	Scope::pushScope( Scope::current().newSubScope( false ) );
@@ -804,8 +900,11 @@ registerExtensions( void )
 	eng.registerFunction( "SubProject", &luaSubProj );
 
 	eng.registerFunction( "AddTool", &luaAddTool );
-	eng.registerFunction( "AddToolOption", &luaAddToolOption );
 	eng.registerFunction( "AddToolSet", &luaAddToolSet );
+	eng.registerFunction( "AddToolOption", &luaAddToolOption );
+	eng.registerFunction( "SetToolModulePath", &luaSetToolModulePath );
+	eng.registerFunction( "AddToolModulePath", &luaAddToolModulePath );
+	eng.registerFunction( "LoadToolModule", &luaLoadToolModule );
 	eng.registerFunction( "EnableLanguages", &luaEnableLangs );
 	eng.registerFunction( "SetOption", &luaSetOption );
 
@@ -854,6 +953,7 @@ registerExtensions( void )
 	eng.registerFunction( "ExternalLibraryExists", &packageExists );
 	eng.registerFunction( "ExternalLibrary", &packageFind );
 	eng.registerFunction( "RequiredExternalLibrary", &packageFindRequired );
+
 }
 
 

@@ -201,7 +201,7 @@ Executable::transform( TransformSet &xform ) const
 
 	ret = std::make_shared<BuildItem>( getName(), getDir() );
 	ret->setUseName( false );
-	ret->setOutputDir( xform.getOutDir() );
+	ret->setOutputDir( xform.getBinDir() );
 	ret->setTopLevel( true );
 
 	std::set<std::string> tags;
