@@ -64,6 +64,8 @@ local l = Compile(
 l:forceTool( ".c", "cxx" )
 l:overrideToolSetting( "warnings", "some" )
 
+Include( lua_dir )
+
 lua = Library( "conslua", l )
 exe = Executable( "constructor", x, lua )
 -- AddDefines( x, "SOME_DEFINE" )

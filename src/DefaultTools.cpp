@@ -95,8 +95,9 @@ DefaultTools::checkAndAddClang( Scope &s, bool regAsDefault )
 			t->myImplDepName = "$out.d";
 			t->myImplDepStyle = "gcc";
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
+			t->myFlagPrefixes = { { "includes", "-I" } };
 			t->myDescription = " CC $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "-c", "-o", "$out", "$in" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -164,7 +165,8 @@ DefaultTools::checkAndAddClang( Scope &s, bool regAsDefault )
 			t->myImplDepStyle = "gcc";
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
 			t->myDescription = "CXX $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "-c", "-o", "$out", "$in" };
+			t->myFlagPrefixes = { { "includes", "-I" } };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
