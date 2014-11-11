@@ -120,7 +120,7 @@ if doxygen then
 	}
 end
 
-BuildConfiguration{ name="selfRelease", optimization="heavy", warnings="most" }
+BuildConfiguration{ name="selfRelease", optimization="opt", warnings="most" }
 BuildConfiguration{ name="selfBuild", optimization="optdebug", warnings="most" }
 BuildConfiguration{ name="selfDebug", optimization="debug", warnings="most" }
 --BuildConfiguration{ name="selfWin64", opt="optimize", toolset="cross" }
@@ -132,6 +132,7 @@ DefaultConfiguration( "selfBuild" )
 -- SetDefaultWarningLevel( "strict" )
 EnableLanguages( "c++11" )
 SetOption( "threads", "on" )
+--SetOption( "vectorize", "native" )
 -- 
 
 

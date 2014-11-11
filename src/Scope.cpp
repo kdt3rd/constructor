@@ -270,11 +270,9 @@ Scope::addDefaultTools( void )
 {
 #ifdef WIN32
 	throw std::runtime_error( "Not yet implemented" );
-	bool didReg = DefaultTools::checkAndAddCl( *this, true );
-#else
-	bool didReg = DefaultTools::checkAndAddClang( *this, true );
-	didReg = DefaultTools::checkAndAddGCC( *this, ! didReg );
 #endif
+
+	DefaultTools::checkAndAddCFamilies( *this );
 }
 
 

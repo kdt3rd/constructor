@@ -22,6 +22,9 @@
 
 #pragma once
 
+#include <string>
+#include <map>
+
 
 ////////////////////////////////////////
 
@@ -31,9 +34,15 @@ class Scope;
 class DefaultTools
 {
 public:
-	static bool checkAndAddCl( Scope &s, bool regAsDefault );
-	static bool checkAndAddClang( Scope &s, bool regAsDefault );
-	static bool checkAndAddGCC( Scope &s, bool regAsDefault );
+	static void checkAndAddCFamilies( Scope &s );
+
+protected:
+#ifdef WIN32
+	static bool checkAndAddCl( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
+#endif
+	static bool checkAndAddClang( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
+	static bool checkAndAddGCC( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
+	static void checkAndAddArchiver( Scope &s, const std::map<std::string, std::string> &exelist );
 };
 
 
