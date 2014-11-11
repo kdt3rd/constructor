@@ -228,8 +228,9 @@ Engine::Engine( void )
 
 //	lua_getglobal( L, "debug" );
 //	lua_getfield( L, -1, "traceback" );
-	lua_pushcfunction( L, &Engine::errorCB );
-	myErrFunc = lua_gettop( L );
+
+//	lua_pushcfunction( L, &Engine::errorCB );
+//	myErrFunc = lua_gettop( L );
 }
 
 
@@ -386,8 +387,9 @@ Engine::runFile( const char *file )
 	LuaFile f( file );
 	throwIfError( L, lua_load( L, &fileReader, &f, tmpname.c_str(), NULL ), file );
 
-	int funcPos = lua_gettop( L );
 
+	int funcPos = lua_gettop( L );
+	
 	// for the metatable
 	lua_newtable( L );
 	lua_getglobal( L, "_G" );
@@ -399,8 +401,8 @@ Engine::runFile( const char *file )
 	lua_copy( L, envPos, -1 );
 	lua_setupvalue( L, funcPos, 1 );
 
-	throwIfError( L, lua_pcall( L, 0, LUA_MULTRET, myErrFunc ), file );
-	lua_pop( L, 1 );
+	throwIfError( L, lua_pcall( L, 0, LUA_MULTRET, 0 ), file );
+
 //	lua_getglobal( L, "_G" );
 //	// now troll through the created environment and copy into
 //	// the real global table
@@ -469,29 +471,14 @@ Engine::singleton( void )
 int
 Engine::errorCB( lua_State *L )
 {
-	lua_Debug d;
-	lua_getstack(L, 1, &d);
-	lua_getinfo(L, "Sln", &d);
-	std::string err = lua_tostring(L, -1);
-	lua_pop(L, 1);
-	std::stringstream msg;
-	msg << d.short_src << ":" << d.currentline;
-
-	if (d.name != 0)
-	{
-		msg << "(" << d.namewhat << " " << d.name << ")";
-	}
-	msg << " " << err;
-//	lua_pushstring(L, msg.str().c_str());
-	std::cout << "error: " << err << std::endl;
-	return 1;
-#if 0
+#if 1
 	int T = 1;//1;//lua_gettop( L );
-	const char *msg = "<Unable to retrieve error value";
-//	const char *tmsg = lua_tostring( L, T );
-//	if ( tmsg )
-//		msg = tmsg;
+	const char *msg = "<Unable to retrieve error value>";
+	const char *tmsg = lua_tostring( L, T );
+	if ( tmsg )
+		msg = tmsg;
 
+	std::cout << "tmsg: " << tmsg << std::endl;
 	if ( msg )
 	{
 		std::cout << "errorCB: msg '" << msg << "'" << std::endl;

@@ -120,7 +120,7 @@ private:
 	std::stack< std::pair<std::string, bool> > myCurLib;
 
 	lua_State *L;
-	int myErrFunc;
+//	int myErrFunc;
 };
 
 } // namespace Lua
