@@ -45,6 +45,10 @@ public:
 	inline void inherit( bool yesno );
 	inline bool inherit( void ) const;
 
+	inline bool useToolFlagTransform( void ) const;
+	inline const std::string &getToolTag( void ) const;
+	void setToolTag( std::string tag );
+
 	inline bool empty( void ) const;
 	void clear( void );
 	void add( std::string v );
@@ -53,6 +57,10 @@ public:
 	void addIfMissing( const std::vector<std::string> &v );
 	void moveToEnd( const std::string &v );
 	void moveToEnd( const std::vector<std::string> &v );
+	// removes duplicates, keeping last entry
+	// does NOT change relative ordering
+	void removeDuplicatesKeepLast( void );
+
 	void reset( std::string v );
 	void reset( std::vector<std::string> v );
 
@@ -72,6 +80,7 @@ private:
 	std::string myName;
 	std::vector<std::string> myValues;
 	mutable std::string myCachedValue;
+	std::string myToolTag;
 	bool myInherit = false;
 };
 
@@ -92,20 +101,22 @@ Variable::name( void ) const
 ////////////////////////////////////////
 
 
-inline void
-Variable::inherit( bool yesno )
-{
-	myInherit = yesno;
-}
+inline void Variable::inherit( bool yesno ) { myInherit = yesno; }
+inline bool Variable::inherit( void ) const { return myInherit; }
 
 
 ////////////////////////////////////////
 
 
-inline bool
-Variable::inherit( void ) const
+inline const std::string &
+Variable::getToolTag( void ) const
 {
-	return myInherit;
+	return myToolTag;
+}
+inline bool
+Variable::useToolFlagTransform( void ) const
+{
+	return ! myToolTag.empty();
 }
 
 

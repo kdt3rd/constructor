@@ -374,7 +374,7 @@ Tool::createRule( const TransformSet &xset, bool useBraces ) const
 			opt = getLanguage();
 		else
 		{
-			opt = xset.getVarValue( i.first );
+			opt = xset.getOptionValue( i.first );
 			if ( opt.empty() )
 				opt = getDefaultOption( i.first );
 		}

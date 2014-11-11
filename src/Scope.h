@@ -63,6 +63,9 @@ public:
 	inline VariableSet &getVars( void );
 	inline const VariableSet &getVars( void ) const;
 
+	inline VariableSet &getOptions( void );
+	inline const VariableSet &getOptions( void ) const;
+
 	inline std::vector< std::shared_ptr<Tool> > &getTools( void );
 	inline const std::vector< std::shared_ptr<Tool> > &getTools( void ) const;
 
@@ -89,6 +92,7 @@ private:
 
 	std::weak_ptr<Scope> myParent;
 	VariableSet myVariables;
+	VariableSet myOptions;
 	std::vector< std::shared_ptr<Scope> > mySubScopes;
 	std::shared_ptr<Directory> myNameDir;
 
@@ -130,8 +134,19 @@ inline std::shared_ptr<Scope> Scope::getParent( void ) const { return myParent.l
 ////////////////////////////////////////
 
 
-inline VariableSet &Scope::getVars( void ) { return myVariables; }
-inline const VariableSet &Scope::getVars( void ) const { return myVariables; }
+inline VariableSet &Scope::getVars( void )
+{ return myVariables; }
+inline const VariableSet &Scope::getVars( void ) const
+{ return myVariables; }
+
+
+////////////////////////////////////////
+
+
+inline VariableSet &Scope::getOptions( void )
+{ return myOptions; }
+inline const VariableSet &Scope::getOptions( void ) const
+{ return myOptions; }
 
 
 ////////////////////////////////////////
@@ -139,15 +154,10 @@ inline const VariableSet &Scope::getVars( void ) const { return myVariables; }
 
 inline std::vector< std::shared_ptr<Tool> > &
 Scope::getTools( void )
-{
-	return myTools;
-}
+{ return myTools; }
 inline const std::vector< std::shared_ptr<Tool> > &
 Scope::getTools( void ) const
-{
-	return myTools;
-}
-
+{ return myTools; }
 
 
 ////////////////////////////////////////

@@ -128,7 +128,7 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
 			t->myFlagPrefixes = { { "includes", "-I" } };
 			t->myDescription = " CC $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -166,7 +166,7 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			};
 			t->myFlagPrefixes = { { "libs", "-l" }, { "libdirs", "-L" } };
 			t->myDescription = " LD $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$cflags", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$vectorize", "$cflags", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
 			s.addTool( t );
 		}
 		else if ( name == "clang++" )
@@ -217,7 +217,7 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
 			t->myDescription = "CXX $out";
 			t->myFlagPrefixes = { { "includes", "-I" } };
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -255,7 +255,7 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			};
 			t->myFlagPrefixes = { { "libs", "-l" }, { "libdirs", "-L" } };
 			t->myDescription = " LD $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$cflags", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$vectorize", "$cflags", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
 			s.addTool( t );
 		}
 	}
@@ -285,8 +285,7 @@ DefaultTools::checkAndAddGCC( Scope &s, const std::map<std::string, std::string>
 		std::shared_ptr<Tool> t;
 		if ( name == "gcc" )
 		{
-			std::cout << "TODO: Add version check for gcc to optionally enable features" << std::endl;
-
+			// TODO: Add version check for gcc to optionally enable features
 			t = std::make_shared<Tool>( "cc", name );
 			cTools.push_back( name );
 			t->myExtensions = { ".c" };
@@ -332,7 +331,7 @@ DefaultTools::checkAndAddGCC( Scope &s, const std::map<std::string, std::string>
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
 			t->myFlagPrefixes = { { "includes", "-I" } };
 			t->myDescription = " CC $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -370,7 +369,7 @@ DefaultTools::checkAndAddGCC( Scope &s, const std::map<std::string, std::string>
 			};
 			t->myFlagPrefixes = { { "libs", "-l" }, { "libdirs", "-L" } };
 			t->myDescription = " LD $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$cflags", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$vectorize", "$cflags", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
 			s.addTool( t );
 		}
 		else if ( name == "g++" )
@@ -421,7 +420,7 @@ DefaultTools::checkAndAddGCC( Scope &s, const std::map<std::string, std::string>
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
 			t->myDescription = "CXX $out";
 			t->myFlagPrefixes = { { "includes", "-I" } };
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -459,7 +458,7 @@ DefaultTools::checkAndAddGCC( Scope &s, const std::map<std::string, std::string>
 			};
 			t->myFlagPrefixes = { { "libs", "-l" }, { "libdirs", "-L" } };
 			t->myDescription = " LD $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$cflags", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$vectorize", "$cflags", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
 
 			s.addTool( t );
 		}

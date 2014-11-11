@@ -78,6 +78,19 @@ TransformSet::addTool( const std::shared_ptr<Tool> &t )
 ////////////////////////////////////////
 
 
+std::shared_ptr<Tool>
+TransformSet::getTool( const std::string &tag ) const
+{
+	for ( auto &t: myTools )
+		if ( t->getTag() == tag )
+			return t;
+	return std::shared_ptr<Tool>();
+}
+
+
+////////////////////////////////////////
+
+
 void
 TransformSet::mergeVariables( const VariableSet &vs )
 {
@@ -87,6 +100,22 @@ TransformSet::mergeVariables( const VariableSet &vs )
 	{
 		for ( auto i: vs )
 			myVars.emplace( std::make_pair( i.first, i.second ) );
+	}
+}
+
+
+////////////////////////////////////////
+
+
+void
+TransformSet::mergeOptions( const VariableSet &vs )
+{
+	if ( myOptions.empty() )
+		myOptions = vs;
+	else
+	{
+		for ( auto i: vs )
+			myOptions.emplace( std::make_pair( i.first, i.second ) );
 	}
 }
 
@@ -145,6 +174,20 @@ TransformSet::getVarValue( const std::string &v ) const
 {
 	auto i = myVars.find( v );
 	if ( i != myVars.end() )
+		return i->second.value();
+
+	return String::empty();
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+TransformSet::getOptionValue( const std::string &v ) const
+{
+	auto i = myOptions.find( v );
+	if ( i != myOptions.end() )
 		return i->second.value();
 
 	return String::empty();

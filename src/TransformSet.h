@@ -54,7 +54,9 @@ public:
 	inline const std::vector< std::shared_ptr<TransformSet> > &getSubScopes( void ) const;
 
 	void addTool( const std::shared_ptr<Tool> &t );
+	std::shared_ptr<Tool> getTool( const std::string &tag ) const;
 	void mergeVariables( const VariableSet &vs );
+	void mergeOptions( const VariableSet &vs );
 
 	std::shared_ptr<Tool> findTool( const std::string &ext ) const;
 	std::shared_ptr<Tool> findToolByTag( const std::string &tag,
@@ -64,6 +66,9 @@ public:
 
 	inline const VariableSet &getVars( void ) const;
 	const std::string &getVarValue( const std::string &v ) const;
+
+	inline const VariableSet &getOptions( void ) const;
+	const std::string &getOptionValue( const std::string &v ) const;
 
 	bool isTransformed( const Item *i ) const;
 	std::shared_ptr<BuildItem> getTransform( const Item *i ) const;
@@ -81,6 +86,7 @@ private:
 	std::shared_ptr<Directory> myArtifactDirectory;
 	std::vector< std::shared_ptr<Tool> > myTools;
 	VariableSet myVars;
+	VariableSet myOptions;
 
 	std::vector< std::shared_ptr<BuildItem> > myBuildItems;
 	std::map< const Item *, std::shared_ptr<BuildItem> > myTransformMap;
@@ -124,6 +130,11 @@ inline const VariableSet &
 TransformSet::getVars( void ) const
 {
 	return myVars;
+}
+inline const VariableSet &
+TransformSet::getOptions( void ) const
+{
+	return myOptions;
 }
 
 

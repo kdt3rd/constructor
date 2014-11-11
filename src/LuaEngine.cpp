@@ -400,7 +400,7 @@ Engine::runFile( const char *file )
 	lua_setupvalue( L, funcPos, 1 );
 
 	throwIfError( L, lua_pcall( L, 0, LUA_MULTRET, myErrFunc ), file );
-
+	lua_pop( L, 1 );
 //	lua_getglobal( L, "_G" );
 //	// now troll through the created environment and copy into
 //	// the real global table
@@ -469,52 +469,52 @@ Engine::singleton( void )
 int
 Engine::errorCB( lua_State *L )
 {
-	lua_Integer level;
-	int arg = 0;
-	lua_State *L1 = L;
-	if ( lua_isthread( L, 1 ) )
+	lua_Debug d;
+	lua_getstack(L, 1, &d);
+	lua_getinfo(L, "Sln", &d);
+	std::string err = lua_tostring(L, -1);
+	lua_pop(L, 1);
+	std::stringstream msg;
+	msg << d.short_src << ":" << d.currentline;
+
+	if (d.name != 0)
 	{
-		arg = 1;
-		L1 = lua_tothread( L, 1 );
+		msg << "(" << d.namewhat << " " << d.name << ")";
 	}
-	lua_Debug ar;
-	if ( lua_isnumber( L, arg + 2 ) )
-	{
-		level = lua_tointeger( L, arg + 2 );
-		lua_pop( L, 1 );
-	}
-	else
-		level = (L == L1) ? 1 : 0;  /* level 0 may be this own function */
-	if ( lua_gettop( L ) == arg )
-		lua_pushliteral(L, "");
-	else if ( ! lua_isstring( L, arg+1 ) ) // message not a string, bail
-		return 1;
-	else
-		lua_pushliteral(L, "\n");
-	lua_pushliteral(L, "stack traceback:");
-	while ( lua_getstack( L1, static_cast<int>( level++ ), &ar ) )
-	{
-		lua_pushliteral( L, "\n\t" );
-		lua_getinfo( L1, "Snl", &ar );
-		lua_pushfstring( L, "%s:", ar.short_src );
-		if( ar.currentline > 0 )
-			lua_pushfstring( L, "%d:", ar.currentline );
-		if( *ar.namewhat != '\0' ) // there is a function name
-			lua_pushfstring( L, " in function " LUA_QS, ar.name );
-		else
-		{
-			if( *ar.what == 'm' )  /* main? */
-				lua_pushfstring( L, " in main chunk" );
-			else if ( *ar.what == 'C' || *ar.what == 't' )
-				lua_pushliteral( L, " ?" );  /* C function or tail call */
-			else
-				lua_pushfstring( L, " in function <%s:%d>",
-								 ar.short_src, ar.linedefined );
-		}
-		lua_concat(L, lua_gettop(L) - arg);
-	}
-	lua_concat(L, lua_gettop(L) - arg);
+	msg << " " << err;
+//	lua_pushstring(L, msg.str().c_str());
+	std::cout << "error: " << err << std::endl;
 	return 1;
+#if 0
+	int T = 1;//1;//lua_gettop( L );
+	const char *msg = "<Unable to retrieve error value";
+//	const char *tmsg = lua_tostring( L, T );
+//	if ( tmsg )
+//		msg = tmsg;
+
+	if ( msg )
+	{
+		std::cout << "errorCB: msg '" << msg << "'" << std::endl;
+//		luaL_traceback( L, L, msg, T );
+	}
+	else if ( ! lua_isnoneornil( L, T ) )
+	{
+		std::cout << "errorCB: non-none or nil value" << std::endl;
+		// there's an error object, try the tostring method
+//		if ( ! luaL_callmeta( L, 1, "__tostring" ) )
+//			lua_pushliteral( L, "<Unable to find an error message>" );
+//		else
+//			lua_pushliteral( L, "<No string meta for error message>" );
+	}
+	else
+	{
+		std::cout << "errorCB: black / none / nil / pining-for-the-fjords value" << std::endl;
+//		lua_pushliteral( L, "<nil error message>" );
+	}
+
+//	return 1;
+	return 0;
+#endif
 }
 
 

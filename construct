@@ -59,38 +59,9 @@ end
 -- a wrapper function around compile that sets the explicit moc
 -- tool, then make the moc tool have a .h such that it doesn't
 -- try to run moc on every header
+--
+-- see forceTool on Item to do this...
 
--- cc = FindExecutable( "gcc" )
--- if cc then
--- 	AddTool{ tag="cc",
--- 			 name="gcc",
--- 			 exe=cc,
--- 			 input_extensions={ ".c" },
--- 			 output_extensions={ ".o" },
--- 			 warnings={ none={"-w"},
--- 						some={"-Wall"},
--- 						"error"={"-Wall", "-Werror"},
--- 						strict={"-Wall"},
--- 			 },
--- 			 optimizations={ "debug" = {"-g"},
--- 							 "optimize" = {"-O3"},
--- 							 "size" = {"-Os"},
--- 							 "optdebug" = {"-g", "-O3"},
--- 			 },
--- 			 languages={"C"={}, "C99"={"-std=c99"}},
--- 			 default_language="C",
--- 			 dependencies={"-MMD", "-MF", "$out.d"},
--- 		   }
--- end
--- AddTool{ name="clang++"
--- 		 exe=FindExecutable( "clang++" ),
--- 		 input_extensions={ ".cpp" },
--- 		 output_extensions={ ".o" }
--- 		 languages={"C++"={}, "C++11"={"-std=c++11", "-stdlib=libc++"}},
--- 		 default_language="C++",
--- 		 dependencies={"-MMD", "-MF", "$out.d"}
--- 	   }
--- 
 -- lime = Executable( "lime", Compile( "main.cpp" ) )
 -- AddTool{ name="lime",
 -- 		 exe=lime,
@@ -131,6 +102,7 @@ DefaultConfiguration( "selfBuild" )
 -- --SetWarningLevel( "error" )
 -- SetDefaultWarningLevel( "strict" )
 EnableLanguages( "c++11" )
+-- need this for the call_once stuff, it crashes without threads enabled :(
 SetOption( "threads", "on" )
 --SetOption( "vectorize", "native" )
 -- 
@@ -152,9 +124,9 @@ SetOption( "threads", "on" )
 --	print( "Wahoo, QtOpenGL 4.8.6 exists!" )
 --end
 
-x = ExternalLibrary( "QtOpenGL" )
-if x then
-	print( "Found " .. x:name() .. " prefix " .. x:variables()["prefix"] )
-end
+--x = ExternalLibrary( "QtOpenGL" )
+--if x then
+--	print( "Found " .. x:name() .. " prefix " .. x:variables()["prefix"] )
+--end
 
 constructor = SubDir( "src" )

@@ -441,8 +441,8 @@ luaSetOption( lua_State *L )
 
 	std::string nm = Lua::Parm<std::string>::get( L, N, 1 );
 	std::string val = Lua::Parm<std::string>::get( L, N, 2 );
-	auto &vars = Scope::current().getVars();
-	auto ne = vars.emplace( std::make_pair( nm, Variable( nm ) ) );
+	auto &opts = Scope::current().getOptions();
+	auto ne = opts.emplace( std::make_pair( nm, Variable( nm ) ) );
 	ne.first->second.reset( std::move( val ) );
 
 	return 0;
@@ -550,6 +550,7 @@ include( lua_State *L )
 		incPath = vars.emplace( std::make_pair( "includes", Variable( "includes" ) ) ).first;
 
 	Variable &v = incPath->second;
+	v.setToolTag( "cc" );
 
 	int N = lua_gettop( L );
 	for ( int i = 1; i <= N; ++i )

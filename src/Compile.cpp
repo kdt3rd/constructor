@@ -308,8 +308,8 @@ Library::transform( TransformSet &xform ) const
 			ret->addDependency( DependencyType::IMPLICIT, xi );
 			ret->addToVariable( "cflags", xi->getVariable( "cflags" ) );
 			ret->addToVariable( "ldflags", xi->getVariable( "ldflags" ) );
-			outlibs.moveToEnd( xi->getVariable( "libs" ).values() );
-			outlibdirs.moveToEnd( xi->getVariable( "libdirs" ).values() );
+			outlibs.add( xi->getVariable( "libs" ).values() );
+			outlibdirs.addIfMissing( xi->getVariable( "libdirs" ).values() );
 		}
 		else if ( dynamic_cast<const Executable *>( i.get() ) )
 		{
@@ -355,7 +355,10 @@ Library::transform( TransformSet &xform ) const
 	if ( libType == "static" )
 	{
 		if ( ! outlibs.empty() )
+		{
+			outlibs.removeDuplicatesKeepLast();
 			ret->addToVariable( "libs", outlibs );
+		}
 		if ( ! outlibdirs.empty() )
 			ret->addToVariable( "libdirs", outlibdirs );
 	}

@@ -39,7 +39,7 @@ public:
 	Configuration( const Lua::Table &t );
 
 	inline const std::string &name( void ) const;
-	inline const VariableSet &vars( void ) const;
+	inline const VariableSet &getChoices( void ) const;
 
 	static const Configuration &getDefault( void );
 	static void setDefault( std::string name );
@@ -67,7 +67,7 @@ Configuration::name( void ) const
 
 inline
 const VariableSet &
-Configuration::vars( void ) const
+Configuration::getChoices( void ) const
 {
 	return myVariables;
 }

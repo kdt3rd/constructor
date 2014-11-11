@@ -58,6 +58,16 @@ Variable::Variable( const std::string &n, const std::string &val )
 
 
 void
+Variable::setToolTag( std::string tag )
+{
+	myToolTag = std::move( tag );
+}
+
+
+////////////////////////////////////////
+
+
+void
 Variable::clear( void )
 {
 	myValues.clear();
@@ -165,6 +175,36 @@ Variable::moveToEnd( const std::vector<std::string> &v )
 {
 	for ( const std::string &i: v )
 		moveToEnd( i );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Variable::removeDuplicatesKeepLast( void )
+{
+	// O(n^2) but it's simple
+	for ( size_t i = 0; i != myValues.size(); ++i )
+	{
+		bool kill = false;
+		const std::string &cur = myValues[i];
+		for ( size_t j = i + 1; j < myValues.size(); ++j )
+		{
+			if ( myValues[j] == cur )
+			{
+				kill = true;
+				break;
+			}
+		}
+
+		if ( kill )
+		{
+			typedef typename std::vector<std::string>::iterator::difference_type dt_t;
+			myValues.erase( myValues.begin() + static_cast<dt_t>( i ) );
+			--i;
+		}
+	}
 }
 
 

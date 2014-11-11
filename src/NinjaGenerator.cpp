@@ -127,7 +127,16 @@ emitVariables( std::ostream &os, const TransformSet &x )
 	const VariableSet &vars = x.getVars();
 	for ( auto i: vars )
 	{
-		os << '\n' << i.first << "=" << i.second.value();
+		if ( i.second.useToolFlagTransform() )
+		{
+			auto t = x.getTool( i.second.getToolTag() );
+			if ( ! t )
+				throw std::runtime_error( "Variable set to use tool flag transform, but no tool with tag '" + i.second.getToolTag() + "' found" );
+
+			os << '\n' << i.first << "=" << i.second.prepended_value( t->getCommandPrefix( i.first ) );
+		}
+		else
+			os << '\n' << i.first << "=" << i.second.value();
 	}
 	if ( ! vars.empty() )
 		os << '\n';

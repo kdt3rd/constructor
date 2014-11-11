@@ -239,7 +239,8 @@ Scope::transform( TransformSet &xform,
 	}
 
 	xform.mergeVariables( myVariables );
-	xform.mergeVariables( conf.vars() );
+	xform.mergeOptions( myOptions );
+	xform.mergeOptions( conf.getChoices() );
 
 	for ( const ItemPtr &i: myItems )
 		i->transform( xform );

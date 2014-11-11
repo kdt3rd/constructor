@@ -262,6 +262,35 @@ emitTargets( std::ostream &os, std::vector<std::string> &defTargs, std::vector<s
 	}
 }
 
+
+////////////////////////////////////////
+
+
+static void
+emitVariables( std::ostream &os, const TransformSet &x )
+{
+	const VariableSet &vars = x.getVars();
+	for ( auto i: vars )
+	{
+		if ( i.second.useToolFlagTransform() )
+		{
+			auto t = x.getTool( i.second.getToolTag() );
+			if ( ! t )
+				throw std::runtime_error( "Variable set to use tool flag transform, but no tool with tag '" + i.second.getToolTag() + "' found" );
+
+			os << '\n' << i.first << ":=" << i.second.prepended_value( t->getCommandPrefix( i.first ) );
+		}
+		else
+			os << '\n' << i.first << ":=" << i.second.value();
+	}
+	if ( ! vars.empty() )
+		os << '\n';
+}
+
+
+////////////////////////////////////////
+
+
 static void
 emitScope( std::ostream &os,
 		   std::vector<std::string> &defTargs,
@@ -291,6 +320,8 @@ emitScope( std::ostream &os,
 			"default: all\n";
 		emitScope( ssf, defTargs, outD, *i, scopeCount );
 	}
+
+	emitVariables( os, x );
 
 	std::vector<std::string> depFiles;
 	emitTargets( os, defTargs, depFiles, x );
