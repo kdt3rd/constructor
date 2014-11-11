@@ -279,7 +279,7 @@ emitScope( std::ostream &os,
 		std::string sfn = subscopefn.str();
 
 		os << "\n" << subscope << ": " << sfn
-		   << "\t@$(MAKE) -f " << subscopefn << "\n";
+		   << "\t@$(MAKE) -f " << sfn << "\n";
 
 		std::ofstream ssf( outD.makefilename( sfn ) );
 		ssf <<
