@@ -794,10 +794,10 @@ PackageConfig::makeLibraryReference( const std::string &name,
 #ifdef __APPLE__
 	if ( path.find( ".framework" ) != std::string::npos )
 	{
-		Variable &cflags = ret->variable( "cflags" );
+		Variable &cflags = ret->getVariable( "cflags" );
 		cflags.add( "-framework" );
 		cflags.add( name );
-		Variable &libs = ret->variable( "libs" );
+		Variable &libs = ret->getVariable( "libs" );
 		libs.add( "-framework" );
 		libs.add( name );
 		return ret;
