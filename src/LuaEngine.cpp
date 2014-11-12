@@ -377,16 +377,38 @@ Engine::runFile( const char *file )
 {
 	if ( ! myCurLib.empty() )
 		throw std::runtime_error( "unbalanced push / pops for library definitions" );
-	// create a new global environment for the file
-	// but let it still look up in the current one;
-	lua_newtable( L );
-	int envPos = lua_gettop( L );
+
+	int globTable = 0;
+	if ( myCurTables.empty() )
+	{
+		lua_newtable( L );
+		globTable = lua_gettop( L );
+	}
+	else
+	{
+		globTable = myCurTables.top()
+	}
+	myCurTables.push( globTable );
+	ON_EXIT{ myCurTables.pop();};
+
+//	// create a new global environment for the file
+//	// but let it still look up in the current one;
+//	lua_newtable( L );
+//	int envPos = lua_gettop( L );
+
+//	lua_getglobal( L, "_G" );
+//	copyTable( lua_gettop( L ), envPos );
+//	lua_pop( L, 1 );
+
+//	if ( ! myCurTables.empty() )
+//		copyTable( myCurTables.top(), envPos );
+//	myCurTables.push( envPos );
+//	ON_EXIT{ myCurTables.pop();};
 
 	std::string tmpname = "@";
 	tmpname.append( file );
 	LuaFile f( file );
 	throwIfError( L, lua_load( L, &fileReader, &f, tmpname.c_str(), NULL ), file );
-
 
 	int funcPos = lua_gettop( L );
 	
@@ -404,38 +426,8 @@ Engine::runFile( const char *file )
 	throwIfError( L, lua_pcall( L, 0, LUA_MULTRET, 0 ), file );
 
 //	lua_getglobal( L, "_G" );
-//	// now troll through the created environment and copy into
-//	// the real global table
-//	lua_pushnil( L );
-//	while ( lua_next( L, envPos ) )
-//	{
-//		lua_pushvalue( L, -2 );
-//        // stack now contains: -1 => key; -2 => value; -3 => key; -4 => global table
-//		std::cout << "Considering " << lua_tolstring( L, -1, NULL ) << std::endl;
-//		bool copy = false;
-//		switch ( lua_type( L, -2 ) )
-//		{
-//			case LUA_TTABLE: copy = true; break;
-//			case LUA_TFUNCTION:
-//			case LUA_TLIGHTUSERDATA:
-//			case LUA_TNIL:
-//			case LUA_TBOOLEAN:
-//			case LUA_TTHREAD:
-//			case LUA_TNONE:
-//			default:
-//				break;
-//		}
-//
-//		if ( copy )
-//		{
-//			std::cout << " -> Copying ..." << std::endl;
-//			// need to swap so the settable args are in the right order
-//			lua_insert( L, -2 );
-//			lua_settable( L, -4 );
-//		}
-//		else
-//			lua_pop( L, 2 );
-//	}
+//	copyTable( envPos, lua_gettop( L ) );
+
 //	lua_pop( L, 1 );
 	return 1;
 }
@@ -462,6 +454,47 @@ Engine::singleton( void )
 {
 	static Engine theEng;
 	return theEng;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::copyTable( int tablePos, int destPos )
+{
+	// now troll through the created environment and copy into
+	// the real global table
+	lua_pushnil( L );
+	while ( lua_next( L, tablePos ) )
+	{
+		lua_pushvalue( L, -2 );
+		// stack now contains: -1 => key; -2 => value; -3 => key; -4 => global table
+		std::cout << "Considering " << lua_tolstring( L, -1, NULL ) << std::endl;
+		bool copy = true;
+//		switch ( lua_type( L, -2 ) )
+//		{
+//			case LUA_TTABLE: copy = true; break;
+//			case LUA_TFUNCTION:
+//			case LUA_TLIGHTUSERDATA:
+//			case LUA_TNIL:
+//			case LUA_TBOOLEAN:
+//			case LUA_TTHREAD:
+//			case LUA_TNONE:
+//			default:
+//				break;
+//		}
+
+		if ( copy )
+		{
+			std::cout << " -> Copying ..." << std::endl;
+			// need to swap so the settable args are in the right order
+			lua_insert( L, -2 );
+			lua_settable( L, destPos );
+		}
+		else
+			lua_pop( L, 2 );
+	}
 }
 
 

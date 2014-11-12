@@ -23,7 +23,6 @@
 #include "FileUtil.h"
 
 #include "ScopeGuard.h"
-#include "LuaEngine.h"
 #include "Directory.h"
 #include "OSUtil.h"
 #include "StrUtil.h"

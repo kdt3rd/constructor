@@ -109,6 +109,8 @@ public:
 	static Engine &singleton( void );
 
 private:
+	void copyTable( int tablePos, int destTablePos );
+
 	static int errorCB( lua_State *L );
 	static int dispatchFunc( lua_State *L );
 
@@ -118,6 +120,7 @@ private:
 	std::vector<BoundFunction> mFuncs;
 	std::vector< std::shared_ptr<FunctionBase> > mCPPFuncs;
 	std::stack< std::pair<std::string, bool> > myCurLib;
+	std::stack<int> myCurTables;
 
 	lua_State *L;
 //	int myErrFunc;

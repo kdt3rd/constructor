@@ -28,7 +28,6 @@
 #include <string>
 #include <memory>
 #include <set>
-#include "LuaEngine.h"
 #include "Variable.h"
 #include "Dependency.h"
 #include "Directory.h"
