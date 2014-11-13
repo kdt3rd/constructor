@@ -378,32 +378,10 @@ Engine::runFile( const char *file )
 	if ( ! myCurLib.empty() )
 		throw std::runtime_error( "unbalanced push / pops for library definitions" );
 
-	int globTable = 0;
-	if ( myCurTables.empty() )
-	{
-		lua_newtable( L );
-		globTable = lua_gettop( L );
-	}
-	else
-	{
-		globTable = myCurTables.top()
-	}
-	myCurTables.push( globTable );
-	ON_EXIT{ myCurTables.pop();};
-
-//	// create a new global environment for the file
-//	// but let it still look up in the current one;
-//	lua_newtable( L );
-//	int envPos = lua_gettop( L );
-
-//	lua_getglobal( L, "_G" );
-//	copyTable( lua_gettop( L ), envPos );
-//	lua_pop( L, 1 );
-
-//	if ( ! myCurTables.empty() )
-//		copyTable( myCurTables.top(), envPos );
-//	myCurTables.push( envPos );
-//	ON_EXIT{ myCurTables.pop();};
+	// create the table, this will serve as the return value
+	// for the function
+	lua_newtable( L );
+	int envPos = lua_gettop( L );
 
 	std::string tmpname = "@";
 	tmpname.append( file );
@@ -411,24 +389,34 @@ Engine::runFile( const char *file )
 	throwIfError( L, lua_load( L, &fileReader, &f, tmpname.c_str(), NULL ), file );
 
 	int funcPos = lua_gettop( L );
+
+	// if we're the first function, we'll just modify the global table
+	// and not override the upvalue
+	if ( ! myFileFuncs.empty() )
+	{
+		// metatable
+		lua_newtable( L );
+		lua_getglobal( L, "_G" );
+		lua_setfield( L, -2, "__index" );
+		lua_setmetatable( L, envPos );
+
+		lua_pushnil( L );
+		lua_copy( L, envPos, -1 );
+		lua_setupvalue( L, funcPos, 1 );
+	}
+	{
+		myFileFuncs.push( funcPos );
+		ON_EXIT{ myFileFuncs.pop();};
 	
-	// for the metatable
-	lua_newtable( L );
-	lua_getglobal( L, "_G" );
-	lua_setfield( L, -2, "__index" );
-	// push the metatable into the new global table
-	lua_setmetatable( L, envPos );
-	// and set it as the up value for the function
-	lua_pushnil( L );
-	lua_copy( L, envPos, -1 );
-	lua_setupvalue( L, funcPos, 1 );
+		throwIfError( L, lua_pcall( L, 0, LUA_MULTRET, 0 ), file );
+	}
 
-	throwIfError( L, lua_pcall( L, 0, LUA_MULTRET, 0 ), file );
+	if ( myFileFuncs.empty() )
+	{
+		lua_pop( L, 1 );
+		return 0;
+	}
 
-//	lua_getglobal( L, "_G" );
-//	copyTable( envPos, lua_gettop( L ) );
-
-//	lua_pop( L, 1 );
 	return 1;
 }
 

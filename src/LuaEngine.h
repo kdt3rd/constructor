@@ -120,7 +120,7 @@ private:
 	std::vector<BoundFunction> mFuncs;
 	std::vector< std::shared_ptr<FunctionBase> > mCPPFuncs;
 	std::stack< std::pair<std::string, bool> > myCurLib;
-	std::stack<int> myCurTables;
+	std::stack<int> myFileFuncs;
 
 	lua_State *L;
 //	int myErrFunc;
