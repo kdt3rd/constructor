@@ -24,6 +24,7 @@
 #include <stdexcept>
 #include "FileUtil.h"
 #include "StrUtil.h"
+#include "Debug.h"
 #include <iostream>
 
 
@@ -127,7 +128,9 @@ BuildItem::extractTags( std::set<std::string> &tags ) const
 	else
 	{
 		std::vector<ItemPtr> deps = extractDependencies( DependencyType::EXPLICIT );
-		for ( ItemPtr &i: deps )
+		if ( deps.empty() )
+			VERBOSE( getName() << " has no explicit dependencies" );
+		for ( const ItemPtr &i: deps )
 			i->extractTags( tags );
 	}
 }
@@ -143,6 +146,16 @@ BuildItem::getTag( void ) const
 		return myTool->getTag();
 
 	return String::empty();
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::setOutputs( const std::vector<std::string> &outList )
+{
+	myOutputs = outList;
 }
 
 
@@ -177,6 +190,20 @@ BuildItem::setVariable( const std::string &name, const std::string &val )
 		i->second.reset( val );
 	else
 		myVariables.emplace( std::make_pair( name, Variable( name, val ) ) );
+}
+
+
+////////////////////////////////////////
+
+
+void
+BuildItem::setVariable( const std::string &name, const std::vector<std::string> &val )
+{
+	auto i = myVariables.find( name );
+	if ( i != myVariables.end() )
+		i->second.reset( val );
+	else
+		myVariables.emplace( std::make_pair( name, Variable( name ) ) ).first->second.reset( val );
 }
 
 

@@ -58,6 +58,10 @@ public:
 	void extractTags( std::set<std::string> &tags ) const;
 	const std::string &getTag( void ) const;
 
+	// the tool will normally auto-create this, but for
+	// some code generation / filtering operations, this is useful
+	void setOutputs( const std::vector<std::string> &outList );
+
 	inline const std::vector<std::string> &getOutputs( void ) const;
 
 	void setFlag( const std::string &n, const std::string &v );
@@ -65,6 +69,7 @@ public:
 
 	void setVariables( VariableSet v );
 	void setVariable( const std::string &name, const std::string &val );
+	void setVariable( const std::string &name, const std::vector<std::string> &val );
 	void addToVariable( const std::string &name, const std::string &val );
 	void addToVariableAtEnd( const std::string &name, const std::string &val );
 	void addToVariable( const std::string &name, const Variable &val );

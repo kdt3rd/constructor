@@ -228,9 +228,10 @@ Engine::Engine( void )
 
 //	lua_getglobal( L, "debug" );
 //	lua_getfield( L, -1, "traceback" );
+//	lua_remove( L, -2 );
 
 //	lua_pushcfunction( L, &Engine::errorCB );
-//	myErrFunc = lua_gettop( L );
+	myErrFunc = 0;//lua_gettop( L );
 }
 
 
@@ -383,6 +384,22 @@ Engine::runFile( const char *file )
 	lua_newtable( L );
 	int envPos = lua_gettop( L );
 
+	return runFile( file, envPos );
+}
+
+
+////////////////////////////////////////
+
+
+int
+Engine::runFile( const char *file, int envPos )
+{
+	if ( ! myCurLib.empty() )
+		throw std::runtime_error( "unbalanced push / pops for library definitions" );
+
+	myFileNames.push( std::string( file ) );
+	ON_EXIT{ myFileNames.pop(); };
+
 	std::string tmpname = "@";
 	tmpname.append( file );
 	LuaFile f( file );
@@ -407,8 +424,16 @@ Engine::runFile( const char *file )
 	{
 		myFileFuncs.push( funcPos );
 		ON_EXIT{ myFileFuncs.pop();};
-	
-		throwIfError( L, lua_pcall( L, 0, LUA_MULTRET, 0 ), file );
+
+		try
+		{
+			throwIfError( L, lua_pcall( L, 0, LUA_MULTRET, myErrFunc ), file );
+		}
+		catch ( ... )
+		{
+			std::cerr << "Processing file " << myFileNames.top() << ":\n";
+			throw;
+		}
 	}
 
 	if ( myFileFuncs.empty() )
@@ -492,37 +517,29 @@ Engine::copyTable( int tablePos, int destPos )
 int
 Engine::errorCB( lua_State *L )
 {
-#if 1
-	int T = 1;//1;//lua_gettop( L );
-	const char *msg = "<Unable to retrieve error value>";
-	const char *tmsg = lua_tostring( L, T );
-	if ( tmsg )
-		msg = tmsg;
+	Engine &me = singleton();
 
-	std::cout << "tmsg: " << tmsg << std::endl;
-	if ( msg )
+	int T = lua_gettop( L );
+	std::stringstream msgbuf;
+	if ( ! me.myFileNames.empty() )
+		msgbuf << "In file " << me.myFileNames.top() << ": ";
+
+	if ( T == 1 )
 	{
-		std::cout << "errorCB: msg '" << msg << "'" << std::endl;
-//		luaL_traceback( L, L, msg, T );
-	}
-	else if ( ! lua_isnoneornil( L, T ) )
-	{
-		std::cout << "errorCB: non-none or nil value" << std::endl;
-		// there's an error object, try the tostring method
-//		if ( ! luaL_callmeta( L, 1, "__tostring" ) )
-//			lua_pushliteral( L, "<Unable to find an error message>" );
-//		else
-//			lua_pushliteral( L, "<No string meta for error message>" );
+		const char *tmsg = lua_tostring( L, T );
+		if ( tmsg )
+			msgbuf << tmsg;
+		std::cout << "errorCB: T " << tmsg << std::endl;
 	}
 	else
 	{
-		std::cout << "errorCB: black / none / nil / pining-for-the-fjords value" << std::endl;
-//		lua_pushliteral( L, "<nil error message>" );
+		std::cout << "errorCB: T " << T << std::endl;
+		msgbuf << "<nil error message>";
 	}
-
-//	return 1;
-	return 0;
-#endif
+	
+	std::string tmp = msgbuf.str();
+	lua_pushlstring( L, tmp.c_str(), tmp.size() );
+	return 1;
 }
 
 

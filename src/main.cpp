@@ -39,6 +39,7 @@
 #include "Generator.h"
 #include "NinjaGenerator.h"
 #include "MakeGenerator.h"
+#include "CodeGenerator.h"
 
 
 ////////////////////////////////////////
@@ -72,7 +73,11 @@ usageAndExit( const char *argv0, int es )
 		" --verbose         Displays messages as the build tree is processed\n"
 		" --debug           Displays debugging messages\n"
 		" -h|--help|-?      This help message\n"
-		"\n";
+		"\n"
+		"----\n\n"
+		"Built in data blob transform:\n"
+			  << argv0 << " -embed_binary_cstring <outname> [-comma] [-file_prefix <fn>] [-file_suffix <fn>] [-item_prefix <fn>] [-item_suffix <fn>] [-item_indent <fn>] inputfile1 ...\n"
+		" to be used with GenerateSourceDataFile to transform data into binary C strings for embedding in executables\n";
 	emitGenerators( es );
 }
 
@@ -151,6 +156,8 @@ main( int argc, const char *argv[] )
 {
 	try
 	{
+		File::setArgv0( argv[0] );
+
 		NinjaGenerator::init();
 		MakeGenerator::init();
 
@@ -159,6 +166,16 @@ main( int argc, const char *argv[] )
 		std::shared_ptr<Generator> generator;
 		bool doConfigDir = true;
 		bool doWrapper = false;
+
+		bool generateCode = false;
+		std::string generateOutputName;
+		bool generateComma = false;
+		std::string filePrefix;
+		std::string fileSuffix;
+		std::string itemPrefix;
+		std::string itemSuffix;
+		std::string itemIndent;
+		std::vector<std::string> inpList;
 
 		for ( int i = 1; i < argc; ++i )
 		{
@@ -205,6 +222,59 @@ main( int argc, const char *argv[] )
 					continue;
 				}
 
+				if ( tmp == "embed_binary_cstring" )
+				{
+					generateCode = true;
+					if ( ( i + 1 ) >= argc )
+					{
+						std::cerr << "ERROR: Missing argument for embed_binary_cstring" << std::endl;
+						usageAndExit( argv[0], 1 );
+					}
+					++i;
+					generateOutputName = argv[i];
+					continue;
+				}
+
+				if ( tmp == "comma" )
+				{
+					if ( ! generateCode )
+					{
+						std::cerr << "ERROR: -comma argument only valid when running in embed code mode" << std::endl;
+						usageAndExit( argv[0], 1 );
+					}
+					generateComma = true;
+					continue;
+				}
+
+				if ( tmp == "file_prefix" || tmp == "file_suffix" ||
+					 tmp == "item_prefix" || tmp == "item_suffix" ||
+					 tmp == "item_indent" )
+				{
+					if ( ! generateCode )
+					{
+						std::cerr << "ERROR: -" << tmp << " argument only valid when running in embed code mode" << std::endl;
+						usageAndExit( argv[0], 1 );
+					}
+
+					if ( ( i + 1 ) >= argc )
+					{
+						std::cerr << "ERROR: Missing argument for " << tmp << std::endl;
+						usageAndExit( argv[0], 1 );
+					}
+					++i;
+					if ( tmp == "file_prefix" )
+						filePrefix = argv[i];
+					else if ( tmp == "file_suffix" )
+						fileSuffix = argv[i];
+					else if ( tmp == "item_prefix" )
+						itemPrefix = argv[i];
+					else if ( tmp == "item_suffix" )
+						itemSuffix = argv[i];
+					else if ( tmp == "item_indent" )
+						itemIndent = argv[i];
+					continue;
+				}
+
 				if ( tmp == "G" || tmp == "generator" )
 				{
 					if ( ( i + 1 ) >= argc )
@@ -239,6 +309,10 @@ main( int argc, const char *argv[] )
 					continue;
 				}
 			}
+			else if ( generateCode )
+			{
+				inpList.push_back( argv[i] );
+			}
 			else
 			{
 				if ( ! subdir.empty() )
@@ -248,6 +322,16 @@ main( int argc, const char *argv[] )
 				}
 				subdir = std::move( tmp );
 			}
+		}
+
+		if ( generateCode )
+		{
+			CodeGenerator::emitCode( generateOutputName,
+									 inpList,
+									 filePrefix, fileSuffix,
+									 itemPrefix, itemSuffix,
+									 itemIndent, generateComma );
+			return 0;
 		}
 
 		if ( ! generator )

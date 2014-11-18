@@ -22,41 +22,51 @@
 
 #pragma once
 
-#include "Item.h"
-#include "TransformSet.h"
-#include <queue>
+#include "Compile.h"
+#include "Directory.h"
 
 
 ////////////////////////////////////////
 
 
-class CompileSet : public Item
+class CodeGenerator : public CompileSet
 {
 public:
-	CompileSet( void );
-	virtual ~CompileSet( void );
+	CodeGenerator( std::string name );
+	virtual ~CodeGenerator( void );
 
-	void addItem( const ItemPtr &i );
-	void addItem( std::string name );
-
+	void setItemInfo( const std::vector<std::string> &itemPrefix,
+					  const std::vector<std::string> &itemSuffix,
+					  const std::string &itemIndent,
+					  bool doCommas );
+	void setFileInfo( const std::vector<std::string> &filePrefix,
+					  const std::vector<std::string> &fileSuffix );
+					  
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
-protected:
-	CompileSet( std::string name );
+	static void emitCode( const std::string &outfn,
+						  const std::vector<std::string> &inputs,
+						  const std::string &filePrefix,
+						  const std::string &fileSuffix,
+						  const std::string &itemPrefix,
+						  const std::string &itemSuffix,
+						  const std::string &itemIndent,
+						  bool doCommas );
 
-	void
-	followChains( std::queue<std::shared_ptr<BuildItem>> &chainsToCheck,
-				  std::set<std::string> &tags,
-				  const std::shared_ptr<BuildItem> &ret,
-				  TransformSet &xform ) const;
+private:
+	void processEntry( const std::string &tag,
+					   const std::shared_ptr<Directory> &tmpd,
+					   const std::vector<std::string> &list,
+					   const std::shared_ptr<BuildItem> &ret,
+					   std::vector<std::string> &varlist ) const;
 
-	std::shared_ptr<BuildItem>
-	chainTransform( const std::string &name,
-					const std::shared_ptr<Directory> &srcdir,
-					TransformSet &xform ) const;
-
-	std::vector<ItemPtr> myItems;
+	std::vector<std::string> myItemPrefix, myItemSuffix;
+	std::vector<std::string> myFilePrefix, myFileSuffix;
+	std::string myItemIndent;
+	bool myDoCommas = false;
 };
 
+
+////////////////////////////////////////
 
 

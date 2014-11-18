@@ -204,14 +204,23 @@ emitTargets( std::ostream &os, const TransformSet &x )
 			auto &bivars = bi->getVariables();
 			for ( auto &bv: bivars )
 			{
-				std::string outv = bv.second.prepended_value( t->getCommandPrefix( bv.first ) );
+				std::string outv;
+				if ( bv.second.useToolFlagTransform() )
+				{
+					auto tt = x.getTool( bv.second.getToolTag() );
+					if ( ! tt )
+						throw std::runtime_error( "Variable set to use tool flag transform, but no tool with tag '" + bv.second.getToolTag() + "' found" );
+					outv = bv.second.prepended_value( tt->getCommandPrefix( bv.first ) );
+				}
+				else
+					outv = bv.second.prepended_value( t->getCommandPrefix( bv.first ) );
 				os << "\n  " << bv.first << "=" << outv;
 			}
 
 			if ( bi->isTopLevelItem() )
 			{
 				PRECONDITION( bi->getOutputs().size() == 1,
-							  "Expecting top level item to only have 1 output" );
+							  "Expecting top level item '" << bi->getName() << "' to have 1 output, found " << bi->getOutputs().size() );
 				os << "\nbuild " << escape( bi->getName() ) << ": phony "
 				   << outd->makefilename( bi->getOutputs()[0] )
 				   << '\n';
@@ -307,6 +316,7 @@ NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 	f <<
 		"\nrule regen_constructor\n"
 		"  command = cd $in" << " &&";
+	// TODO: Add environment support???
 	for ( int a = 0; a < argc; ++a )
 		f << ' ' << argv[a];
 	f <<

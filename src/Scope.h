@@ -55,10 +55,14 @@ public:
 	inline std::shared_ptr<Scope> getParent( void ) const;
 	std::shared_ptr<Scope> newSubScope( bool inherits );
 
-//	void setNameDir( const std::shared_ptr<Directory> &d );
-//	std::string createName( const std::shared_ptr<Directory> &outDir );
-
 	inline const std::vector< std::shared_ptr<Scope> > &getSubScopes( void ) const;
+
+//	class VariableGroup
+//	{
+//	};
+//
+//	std::shared_ptr<VariableGroup> pushVariableGroup( void );
+//	void popVariableGroup( void );
 
 	inline VariableSet &getVars( void );
 	inline const VariableSet &getVars( void ) const;
@@ -94,7 +98,6 @@ private:
 	VariableSet myVariables;
 	VariableSet myOptions;
 	std::vector< std::shared_ptr<Scope> > mySubScopes;
-	std::shared_ptr<Directory> myNameDir;
 
 	std::vector<ItemPtr> myItems;
 

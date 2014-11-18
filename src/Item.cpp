@@ -119,6 +119,28 @@ Item::transform( TransformSet &xform ) const
 
 
 void
+Item::copyDependenciesToBuild( TransformSet &xform ) const
+{
+	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	if ( ! ret )
+		return;
+
+	for ( auto dep: myDependencies )
+	{
+		if ( dep.first )
+		{
+			std::shared_ptr<BuildItem> d = xform.getTransform( dep.first.get() );
+			if ( d )
+				ret->addDependency( dep.second, d );
+		}
+	}
+}
+
+
+////////////////////////////////////////
+
+
+void
 Item::forceTool( const std::string &ext, const std::string &t )
 {
 	myForceTool[ext] = t;
@@ -143,6 +165,22 @@ Item::getVariable( const std::string &nm )
 {
 	auto v = myVariables.emplace( std::make_pair( nm, Variable( nm ) ) );
 	return v.first->second;
+}
+
+
+////////////////////////////////////////
+
+
+const Variable &
+Item::getVariable( const std::string &nm ) const
+{
+	auto i = myVariables.find( nm );
+	if ( i == myVariables.end() )
+	{
+		static const Variable nilVar = Variable( std::string() );
+		return nilVar;
+	}
+	return i->second;
 }
 
 

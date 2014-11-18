@@ -22,31 +22,20 @@
 
 #pragma once
 
-#include <string>
-#include <map>
+#include "Compile.h"
 
 
 ////////////////////////////////////////
 
 
-class Scope;
-
-class DefaultTools
+class Executable : public CompileSet
 {
 public:
-	static void checkAndAddCFamilies( Scope &s );
+	Executable( std::string name );
+	virtual ~Executable( void );
+
+	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
 protected:
-#ifdef WIN32
-	static bool checkAndAddCl( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-#endif
-	static bool checkAndAddClang( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static bool checkAndAddGCC( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static void checkAndAddArchiver( Scope &s, const std::map<std::string, std::string> &exelist );
-	static void addSelfGenerator( Scope &s );
+	virtual std::shared_ptr<Directory> getOutputDir( TransformSet &xform ) const;
 };
-
-
-
-
-

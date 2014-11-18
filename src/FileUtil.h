@@ -79,5 +79,8 @@ const std::vector<std::string> &getPath( void );
 bool findExecutable( std::string &filepath, const std::string &name );
 std::map<std::string, std::string> findExecutables( std::vector<std::string> progs );
 
+void setArgv0( const std::string &a );
+const std::string &getArgv0( void );
+
 } // namespace File
 

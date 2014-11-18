@@ -78,29 +78,6 @@ Scope::newSubScope( bool inherits )
 ////////////////////////////////////////
 
 
-//void
-//Scope::setNameDir( const std::shared_ptr<Directory> &d )
-//{
-//	myNameDir = d;
-//}
-
-
-////////////////////////////////////////
-
-
-//std::string
-//Scope::createName( const std::shared_ptr<Directory> &outDir )
-//{
-//	if ( myNameDir )
-//		return myNameDir->( '_' );
-//
-//	return std::string();
-//}
-
-
-////////////////////////////////////////
-
-
 void
 Scope::addTool( const std::shared_ptr<Tool> &t )
 {
@@ -244,6 +221,9 @@ Scope::transform( TransformSet &xform,
 
 	for ( const ItemPtr &i: myItems )
 		i->transform( xform );
+
+	for ( const ItemPtr &i: myItems )
+		i->copyDependenciesToBuild( xform );
 }
 
 

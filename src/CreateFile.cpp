@@ -20,33 +20,64 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#pragma once
+#include "CreateFile.h"
 
-#include <string>
-#include <map>
+#include "Debug.h"
+#include "TransformSet.h"
+#include "FileUtil.h"
 
 
 ////////////////////////////////////////
 
 
-class Scope;
-
-class DefaultTools
+CreateFile::CreateFile( const std::string &name )
+		: Item( name )
 {
-public:
-	static void checkAndAddCFamilies( Scope &s );
-
-protected:
-#ifdef WIN32
-	static bool checkAndAddCl( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-#endif
-	static bool checkAndAddClang( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static bool checkAndAddGCC( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static void checkAndAddArchiver( Scope &s, const std::map<std::string, std::string> &exelist );
-	static void addSelfGenerator( Scope &s );
-};
+}
 
 
+////////////////////////////////////////
 
+
+CreateFile::~CreateFile( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+void
+CreateFile::setLines( const std::vector<std::string> &l )
+{
+	myLines = l;
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<BuildItem>
+CreateFile::transform( TransformSet &xform ) const
+{
+	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	if ( ret )
+		return ret;
+
+	ret = std::make_shared<BuildItem>( getName(), getDir() );
+
+	auto outd = getDir()->reroot( xform.getArtifactDir() );
+	outd->updateIfDifferent( getName(), myLines );
+
+	ret->setOutputDir( outd );
+	ret->setOutputs( { getName() } );
+
+	xform.recordTransform( this, ret );
+
+	return ret;
+}
+
+
+////////////////////////////////////////
 
 

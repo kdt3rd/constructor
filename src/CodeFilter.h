@@ -22,31 +22,32 @@
 
 #pragma once
 
+#include "Compile.h"
+
 #include <string>
-#include <map>
+#include <vector>
 
 
 ////////////////////////////////////////
 
 
-class Scope;
-
-class DefaultTools
+class CodeFilter : public CompileSet
 {
 public:
-	static void checkAndAddCFamilies( Scope &s );
+	CodeFilter( std::string name );
+	virtual ~CodeFilter( void );
 
-protected:
-#ifdef WIN32
-	static bool checkAndAddCl( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-#endif
-	static bool checkAndAddClang( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static bool checkAndAddGCC( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static void checkAndAddArchiver( Scope &s, const std::map<std::string, std::string> &exelist );
-	static void addSelfGenerator( Scope &s );
+	void setTool( const std::shared_ptr<Tool> &t );
+	void setOutputs( std::vector<std::string> o );
+
+	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
+
+private:
+	std::shared_ptr<Tool> myTool;
+	std::vector<std::string> myOutputs;
 };
 
 
-
+////////////////////////////////////////
 
 

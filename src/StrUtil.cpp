@@ -368,8 +368,10 @@ void substituteVariables( std::string &val, bool requireCurly,
 		}
 
 		std::string::size_type endVar = std::string::npos;
+		std::string::size_type extraReplace = 0;
 		if ( val[i] == '{' )
 		{
+			++extraReplace;
 			++i;
 			endVar = val.find_first_of( '}', i );
 			if ( endVar == std::string::npos )
@@ -389,7 +391,7 @@ void substituteVariables( std::string &val, bool requireCurly,
 		{
 			std::string varname = val.substr( i, endVar - i );
 			const std::string &vv = varLookup( varname );
-			val.replace( varStart, endVar - varStart, vv );
+			val.replace( varStart, endVar - varStart + extraReplace, vv );
 			i = endVar;
 		}
 

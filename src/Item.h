@@ -58,6 +58,7 @@ public:
 	inline const std::shared_ptr<Directory> &getDir( void ) const;
 
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
+	virtual void copyDependenciesToBuild( TransformSet &xform ) const;
 
 	virtual void forceTool( const std::string &ext, const std::string &t );
 	virtual void overrideToolSetting( const std::string &s, const std::string &n );
@@ -65,6 +66,7 @@ public:
 	inline VariableSet &getVariables( void );
 	inline const VariableSet &getVariables( void ) const;
 	Variable &getVariable( const std::string &nm );
+	const Variable &getVariable( const std::string &nm ) const;
 	void setVariable( const std::string &nm, const std::string &value,
 					  bool doSplit = false );
 	bool findVariableValueRecursive( std::string &val, const std::string &nm ) const;

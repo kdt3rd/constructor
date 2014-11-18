@@ -50,6 +50,9 @@ public:
 	void cd( const std::string &name );
 	void cdUp( void );
 
+	// returns the last directory entry (kind of like basename)
+	const std::string &cur( void ) const;
+
 	void mkpath( void ) const;
 	// kind of like realpath, but doesn't actually
 	// check for existence or resolve any symlinks, but
@@ -73,6 +76,9 @@ public:
 
 	std::string relativeTo( const Directory &o,
 							const std::string &fn = std::string() ) const;
+
+	void updateIfDifferent( const std::string &fn,
+							const std::vector<std::string> &lines );
 
 	// NB: modifying this will modify global state, but doesn't change
 	// any O.S. level current directory, at least currently. if we

@@ -24,6 +24,7 @@
 
 #include "ScopeGuard.h"
 #include "StrUtil.h"
+#include "Debug.h"
 
 #include <unistd.h>
 #include <errno.h>
@@ -33,6 +34,7 @@
 #include <stdlib.h>
 #include <sstream>
 #include <iostream>
+#include <fstream>
 #include <list>
 #include <iterator>
 #include <stack>
@@ -233,10 +235,32 @@ Directory::cd( const std::string &name )
 void
 Directory::cdUp( void )
 {
-	if ( mySubDirs.empty() )
-		throw std::runtime_error( "Attempt to change directories above root" );
-	mySubDirs.pop_back();
+	if ( ! mySubDirs.empty() )
+		mySubDirs.pop_back();
+	else
+	{
+		if ( myFullDirs.empty() )
+			throw std::runtime_error( "Attempt to change directories above root" );
+		myFullDirs.pop_back();
+	}
+	
 	updateFullPath();
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+Directory::cur( void ) const
+{
+	if ( ! mySubDirs.empty() )
+		return mySubDirs.back();
+
+	if ( ! myFullDirs.empty() )
+		return myFullDirs.back();
+
+	return String::empty();
 }
 
 
@@ -479,6 +503,58 @@ Directory::relativeTo( const Directory &o,
 	}
 
 	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Directory::updateIfDifferent( const std::string &name, const std::vector<std::string> &lines )
+{
+	bool doCreate = true;
+	std::string fn;
+	if ( exists( fn, name ) )
+	{
+		std::ifstream inf( fn );
+		size_t curIdx = 0;
+		std::string curLine;
+		do
+		{
+			if ( std::getline( inf, curLine ) )
+			{
+				if ( curIdx >= lines.size() )
+					break;
+
+				if ( lines[curIdx] != curLine )
+				{
+					VERBOSE( name << ": line " << (curIdx + 1) << " differs: '" << curLine << "' vs '" << lines[curIdx] << "' - regenerating" );
+					break;
+				}
+				++curIdx;
+			}
+			else if ( curIdx == lines.size() )
+			{
+				doCreate = false;
+				break;
+			}
+			else
+			{
+				VERBOSE( name << ": line count different - regenerating" );
+				break;
+			}
+		} while ( doCreate );
+	}
+	
+	if ( doCreate )
+	{
+		mkpath();
+		fn = makefilename( name );
+		VERBOSE( "Creating/updating '" << fn << "'..." );
+		std::ofstream outf( fn );
+		for ( const std::string &l: lines )
+			outf << l << '\n';
+	}
 }
 
 

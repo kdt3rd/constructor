@@ -54,6 +54,7 @@ DefaultTools::checkAndAddCFamilies( Scope &s )
 	makeDef = checkAndAddClang( s, exes, ! makeDef );
 	makeDef = checkAndAddGCC( s, exes, ! makeDef );
 	checkAndAddArchiver( s, exes );
+	addSelfGenerator( s );
 }
 
 
@@ -126,9 +127,9 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			t->myImplDepName = "$out.d";
 			t->myImplDepStyle = "gcc";
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
-			t->myFlagPrefixes = { { "includes", "-I" } };
+			t->myFlagPrefixes = { { "includes", "-I" }, { "defines", "-D" } };
 			t->myDescription = " CC $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$defines", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -216,8 +217,8 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			t->myImplDepStyle = "gcc";
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
 			t->myDescription = "CXX $out";
-			t->myFlagPrefixes = { { "includes", "-I" } };
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
+			t->myFlagPrefixes = { { "includes", "-I" }, { "defines", "-D" } };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$defines", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -329,9 +330,9 @@ DefaultTools::checkAndAddGCC( Scope &s, const std::map<std::string, std::string>
 			t->myImplDepName = "$out.d";
 			t->myImplDepStyle = "gcc";
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
-			t->myFlagPrefixes = { { "includes", "-I" } };
+			t->myFlagPrefixes = { { "includes", "-I" }, { "defines", "-D" } };
 			t->myDescription = " CC $out";
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$defines", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -419,8 +420,8 @@ DefaultTools::checkAndAddGCC( Scope &s, const std::map<std::string, std::string>
 			t->myImplDepStyle = "gcc";
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
 			t->myDescription = "CXX $out";
-			t->myFlagPrefixes = { { "includes", "-I" } };
-			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$includes", "-c", "-o", "$out", "$in" };
+			t->myFlagPrefixes = { { "includes", "-I" }, { "defines", "-D" } };
+			t->myCommand = { "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$defines", "$includes", "-c", "-o", "$out", "$in" };
 
 			s.addTool( t );
 
@@ -518,6 +519,25 @@ DefaultTools::checkAndAddArchiver( Scope &s, const std::map<std::string, std::st
 			s.addTool( t );
 		}
 	}
+}
+
+
+////////////////////////////////////////
+
+
+void
+DefaultTools::addSelfGenerator( Scope &s )
+{
+	std::string selfTool;
+	bool haveSelf = File::findExecutable( selfTool, File::getArgv0() );
+	if ( ! haveSelf )
+		selfTool = File::getArgv0();
+
+	std::shared_ptr<Tool> t = std::make_shared<Tool>( "codegen_binary_cstring", "codegen_binary_cstring" );
+	t->myExeName = selfTool;
+	t->myCommand = { selfTool, "-embed_binary_cstring", "$out", "$codegen_info", "$in"};
+	t->myDescription = "BLOB $out";
+	s.addTool( t );
 }
 
 

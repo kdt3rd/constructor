@@ -102,6 +102,7 @@ public:
 						const struct luaL_Reg *memberFuncs );
 
 	int runFile( const char *filename );
+	int runFile( const char *filename, int envPos );
 
 	inline lua_State *state( void ) { return L; }
 	const char *getError( void );
@@ -121,9 +122,10 @@ private:
 	std::vector< std::shared_ptr<FunctionBase> > mCPPFuncs;
 	std::stack< std::pair<std::string, bool> > myCurLib;
 	std::stack<int> myFileFuncs;
+	std::stack<std::string> myFileNames;
 
 	lua_State *L;
-//	int myErrFunc;
+	int myErrFunc;
 };
 
 } // namespace Lua

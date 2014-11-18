@@ -552,3 +552,29 @@ Tool::parse( const Lua::Value &v )
 }
 
 
+////////////////////////////////////////
+
+
+std::shared_ptr<Tool>
+Tool::createInternalTool( const std::string &tag,
+						  const std::string &name,
+						  const std::string &desc,
+						  const std::string &exeName,
+						  const ItemPtr &exe,
+						  const std::vector<std::string> &command )
+{
+	std::shared_ptr<Tool> ret = std::make_shared<Tool>( tag, name );
+	ret->myDescription = desc;
+	ret->myExePointer = exe;
+	if ( ! exe )
+		ret->myExeName = exeName;
+	ret->myCommand = command;
+	return ret;
+}
+
+
+////////////////////////////////////////
+
+
+
+

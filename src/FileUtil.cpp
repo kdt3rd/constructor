@@ -54,6 +54,7 @@ static void initPath( void )
 {
 	thePath = String::split( OS::getenv( "PATH" ), OS::pathSeparator() );
 }
+static std::string theArgv0;
 
 } // empty namespace
 
@@ -347,6 +348,12 @@ find( std::string &filepath, const std::vector<std::string> &names,
 bool
 find( std::string &filepath, const std::string &name, const std::vector<std::string> &path )
 {
+	if ( isAbsolute( name.c_str() ) && exists( name.c_str() ) )
+	{
+		filepath = name;
+		return true;
+	}
+
 	for ( const auto &p: path )
 	{
 		try
@@ -498,6 +505,22 @@ findExecutables( std::vector<std::string> progs )
 #endif
 
 	return find( std::move( progs ), thePath );
+}
+
+
+////////////////////////////////////////
+
+
+void
+setArgv0( const std::string &a )
+{
+	theArgv0 = a;
+}
+
+const std::string &
+getArgv0( void )
+{
+	return theArgv0;
 }
 
 } // namespace File

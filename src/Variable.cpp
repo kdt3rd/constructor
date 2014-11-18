@@ -273,7 +273,7 @@ Variable::prepended_value( const std::string &prefix ) const
 		if ( ! ret.empty() )
 			ret.push_back( ' ' );
 
-		if ( i[0] != '$' && i.find( prefix ) != 0 )
+		if ( i.find( prefix ) != 0 )
 			ret.append( prefix );
 
 		ret.append( i );

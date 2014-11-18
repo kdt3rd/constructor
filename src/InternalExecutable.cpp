@@ -20,31 +20,38 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#pragma once
-
-#include <string>
-#include <map>
+#include "InternalExecutable.h"
 
 
 ////////////////////////////////////////
 
 
-class Scope;
-
-class DefaultTools
+InternalExecutable::InternalExecutable( std::string name )
+		: Executable( std::move( name ) )
 {
-public:
-	static void checkAndAddCFamilies( Scope &s );
+}
 
-protected:
-#ifdef WIN32
-	static bool checkAndAddCl( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-#endif
-	static bool checkAndAddClang( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static bool checkAndAddGCC( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static void checkAndAddArchiver( Scope &s, const std::map<std::string, std::string> &exelist );
-	static void addSelfGenerator( Scope &s );
-};
+
+////////////////////////////////////////
+
+
+InternalExecutable::~InternalExecutable( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<Directory>
+InternalExecutable::getOutputDir( TransformSet &xform ) const
+{
+	return getDir()->reroot( xform.getArtifactDir() );
+}
+
+
+////////////////////////////////////////
+
 
 
 

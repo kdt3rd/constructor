@@ -32,6 +32,12 @@
 #include "Directory.h"
 #include "Scope.h"
 #include "Compile.h"
+#include "Executable.h"
+#include "Library.h"
+#include "CodeGenerator.h"
+#include "CodeFilter.h"
+#include "CreateFile.h"
+#include "InternalExecutable.h"
 #include "Configuration.h"
 #include "PackageConfig.h"
 
@@ -72,6 +78,25 @@ extractItem( lua_State *L, int i )
 }
 
 
+////////////////////////////////////////
+
+
+static ItemPtr
+extractItem( const Lua::Value &v )
+{
+	if ( v.type() == LUA_TUSERDATA )
+	{
+		void *ud = v.asPointer();
+		if ( ud )
+			return *(reinterpret_cast<ItemPtr *>( ud ) );
+
+		throw std::runtime_error( "User data item for executable is not a valid item" );
+	}
+
+	throw std::runtime_error( "Argument is not a constructor item" );
+}
+
+
 
 ////////////////////////////////////////
 
@@ -91,6 +116,60 @@ pushItem( lua_State *L, ItemPtr i )
 
 	luaL_setmetatable( L, "Constructor.Item" );
 	new (sptr) ItemPtr( std::move( i ) );
+}
+
+static void
+recurseAndAdd( std::shared_ptr<CompileSet> &ret,
+			   lua_State *L, int i )
+{
+	if ( lua_isnil( L, i ) )
+		return;
+	if ( lua_isstring( L, i ) )
+	{
+		size_t len = 0;
+		const char *n = lua_tolstring( L, i, &len );
+		if ( n )
+			ret->addItem( std::string( n, len ) );
+		else
+			throw std::runtime_error( "String argument, but unable to extract string" );
+	}
+	else if ( lua_isuserdata( L, i ) )
+		ret->addItem( extractItem( L, i ) );
+	else if ( lua_istable( L, i ) )
+	{
+		lua_pushnil( L );
+		while ( lua_next( L, i ) )
+		{
+			recurseAndAdd( ret, L, lua_gettop( L ) );
+			lua_pop( L, 1 );
+		}
+	}
+	else
+		throw std::runtime_error( "Unhandled argument type to Compile" );
+}
+
+template <typename Set>
+static void
+recurseAndAdd( const std::shared_ptr<Set> &ret,
+			   const Lua::Value &curV )
+{
+	switch ( curV.type() )
+	{
+		case LUA_TNIL:
+			break;
+		case LUA_TSTRING:
+			ret->addItem( curV.asString() );
+			break;
+		case LUA_TTABLE:
+			for ( auto &i: curV.asTable() )
+				recurseAndAdd( ret, i.second );
+			break;
+		case LUA_TUSERDATA:
+			ret->addItem( extractItem( curV ) );
+			break;
+		default:
+			throw std::runtime_error( "Unhandled argument type passed to Compile" );
+	}
 }
 
 
@@ -206,40 +285,6 @@ luaJoinPath( lua_State *L )
 	return 1;
 }
 
-static int
-SubDir( lua_State *L )
-{
-	int N = lua_gettop( L );
-	if ( N != 1 || ! lua_isstring( L, 1 ) )
-	{
-		luaL_error( L, "SubDir expects at directory name string as an argument" );
-		return 1;
-	}
-	int ret = 0;
-
-	std::string file = lua_tolstring( L, 1, NULL );
-	std::shared_ptr<Directory> curDir = Directory::current();
-	std::string tmp;
-	if ( curDir->exists( tmp, file ) )
-	{
-		curDir = Directory::pushd( file );
-		ON_EXIT{ Directory::popd(); };
-
-		std::string nextFile;
-		if ( curDir->exists( nextFile, buildFileName() ) )
-		{
-			ret = Lua::Engine::singleton().runFile( nextFile.c_str() );
-			theSubDirFiles.push_back( nextFile );
-		}
-		else
-			throw std::runtime_error( "Unable to find a '" + std::string( buildFileName() ) + "' in " + curDir->fullpath() );
-	}
-	else
-		throw std::runtime_error( "Sub Directory '" + file + "' does not exist in " + curDir->fullpath() );
-
-	return ret;
-}
-
 std::string
 SourceDir( void )
 {
@@ -258,6 +303,207 @@ SourceFile( const std::string &fn )
 	return Directory::current()->makefilename( fn );
 }
 
+
+////////////////////////////////////////
+
+
+int
+luaCodeFilter( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 || ! lua_istable( L, 1 ) )
+		throw std::runtime_error( "Expecting a single (table) argument to CodeFilter - use CodeFilter{ args... } as a quick way to create a table" );
+
+	Lua::Value v;
+	v.load( L, 1 );
+	const Lua::Table &t = v.asTable();
+
+	std::string tag, name, desc;
+	std::vector<std::string> inputFiles;
+	std::vector<std::string> outputFiles;
+	std::vector<std::string> cmd;
+	std::string exeName;
+	ItemPtr exePtr;
+
+	for ( auto &i: t )
+	{
+		if ( i.first.type == Lua::KeyType::INDEX )
+			continue;
+
+		const std::string &k = i.first.tag;
+		if ( k == "tag" )
+			tag = i.second.asString();
+		else if ( k == "name" )
+			name = i.second.asString();
+		else if ( k == "description" )
+			desc = i.second.asString();
+		else if ( k == "exe" )
+		{
+			if ( i.second.type() == LUA_TUSERDATA )
+				exePtr = extractItem( i.second );
+			else
+				exeName = i.second.asString();
+		}
+		else if ( k == "exe_source" || k == "sources" || k == "outputs" ||
+				  k == "variables" )
+		{
+			// we're going to finish loading everything else
+			// then loop over again so we have the name
+			continue;
+		}
+		else if ( k == "cmd" )
+			cmd = i.second.toStringList();
+		else
+			throw std::runtime_error( "Unhandled tag '" + k + "' in CodeFilter" );
+	}
+
+	if ( name.empty() )
+		throw std::runtime_error( "Generator definition requires a name" );
+
+	std::shared_ptr<CodeFilter> ret = std::make_shared<CodeFilter>( name );
+
+	for ( auto &i: t )
+	{
+		if ( i.first.type == Lua::KeyType::INDEX )
+			continue;
+
+		const std::string &k = i.first.tag;
+		if ( k == "exe_source" )
+		{
+			// we're going to finish loading everything else
+			// then loop over again so we have the name
+			if ( exePtr )
+				throw std::runtime_error( "Multiple executable sources specified for code generator" );
+			auto e = std::make_shared<InternalExecutable>( exeName.empty() ? name : exeName );
+			recurseAndAdd( e, i.second );
+			exePtr = e;
+		}
+		else if ( k == "sources" )
+			recurseAndAdd( ret, i.second );
+		else if ( k == "outputs" )
+			ret->setOutputs( i.second.toStringList() );
+		else if ( k == "variables" )
+		{
+			const Lua::Table &vars = i.second.asTable();
+			for ( auto &x: vars )
+			{
+				if ( x.first.type == Lua::KeyType::INDEX )
+					continue;
+				const std::string &vk = x.first.tag;
+				ret->getVariable( vk ).reset( x.second.toStringList() );
+			}
+		}
+	}
+
+	if ( exePtr )
+		ret->addDependency( DependencyType::ORDER, exePtr );
+
+	std::shared_ptr<Tool> gt = Tool::createInternalTool( tag, name, desc,
+														 exeName, exePtr,
+														 cmd );
+	ret->setTool( gt );
+	Scope::current().addTool( gt );
+
+	Scope::current().addItem( ret );
+	pushItem( L, ret );
+
+	return 1;
+}
+
+
+////////////////////////////////////////
+
+
+static int
+luaCreateFile( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N != 2 || ! lua_isstring( L, 1 ) || ! lua_istable( L, 2 ) )
+		throw std::runtime_error( "CreateFile expects 2 arguments: file name, table of strings - one for each line" );
+
+	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
+	Lua::Value v;
+	v.load( L, 2 );
+	std::shared_ptr<CreateFile> ret = std::make_shared<CreateFile>( name );
+	ret->setLines( v.toStringList() );
+
+	Scope::current().addItem( ret );
+	pushItem( L, ret );
+	return 1;
+}
+
+static int
+luaGenerateSource( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 || ! lua_istable( L, 1 ) )
+		throw std::runtime_error( "Expecting a single (table) argument to GenerateSourceDataFile - use function{ args... } as a quick way to create a table" );
+
+	Lua::Value v;
+	v.load( L, 1 );
+	const Lua::Table &t = v.asTable();
+
+	std::string name;
+	std::vector<std::string> inputItems;
+	std::vector<std::string> itemPrefix, filePrefix;
+	std::vector<std::string> itemSuffix, fileSuffix;
+	std::string itemIndent;
+	std::string function;
+	bool doCommas = false;
+
+	for ( auto &i: t )
+	{
+		if ( i.first.type == Lua::KeyType::INDEX )
+			continue;
+
+		const std::string &k = i.first.tag;
+		if ( k == "output" )
+			name = i.second.asString();
+		else if ( k == "input_items" )
+			inputItems = i.second.toStringList();
+		else if ( k == "file_prefix" )
+			filePrefix = i.second.toStringList();
+		else if ( k == "file_suffix" )
+			fileSuffix = i.second.toStringList();
+		else if ( k == "item_prefix" )
+			itemPrefix = i.second.toStringList();
+		else if ( k == "item_suffix" )
+			itemSuffix = i.second.toStringList();
+		else if ( k == "item_indent" )
+			itemIndent = i.second.asString();
+		else if ( k == "item_transform_func" )
+		{
+			// eventually, make this a lua function
+			function = i.second.asString();
+		}
+		else if ( k == "comma_separate" )
+			doCommas = i.second.asBool();
+		else
+			throw std::runtime_error( "Unhandled tag '" + k + "' in GenerateSourceDataFile" );
+	}
+
+	if ( name.empty() )
+		throw std::runtime_error( "GenerateSourceDataFile definition requires an output" );
+
+	if ( function.empty() )
+		throw std::runtime_error( "GenerateSourceDataFile requires a transform function spec" );
+
+	if ( function != "binary_cstring" )
+		throw std::runtime_error( "GenerateSourceDataFile unsupported function '" + function + "'" );
+
+	if ( inputItems.empty() )
+		throw std::runtime_error( "GenerateSourceDataFile definition requires a list of input items" );
+
+	std::shared_ptr<CodeGenerator> ret = std::make_shared<CodeGenerator>( name );
+
+	for ( const std::string &i: inputItems )
+		ret->addItem( i );
+
+	ret->setItemInfo( itemPrefix, itemSuffix, itemIndent, doCommas );
+	ret->setFileInfo( filePrefix, fileSuffix );
+
+	Scope::current().addItem( ret );
+	pushItem( L, ret );
+	return 1;
+}
 
 
 ////////////////////////////////////////
@@ -449,47 +695,56 @@ luaSetOption( lua_State *L )
 }
 
 static int
+luaSubDir( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 1 || ! lua_isstring( L, 1 ) )
+		throw std::runtime_error( "SubDir expects at directory name string as an argument" );
+	if ( N > 2 )
+		throw std::runtime_error( "SubDir can pass an environment to a subdirectory, but at most 2 arguments expected" );
+	else if ( N == 2 )
+	{
+		if ( ! lua_istable( L, 2 ) )
+			throw std::runtime_error( "SubDir expects a table as the environment argument" );
+	}
+	int ret = 0;
+
+	std::string file = Lua::Parm<std::string>::get( L, N, 1 );
+	std::shared_ptr<Directory> curDir = Directory::current();
+	std::string tmp;
+	if ( curDir->exists( tmp, file ) )
+	{
+		curDir = Directory::pushd( file );
+		ON_EXIT{ Directory::popd(); };
+
+		std::string nextFile;
+		if ( curDir->exists( nextFile, buildFileName() ) )
+		{
+			if ( N == 2 )
+				ret = Lua::Engine::singleton().runFile( nextFile.c_str(), 2 );
+			else
+				ret = Lua::Engine::singleton().runFile( nextFile.c_str() );
+			theSubDirFiles.push_back( nextFile );
+		}
+		else
+			throw std::runtime_error( "Unable to find a '" + std::string( buildFileName() ) + "' in " + curDir->fullpath() );
+	}
+	else
+		throw std::runtime_error( "Sub Directory '" + file + "' does not exist in " + curDir->fullpath() );
+
+	return ret;
+}
+
+static int
 luaSubProj( lua_State *L )
 {
 	Scope::pushScope( Scope::current().newSubScope( false ) );
 	ON_EXIT{ Scope::popScope(); };
-	int ret = SubDir( L );
-//	Scope::current().setNameDir( Directory::last() );
-	return ret;
-}
-
-static void
-recurseAndAdd( std::shared_ptr<CompileSet> &ret,
-			   lua_State *L, int i )
-{
-	if ( lua_isnil( L, i ) )
-		return;
-	if ( lua_isstring( L, i ) )
-	{
-		size_t len = 0;
-		const char *n = lua_tolstring( L, i, &len );
-		if ( n )
-			ret->addItem( std::string( n, len ) );
-		else
-			throw std::runtime_error( "String argument, but unable to extract string" );
-	}
-	else if ( lua_isuserdata( L, i ) )
-		ret->addItem( extractItem( L, i ) );
-	else if ( lua_istable( L, i ) )
-	{
-		lua_pushnil( L );
-		while ( lua_next( L, i ) )
-		{
-			recurseAndAdd( ret, L, lua_gettop( L ) );
-			lua_pop( L, 1 );
-		}
-	}
-	else
-		throw std::runtime_error( "Unhandled argument type to Compile" );
+	return luaSubDir( L );
 }
 
 static int
-compile( lua_State *L )
+luaCompile( lua_State *L )
 {
 	int N = lua_gettop( L );
 	if ( N == 0 )
@@ -508,7 +763,7 @@ compile( lua_State *L )
 }
 
 static int
-executable( lua_State *L )
+luaExecutable( lua_State *L )
 {
 	int N = lua_gettop( L );
 	if ( N < 2 )
@@ -524,8 +779,10 @@ executable( lua_State *L )
 	return 1;
 }
 
+static std::map<std::string, ItemPtr> theDefinedLibs;
+
 static int
-library( lua_State *L )
+luaLibrary( lua_State *L )
 {
 	int N = lua_gettop( L );
 	if ( N < 2 )
@@ -536,13 +793,81 @@ library( lua_State *L )
 	for ( int i = 2; i <= N; ++i )
 		recurseAndAdd( ret, L, i );
 
+	if ( theDefinedLibs.find( ret->getName() ) != theDefinedLibs.end() )
+		throw std::runtime_error( "Multiple libraries by the name '" + ename + "' defined" );
+
+	theDefinedLibs[ret->getName()] = ret;
 	Scope::current().addItem( ret );
 	pushItem( L, ret );
 	return 1;
 }
 
 static int
-include( lua_State *L )
+luaUseLibraries( lua_State *L )
+{
+	int N = lua_gettop( L );
+
+	std::vector<ItemPtr> ret;
+	for ( int i = 1; i <= N; ++i )
+	{
+		std::string lname = Lua::Parm<std::string>::get( L, N, i );
+		auto l = theDefinedLibs.find( lname );
+		if ( l == theDefinedLibs.end() )
+			throw std::runtime_error( "Unable to find library by name '" + lname + "', make sure it is declared first" );
+		ret.push_back( l->second );
+	}
+
+	if ( ret.empty() )
+	{
+		lua_pushnil( L );
+	}
+	else
+	{
+		lua_newtable( L );
+		for ( size_t i = 0, RN = ret.size(); i != RN; ++i )
+		{
+			lua_pushunsigned( L, lua_Unsigned( i + 1 ) );
+			pushItem( L, ret[i] );
+			lua_rawset( L, -3 );
+		}
+	}
+	return 1;
+}
+
+static void
+recurseAndAddPath( Variable &v, lua_State *L, int i )
+{
+	if ( lua_isnil( L, i ) )
+		return;
+	if ( lua_isstring( L, i ) )
+	{
+		size_t len = 0;
+		const char *n = lua_tolstring( L, i, &len );
+		if ( n )
+		{
+			if ( File::isAbsolute( n ) )
+				v.add( std::string( n, len ) );
+			else
+				v.add( Directory::current()->makefilename( n ) );
+		}
+		else
+			throw std::runtime_error( "String argument, but unable to extract string" );
+	}
+	else if ( lua_istable( L, i ) )
+	{
+		lua_pushnil( L );
+		while ( lua_next( L, i ) )
+		{
+			recurseAndAddPath( v, L, lua_gettop( L ) );
+			lua_pop( L, 1 );
+		}
+	}
+	else
+		throw std::runtime_error( "Unhandled argument type to Include" );
+}
+
+static int
+luaInclude( lua_State *L )
 {
 	auto &vars = Scope::current().getVars();
 	auto incPath = vars.find( "includes" );
@@ -554,14 +879,25 @@ include( lua_State *L )
 
 	int N = lua_gettop( L );
 	for ( int i = 1; i <= N; ++i )
-	{
-		std::string iname = Lua::Parm<std::string>::get( L, N, 1 );
+		recurseAndAddPath( v, L, i );
 
-		if ( File::isAbsolute( iname.c_str() ) )
-			v.add( std::move( iname ) );
-		else
-			v.add( Directory::current()->makefilename( iname ) );
-	}
+	return 0;
+}
+
+static int
+luaAddDefines( lua_State *L )
+{
+	auto &vars = Scope::current().getVars();
+	auto defs = vars.find( "defines" );
+	if ( defs == vars.end() )
+		defs = vars.emplace( std::make_pair( "defines", Variable( "defines" ) ) ).first;
+
+	Variable &v = defs->second;
+	v.setToolTag( "cc" );
+
+	int N = lua_gettop( L );
+	for ( int i = 1; i <= N; ++i )
+		v.add( Lua::Parm<std::string>::get( L, N, i ) );
 
 	return 0;
 }
@@ -752,6 +1088,89 @@ itemOverrideToolSetting( lua_State *L )
 	return 0;
 }
 
+static int
+itemAddIncludes( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 2 )
+		throw std::runtime_error( "Item:addIncludes() expects at least 2 arguments - self then string values" );
+	ItemPtr p = extractItem( L, 1 );
+
+	auto &vars = p->getVariables();
+	auto incPath = vars.find( "includes" );
+	if ( incPath == vars.end() )
+		incPath = vars.emplace( std::make_pair( "includes", Variable( "includes" ) ) ).first;
+
+	Variable &v = incPath->second;
+	v.inherit( true );
+	v.setToolTag( "cc" );
+
+	for ( int i = 2; i <= N; ++i )
+	{
+		std::string iname = Lua::Parm<std::string>::get( L, N, i );
+
+		if ( File::isAbsolute( iname.c_str() ) )
+			v.add( std::move( iname ) );
+		else
+			v.add( Directory::current()->makefilename( iname ) );
+	}
+
+	return 0;
+}
+
+static int
+itemAddArtifactInclude( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 1 )
+		throw std::runtime_error( "Item:includeArtifactDir() expects at least 1 argument - self" );
+	ItemPtr p = extractItem( L, 1 );
+
+	auto &vars = p->getVariables();
+	auto incPath = vars.find( "includes" );
+	if ( incPath == vars.end() )
+		incPath = vars.emplace( std::make_pair( "includes", Variable( "includes" ) ) ).first;
+
+	Variable &v = incPath->second;
+	v.inherit( true );
+	v.setToolTag( "cc" );
+	std::string path = "$builddir";
+	path.push_back( File::pathSeparator() );
+	path.append( "build" );
+	path.push_back( File::pathSeparator() );
+	Directory tmp( *(Directory::current()) );
+	tmp.cdUp();
+	std::string parpath = path;
+	parpath.append( tmp.relpath() );
+	v.add( parpath );
+	path.append( Directory::current()->relpath() );
+	v.add( path );
+
+	return 0;
+}
+
+static int
+itemAddDefines( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 2 )
+		throw std::runtime_error( "Item:addDefines() expects at least 2 arguments - self then string values" );
+	ItemPtr p = extractItem( L, 1 );
+
+	auto &vars = p->getVariables();
+	auto defs = vars.find( "defines" );
+	if ( defs == vars.end() )
+		defs = vars.emplace( std::make_pair( "defines", Variable( "defines" ) ) ).first;
+
+	Variable &v = defs->second;
+	v.setToolTag( "cc" );
+
+	for ( int i = 2; i <= N; ++i )
+		v.add( Lua::Parm<std::string>::get( L, N, i ) );
+
+	return 0;
+}
+
 
 ////////////////////////////////////////
 
@@ -788,6 +1207,9 @@ static const struct luaL_Reg item_m[] =
 	{ "inheritVariable", itemInheritVariable },
 	{ "forceTool", itemForceTool },
 	{ "overrideToolSetting", itemOverrideToolSetting },
+	{ "addIncludes", itemAddIncludes },
+	{ "addDefines", itemAddDefines },
+	{ "includeArtifactDir", itemAddArtifactInclude },
 	{ nullptr, nullptr }
 };
 
@@ -894,11 +1316,15 @@ registerExtensions( void )
 {
 	Engine &eng = Engine::singleton();
 
-	eng.registerFunction( "SubDir", &SubDir );
 	eng.registerFunction( "SourceDir", &SourceDir );
 	eng.registerFunction( "RelativeSourceDir", &RelSourceDir );
 	eng.registerFunction( "SourceFile", &SourceFile );
+	eng.registerFunction( "SubDir", &luaSubDir );
 	eng.registerFunction( "SubProject", &luaSubProj );
+
+	eng.registerFunction( "CodeFilter", &luaCodeFilter );
+	eng.registerFunction( "CreateFile", &luaCreateFile );
+	eng.registerFunction( "GenerateSourceDataFile", &luaGenerateSource );
 
 	eng.registerFunction( "AddTool", &luaAddTool );
 	eng.registerFunction( "AddToolSet", &luaAddToolSet );
@@ -909,10 +1335,12 @@ registerExtensions( void )
 	eng.registerFunction( "EnableLanguages", &luaEnableLangs );
 	eng.registerFunction( "SetOption", &luaSetOption );
 
-	eng.registerFunction( "Compile", &compile );
-	eng.registerFunction( "Executable", &executable );
-	eng.registerFunction( "Library", &library );
-	eng.registerFunction( "Include", &include );
+	eng.registerFunction( "Compile", &luaCompile );
+	eng.registerFunction( "Executable", &luaExecutable );
+	eng.registerFunction( "Library", &luaLibrary );
+	eng.registerFunction( "UseLibraries", &luaUseLibraries );
+	eng.registerFunction( "Include", &luaInclude );
+	eng.registerFunction( "AddDefines", &luaAddDefines );
 
 	{
 		eng.pushLibrary( "file" );

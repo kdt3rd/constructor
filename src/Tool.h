@@ -84,6 +84,12 @@ public:
 	Rule createRule( const TransformSet &x, bool useBraces = false ) const;
 
 	static std::shared_ptr<Tool> parse( const Lua::Value &v );
+	static std::shared_ptr<Tool> createInternalTool( const std::string &tag,
+													 const std::string &name,
+													 const std::string &desc,
+													 const std::string &exeName,
+													 const ItemPtr &exe,
+													 const std::vector<std::string> &command );
 
 private:
 	friend class DefaultTools;

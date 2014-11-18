@@ -22,29 +22,27 @@
 
 #pragma once
 
-#include <string>
-#include <map>
+#include "Item.h"
 
 
 ////////////////////////////////////////
 
 
-class Scope;
-
-class DefaultTools
+class CreateFile : public Item
 {
 public:
-	static void checkAndAddCFamilies( Scope &s );
+	CreateFile( const std::string &name );
+	virtual ~CreateFile( void );
 
-protected:
-#ifdef WIN32
-	static bool checkAndAddCl( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-#endif
-	static bool checkAndAddClang( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static bool checkAndAddGCC( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static void checkAndAddArchiver( Scope &s, const std::map<std::string, std::string> &exelist );
-	static void addSelfGenerator( Scope &s );
+	void setLines( const std::vector<std::string> &l );
+
+	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
+private:
+	std::vector<std::string> myLines;
 };
+
+
+////////////////////////////////////////
 
 
 

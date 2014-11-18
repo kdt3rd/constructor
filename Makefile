@@ -14,6 +14,12 @@ SRC:= main.cpp \
 	Scope.cpp \
 	TransformSet.cpp \
 	Compile.cpp \
+	Executable.cpp \
+	InternalExecutable.cpp \
+	Library.cpp \
+	CodeFilter.cpp \
+	CodeGenerator.cpp \
+	CreateFile.cpp \
 	Rule.cpp \
 	Tool.cpp \
 	DefaultTools.cpp \
@@ -38,9 +44,14 @@ COMPILER := g++
 CXXFLAGS := --std=c++11 -Wall -Wextra -g -pthread
 LDFLAGS :=
 OS := $(shell uname -s)
+ifeq ($(OS),Linux)
+CXXFLAGS := $(CXXFLAGS) -DLUA_USE_LINUX
+LDFLAGS := -ldl
+else
 ifeq ($(OS),Darwin)
 COMPILER := clang++
-CXXFLAGS := --std=c++11 --stdlib=libc++ -Wall -Wextra -g
+CXXFLAGS := --std=c++11 --stdlib=libc++ -Wall -Wextra -g -DLUA_USE_MACOSX
+endif
 endif
 
 LUA_VER:=lua-5.2.3

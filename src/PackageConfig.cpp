@@ -265,7 +265,9 @@ PackageConfig::transform( TransformSet &xform ) const
 		ret->addExternalOutput( myPackageFile );
 	}
 	ret->addToVariable( "cflags", getCFlags() );
+	ret->addToVariable( "cflags", getVariable( "cflags" ) );
 	ret->addToVariable( "ldflags", getLibs() );
+	ret->addToVariable( "ldflags", getVariable( "ldflags" ) );
 
 	xform.recordTransform( this, ret );
 	return ret;
@@ -790,6 +792,11 @@ PackageConfig::makeLibraryReference( const std::string &name,
 									 const std::string &path )
 {
 	std::shared_ptr<PackageConfig> ret = std::make_shared<PackageConfig>( name, std::string() );
+	VERBOSE( "Creating external (non- pkg-config) library reference for '" << name << "'..." );
+
+#ifdef WIN32
+	throw std::runtime_error( "Not yet implemented for Win32" );
+#endif
 
 #ifdef __APPLE__
 	if ( path.find( ".framework" ) != std::string::npos )
@@ -806,7 +813,7 @@ PackageConfig::makeLibraryReference( const std::string &name,
 	Directory d( path );
 	d.cdUp();
 
-	Variable &libs = ret->getVariable( "libs" );
+	Variable &libs = ret->getVariable( "ldflags" );
 	libs.add( "-L" );
 	libs.add( d.fullpath() );
 	libs.add( "-l" + name );
@@ -814,9 +821,13 @@ PackageConfig::makeLibraryReference( const std::string &name,
 	d.cdUp();
 	d.cd( "include" );
 
-	Variable &cflags = ret->getVariable( "cflags" );
-	cflags.add( "-I" );
-	cflags.add( d.fullpath() );
+//	if ( d.fullpath() != "/usr/include" )
+	{
+		Variable &cflags = ret->getVariable( "cflags" );
+		cflags.add( "-I" );
+		cflags.add( d.fullpath() );
+	}
+
 	return ret;
 }
 

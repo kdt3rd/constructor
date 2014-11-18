@@ -506,8 +506,15 @@ Value::initString( String v )
 std::vector<std::string>
 Value::toStringList( void ) const
 {
-	checkType( LUA_TTABLE );
 	std::vector<std::string> ret;
+
+	if ( type() == LUA_TSTRING )
+	{
+		ret.push_back( asString() );
+		return ret;
+	}
+
+	checkType( LUA_TTABLE );
 
 	for ( auto &i: asTable() )
 	{

@@ -73,7 +73,7 @@ public:
 	/// returns the list of items that this item has that dependency type on
 	inline std::vector<ItemPtr> extractDependencies( DependencyType dt ) const;
 	
-private:
+protected:
 	inline void recurseChain( std::vector<ItemPtr> &chain ) const
 	{
 		for ( auto &dep: myDependencies )

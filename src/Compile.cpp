@@ -25,6 +25,8 @@
 #include "Debug.h"
 #include "FileUtil.h"
 #include "PackageConfig.h"
+#include "Library.h"
+#include "Executable.h"
 #include <queue>
 
 
@@ -95,13 +97,54 @@ CompileSet::transform( TransformSet &xform ) const
 	ret->setOutputDir( xform.getOutDir() );
 
 	std::queue< std::shared_ptr<BuildItem> > chainsToCheck;
+	Variable outflags( "cflags" );
 	for ( const ItemPtr &i: myItems )
 	{
 		std::shared_ptr<BuildItem> ci = i->transform( xform );
 		PRECONDITION( ci, "Transform failed on item " << i->getName() );
-		chainsToCheck.push( ci );
+		const Library *libDep = dynamic_cast<const Library *>( i.get() );
+		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
+
+		if ( libDep || pkg )
+		{
+			ret->addDependency( DependencyType::IMPLICIT, ci );
+			outflags.addIfMissing( ci->getVariable( "cflags" ).values() );
+		}
+		else if ( dynamic_cast<const Executable *>( i.get() ) )
+		{
+			// executables can't depend on other exes, make this
+			// an order only dependency
+			VERBOSE( "Executable '" << i->getName() << "' will be built before '" << getName() << "' because of declared dependency" );
+			ret->addDependency( DependencyType::ORDER, ci );
+		}
+		else
+			chainsToCheck.push( ci );
 	}
 
+	std::set<std::string> tags;
+	followChains( chainsToCheck, tags, ret, xform );
+
+	if ( ! outflags.empty() )
+	{
+		std::vector< std::shared_ptr<BuildItem> > expDeps = ret->extractDependencies( DependencyType::EXPLICIT );
+		for ( const auto &compItem: expDeps )
+			compItem->addToVariable( "cflags", outflags );
+	}
+
+	xform.recordTransform( this, ret );
+	return ret;
+}
+
+
+////////////////////////////////////////
+
+
+void
+CompileSet::followChains( std::queue<std::shared_ptr<BuildItem>> &chainsToCheck,
+						  std::set<std::string> &tags,
+						  const std::shared_ptr<BuildItem> &ret,
+						  TransformSet &xform ) const
+{
 	while ( ! chainsToCheck.empty() )
 	{
 		// now we need to chain build until we can no more such
@@ -117,10 +160,8 @@ CompileSet::transform( TransformSet &xform ) const
 			// but would only be an implicit dependency...
 			// library or executable would need to promote that
 			// to an explicit dependency somehow
-			if ( i->getTool() )
-				ret->addDependency( DependencyType::EXPLICIT, i );
-			else
-				ret->addDependency( DependencyType::ORDER, i );
+			i->extractTags( tags );
+			ret->addDependency( DependencyType::EXPLICIT, i );
 		}
 		else
 		{
@@ -132,18 +173,18 @@ CompileSet::transform( TransformSet &xform ) const
 				if ( si )
 				{
 					chainsToCheck.push( si );
-					si->addDependency( DependencyType::EXPLICIT, i );
+					si->addDependency( DependencyType::CHAIN, i );
 					addedChain = true;
 				}
 			}
 
 			if ( ! addedChain )
+			{
+				i->extractTags( tags );
 				ret->addDependency( DependencyType::EXPLICIT, i );
+			}
 		}
 	}
-
-	xform.recordTransform( this, ret );
-	return ret;
 }
 
 
@@ -161,209 +202,22 @@ CompileSet::chainTransform( const std::string &name,
 	std::shared_ptr<BuildItem> ret;
 	if ( t )
 	{
+		VERBOSE( name << ": chaining tool for '" << ext << "'" );
 		ret = std::make_shared<BuildItem>( name, srcdir );
+
+		VariableSet buildvars;
+		extractVariables( buildvars );
+		ret->setVariables( std::move( buildvars ) );
+
 		ret->setTool( t );
-		ret->setOutputDir( xform.getOutDir() );
+		ret->setOutputDir( srcdir );
 		xform.add( ret );
 	}
-
-	return ret;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-
-Executable::Executable( std::string name )
-		: CompileSet( std::move( name ) )
-{
-}
-
-
-////////////////////////////////////////
-
-
-Executable::~Executable( void )
-{
-}
-
-
-////////////////////////////////////////
-
-
-std::shared_ptr<BuildItem>
-Executable::transform( TransformSet &xform ) const
-{
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
-	if ( ret )
-		return ret;
-
-	ret = std::make_shared<BuildItem>( getName(), getDir() );
-	ret->setUseName( false );
-	ret->setOutputDir( xform.getBinDir() );
-	ret->setTopLevel( true );
-
-	std::set<std::string> tags;
-	for ( const ItemPtr &i: myItems )
+	else
 	{
-		std::shared_ptr<BuildItem> xi = i->transform( xform );
-		xi->markAsDependent();
-
-		const Library *libDep = dynamic_cast<const Library *>( i.get() );
-		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
-		if ( libDep || pkg )
-		{
-			ret->addDependency( DependencyType::IMPLICIT, xi );
-			ret->addToVariable( "cflags", xi->getVariable( "cflags" ) );
-			ret->addToVariable( "ldflags", xi->getVariable( "ldflags" ) );
-			if ( libDep )
-			{
-				ret->addToVariable( "libs", libDep->getName() );
-				ret->addToVariable( "libdirs", xi->getOutDir()->fullpath() );
-			}
-			ret->addToVariable( "libs", xi->getVariable( "libs" ) );
-			ret->addToVariable( "libdirs", xi->getVariable( "libdirs" ) );
-		}
-		else if ( dynamic_cast<const Executable *>( i.get() ) )
-		{
-			// executables can't depend on other exes, make this
-			// an order only dependency
-			VERBOSE( "Executable '" << i->getName() << "' will be built before '" << getName() << "' because of declared dependency" );
-			ret->addDependency( DependencyType::ORDER, xi );
-		}
-		else
-		{
-			xi->extractTags( tags );
-			ret->addDependency( DependencyType::EXPLICIT, xi );
-		}
+		DEBUG( name << ": no tool found for extension '" << ext << "'" );
 	}
 
-	std::shared_ptr<Tool> t = xform.findToolForSet( "ld", tags );
-	if ( ! t )
-	{
-		std::stringstream msgbuf;
-		msgbuf << "Unable to find linker to handle the following tools: ";
-		bool doC = false;
-		for ( auto &lt: tags )
-		{
-			if ( doC )
-				msgbuf << ", ";
-			msgbuf << lt;
-		}
-		throw std::runtime_error( msgbuf.str() );
-	}
-	ret->setTool( t );
-
-	xform.recordTransform( this, ret );
-	return ret;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-
-
-Library::Library( std::string name )
-		: CompileSet( std::move( name ) )
-{
-}
-
-
-////////////////////////////////////////
-
-
-Library::~Library( void )
-{
-}
-
-
-////////////////////////////////////////
-
-
-std::shared_ptr<BuildItem>
-Library::transform( TransformSet &xform ) const
-{
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
-	if ( ret )
-		return ret;
-
-	ret = std::make_shared<BuildItem>( getName(), getDir() );
-	ret->setUseName( false );
-	ret->setOutputDir( xform.getLibDir() );
-	ret->setTopLevel( true );
-
-	Variable outlibs( "libs" ), outlibdirs( "libdirs" );
-	std::set<std::string> tags;
-	for ( const ItemPtr &i: myItems )
-	{
-		std::shared_ptr<BuildItem> xi = i->transform( xform );
-		xi->markAsDependent();
-
-		const Library *libDep = dynamic_cast<const Library *>( i.get() );
-		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
-
-		if ( libDep || pkg )
-		{
-			ret->addDependency( DependencyType::IMPLICIT, xi );
-			ret->addToVariable( "cflags", xi->getVariable( "cflags" ) );
-			ret->addToVariable( "ldflags", xi->getVariable( "ldflags" ) );
-			outlibs.add( xi->getVariable( "libs" ).values() );
-			outlibdirs.addIfMissing( xi->getVariable( "libdirs" ).values() );
-		}
-		else if ( dynamic_cast<const Executable *>( i.get() ) )
-		{
-			// executables can't depend on other exes, make this
-			// an order only dependency
-			VERBOSE( "Executable '" << i->getName() << "' will be built before '" << getName() << "' because of declared dependency" );
-			ret->addDependency( DependencyType::ORDER, xi );
-		}
-		else
-		{
-			xi->extractTags( tags );
-			ret->addDependency( DependencyType::EXPLICIT, xi );
-		}
-
-	}
-
-	std::string libType;
-	findVariableValueRecursive( libType, "library_type" );
-	if ( libType.empty() )
-		libType = xform.getVarValue( "default_library_type" );
-	if ( libType.empty() )
-	{
-		libType = "static";
-		VERBOSE( "No library type declared for '" << getName() << "', defaulting to static" );
-	}
-
-	std::shared_ptr<Tool> t = xform.findToolForSet( libType, tags );
-	if ( ! t )
-	{
-		std::stringstream msgbuf;
-		msgbuf << "Unable to find library tool to handle a library type '" << libType << "' with objects of the following tools: ";
-		bool doC = false;
-		for ( auto &lt: tags )
-		{
-			if ( doC )
-				msgbuf << ", ";
-			msgbuf << lt;
-		}
-		throw std::runtime_error( msgbuf.str() );
-	}
-	ret->setTool( t );
-
-	if ( libType == "static" )
-	{
-		if ( ! outlibs.empty() )
-		{
-			outlibs.removeDuplicatesKeepLast();
-			ret->addToVariable( "libs", outlibs );
-		}
-		if ( ! outlibdirs.empty() )
-			ret->addToVariable( "libdirs", outlibdirs );
-	}
-
-	xform.recordTransform( this, ret );
 	return ret;
 }
 

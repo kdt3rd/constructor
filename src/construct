@@ -7,6 +7,12 @@ local x = Compile(
 	"TransformSet.cpp",
 	"Compile.cpp",
 	"Rule.cpp",
+	"Executable.cpp",
+	"InternalExecutable.cpp",
+	"Library.cpp",
+	"CodeFilter.cpp",
+	"CodeGenerator.cpp",
+	"CreateFile.cpp",
 	"Tool.cpp",
 	"DefaultTools.cpp",
 	"Configuration.cpp",
@@ -63,11 +69,20 @@ local l = Compile(
 				 )
 l:forceTool( ".c", "cxx" )
 l:overrideToolSetting( "warnings", "some" )
-
+print( "Configuring lua for system " .. sys.system() .. "..." )
+DL = nil
+if sys.system() == "Linux" then
+	l:addDefines( "LUA_USE_LINUX" )
+	DL = ExternalLibrary( "dl" )
+elseif sys.system() == "Darwin" then
+	l:addDefines( "LUA_USE_MACOSX" )
+elseif sys.system() == "Win32" then
+	l:addDefines( "LUA_WIN" )
+end
 Include( lua_dir )
 
 lua = Library( "conslua", l )
-exe = Executable( "constructor", x, lua )
+exe = Executable( "constructor", x, lua, DL )
 -- AddDefines( x, "SOME_DEFINE" )
 -- 
 -- a = Library( "foo", x, FindPackage( "QtCore" ) )
