@@ -50,8 +50,8 @@ struct ParmAdapt<bool>
 
 	static inline bool check_and_get( lua_State *l, int i )
 	{
-		if ( ! lua_isnumber( l, i ) )
-			throw std::runtime_error( "Expected a number argument" );
+		if ( ! lua_isboolean( l, i ) )
+			throw std::runtime_error( "Expected a boolean argument" );
 		return get( l, i );
 	}
 
