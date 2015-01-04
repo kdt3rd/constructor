@@ -81,8 +81,12 @@ public:
 	// "top level" indicates that it should appear
 	// in the list of pseudo targets with a short name for
 	// easy build targeting (i.e. "make foo")
-	inline void setTopLevel( bool tl );
+	inline void setTopLevel( bool tl, const std::string &nm = std::string() );
 	inline bool isTopLevelItem( void ) const;
+	inline const std::string &getTopLevelName( void ) const;
+
+	inline void setDefaultTarget( bool d );
+	inline bool isDefaultTarget( void ) const;
 
 	inline void markAsDependent( void );
 	// basically, this should be true if no one depends on me, to be
@@ -92,6 +96,7 @@ public:
 
 private:
 	std::string myName;
+	std::string myPseudoName;
 
 	std::shared_ptr<Tool> myTool;
 	std::vector<std::string> myOutputs;
@@ -104,6 +109,7 @@ private:
 	bool myIsTopLevel = false;
 	bool myIsDependent = false;
 	bool myUseName = true;
+	bool myDefaultTarget = true;
 };
 
 
@@ -171,15 +177,30 @@ BuildItem::getVariables( void ) const
 
 
 inline void
-BuildItem::setTopLevel( bool tl ) 
+BuildItem::setTopLevel( bool tl, const std::string &nm ) 
 {
 	myIsTopLevel = tl;
+	myPseudoName = nm;
 }
 inline bool
 BuildItem::isTopLevelItem( void ) const
 {
 	return myIsTopLevel;
 }
+inline const std::string &
+BuildItem::getTopLevelName( void ) const
+{
+	if ( myPseudoName.empty() )
+		return getName();
+	return myPseudoName;
+}
+
+
+////////////////////////////////////////
+
+
+inline void BuildItem::setDefaultTarget( bool d ) { myDefaultTarget = d; }
+inline bool BuildItem::isDefaultTarget( void ) const { return myDefaultTarget; }
 
 
 ////////////////////////////////////////
