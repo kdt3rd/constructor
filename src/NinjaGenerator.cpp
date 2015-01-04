@@ -171,6 +171,7 @@ emitTargets( std::ostream &os, const TransformSet &x )
 {
 	for ( const std::shared_ptr<BuildItem> &bi: x.getBuildItems() )
 	{
+		DEBUG( "Processing build item '" << bi->getName() << "'" );
 		auto t = bi->getTool();
 		if ( t )
 		{
@@ -221,9 +222,12 @@ emitTargets( std::ostream &os, const TransformSet &x )
 			{
 				PRECONDITION( bi->getOutputs().size() == 1,
 							  "Expecting top level item '" << bi->getName() << "' to have 1 output, found " << bi->getOutputs().size() );
-				os << "\nbuild " << escape( bi->getName() ) << ": phony "
-				   << outd->makefilename( bi->getOutputs()[0] )
-				   << '\n';
+				os << "\nbuild " << escape( bi->getTopLevelName() ) << ": phony "
+				   << outd->makefilename( bi->getOutputs()[0] );
+
+				if ( bi->isDefaultTarget() )
+					os << "\ndefault " << bi->getTopLevelName();
+				os << '\n';
 			}
 			// don't need this since ninja implicitly builds
 			// these anyway
@@ -231,6 +235,10 @@ emitTargets( std::ostream &os, const TransformSet &x )
 //			{
 //				
 //			}
+		}
+		else
+		{
+			DEBUG( " --> NO TOOL" );
 		}
 	}
 }
