@@ -45,6 +45,16 @@
 #include <mutex>
 #include <iostream>
 
+// NB: This is a rather monolithic file. It's unfortunate, but this
+// started out as separate files, but was collapsed while searching
+// for the correct abstraction points such as separating the program
+// from the lua integration and trying to figure out what utility
+// functions were necessary to divide something from a "file" function
+// or a "directory" function, and the various lua integration point
+// utility functions for parsing tables, or recursively populating the
+// compile list. Hopefully once things are relatively stable, it can
+// be split apart again.
+
 
 ////////////////////////////////////////
 
@@ -73,7 +83,7 @@ extractItem( lua_State *L, int i )
 {
 	void *ud = luaL_checkudata( L, i, "Constructor.Item" );
 	if ( ! ud )
-		throw std::runtime_error( "User Data item is not a constructor item" );
+		throw std::runtime_error( "User data is not a constructor item" );
 	return *( reinterpret_cast<ItemPtr *>( ud ) );
 }
 
@@ -90,10 +100,10 @@ extractItem( const Lua::Value &v )
 		if ( ud )
 			return *(reinterpret_cast<ItemPtr *>( ud ) );
 
-		throw std::runtime_error( "User data item for executable is not a valid item" );
+		throw std::runtime_error( "User data is not a constructor item" );
 	}
 
-	throw std::runtime_error( "Argument is not a constructor item" );
+	throw std::runtime_error( "Argument is not a user data item" );
 }
 
 
@@ -285,22 +295,98 @@ luaJoinPath( lua_State *L )
 	return 1;
 }
 
-std::string
-SourceDir( void )
+static std::string
+luaSourceDir( void )
 {
 	return Directory::current()->fullpath();
 }
 
-std::string
-RelSourceDir( void )
+static std::string
+luaRelativeSourceDir( void )
 {
 	return Directory::current()->relpath();
 }
 
-std::string
-SourceFile( const std::string &fn )
+static std::string
+luaSourceFile( const std::string &fn )
 {
 	return Directory::current()->makefilename( fn );
+}
+
+static void addRescanDir( const std::string &fp )
+{
+	bool found = false;
+	for ( const std::string &inF: theSubDirFiles )
+	{
+		if ( inF == fp )
+		{
+			found = true;
+			break;
+		}
+	}
+	if ( ! found )
+		theSubDirFiles.push_back( fp );
+}
+
+// searches the current directory, matching a pattern. This can be
+// a pattern with sub-directories in it, always in unix notation,
+// and shell globbing rules more than just a standard posix regex,
+// so a pattern of {foo,bar}/*.h would search for *.h in sub-dirs
+// foo and bar.
+static void globDir( std::shared_ptr<CompileSet> &ret,
+					 const std::string &pattern )
+{
+	auto curD = Directory::current();
+
+	// trigger constructor to re-run if one of
+	// the searched directories changes
+	const std::string &fp = curD->fullpath();
+
+	// NB: NOT using the pathSeparator here
+	/// @todo { Document the file glob and separator for subdirs }
+	std::string::size_type pSep = pattern.find_first_of( '/' );
+
+	if ( pSep != std::string::npos )
+	{
+		std::string curMatch = pattern.substr( 0, pSep );
+		std::string subMatch = pattern.substr( pSep + 1 );
+
+		std::string pat = File::globToRegex( curMatch );
+		if ( pat != curMatch )
+			addRescanDir( fp );
+
+		std::vector<std::string> subs = File::globRegex( fp, pat );
+		for ( const std::string &s: subs )
+		{
+			Directory::pushd( s );
+			ON_EXIT{ Directory::popd(); };
+			globDir( ret, subMatch );
+		}
+	}
+	else
+	{
+		addRescanDir( fp );
+
+		// can't use the utility string-based addItem since
+		// we might be recursed to a sub-dir of the directory the
+		// compile set is set to in which case the utility addItem
+		// fails because it doesn't exist
+		for ( std::string &f: File::glob( fp, pattern ) )
+			ret->addItem( std::make_shared<Item>( std::move( f ) ) );
+	}
+}
+
+static int
+luaGlobFiles( lua_State *L )
+{
+	if ( lua_gettop( L ) != 1 || ! lua_isstring( L, 1 ) )
+		throw std::runtime_error( "Expecting a single pattern string argument to GlobaFiles" );
+
+	std::shared_ptr<CompileSet> ret = std::make_shared<CompileSet>();
+	globDir( ret, Lua::Parm<std::string>::get( L, 1, 1 ) );
+
+	pushItem( L, ret );
+	return 1;
 }
 
 
@@ -580,7 +666,11 @@ luaAddToolModulePath( lua_State *L )
 			size_t len = 0;
 			const char *s = lua_tolstring( L, i, &len );
 			std::string curP( s, len );
-			theToolModulePath.emplace_back( std::move( curP ) );
+
+			if ( File::isAbsolute( s ) )
+				theToolModulePath.emplace_back( std::move( curP ) );
+			else
+				theToolModulePath.emplace_back( Directory::current()->makefilename( curP ) );
 		}
 		else
 		{
@@ -611,6 +701,7 @@ int
 luaLoadToolModule( lua_State *L )
 {
 	int N = lua_gettop( L );
+	int ret = 0;
 
 	for ( int i = 1; i <= N; ++i )
 	{
@@ -635,7 +726,7 @@ luaLoadToolModule( lua_State *L )
 
 			if ( found )
 			{
-				Lua::Engine::singleton().runFile( luaFile.c_str() );
+				ret += Lua::Engine::singleton().runFile( luaFile.c_str() );
 				theSubDirFiles.push_back( luaFile );
 			}
 			else
@@ -649,7 +740,7 @@ luaLoadToolModule( lua_State *L )
 		}
 	}
 
-	return 0;
+	return ret;
 }
 
 static int
@@ -736,7 +827,7 @@ luaSubDir( lua_State *L )
 }
 
 static int
-luaSubProj( lua_State *L )
+luaSubProject( lua_State *L )
 {
 	Scope::pushScope( Scope::current().newSubScope( false ) );
 	ON_EXIT{ Scope::popScope(); };
@@ -1067,11 +1158,20 @@ itemInheritVariable( lua_State *L )
 static int
 itemForceTool( lua_State *L )
 {
-	if ( lua_gettop( L ) != 3 )
-		throw std::runtime_error( "Item:forceTool() expects 3 arguments - self, extension, tool name" );
-	ItemPtr p = extractItem( L, 1 );
-	p->forceTool( Lua::Parm<std::string>::get( L, 3, 2 ),
-				  Lua::Parm<std::string>::get( L, 3, 3 ) );
+	int N = lua_gettop( L );
+	if ( N == 2 || N == 3 )
+	{
+		ItemPtr p = extractItem( L, 1 );
+		if ( N == 3 )
+		{
+			p->forceTool( Lua::Parm<std::string>::get( L, 3, 2 ),
+						  Lua::Parm<std::string>::get( L, 3, 3 ) );
+		}
+		else
+			p->forceTool( Lua::Parm<std::string>::get( L, 2, 2 ) );
+	}
+	else
+		throw std::runtime_error( "Item:forceTool() expects 2 or 3 arguments - self, [extension,] tool name" );
 
 	return 0;
 }
@@ -1119,6 +1219,28 @@ itemAddIncludes( lua_State *L )
 }
 
 static int
+itemAddDefines( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 2 )
+		throw std::runtime_error( "Item:addDefines() expects at least 2 arguments - self then string values" );
+	ItemPtr p = extractItem( L, 1 );
+
+	auto &vars = p->getVariables();
+	auto defs = vars.find( "defines" );
+	if ( defs == vars.end() )
+		defs = vars.emplace( std::make_pair( "defines", Variable( "defines" ) ) ).first;
+
+	Variable &v = defs->second;
+	v.setToolTag( "cc" );
+
+	for ( int i = 2; i <= N; ++i )
+		v.add( Lua::Parm<std::string>::get( L, N, i ) );
+
+	return 0;
+}
+
+static int
 itemAddArtifactInclude( lua_State *L )
 {
 	int N = lua_gettop( L );
@@ -1150,23 +1272,49 @@ itemAddArtifactInclude( lua_State *L )
 }
 
 static int
-itemAddDefines( lua_State *L )
+itemSetTopLevel( lua_State *L )
 {
 	int N = lua_gettop( L );
-	if ( N < 2 )
-		throw std::runtime_error( "Item:addDefines() expects at least 2 arguments - self then string values" );
+	if ( N != 2 )
+		throw std::runtime_error( "Item:setTopLevel() expects 2 arguments - self, boolean" );
+
 	ItemPtr p = extractItem( L, 1 );
+	bool tl = Lua::Parm<bool>::get( L, N, 2 );
+	p->setAsTopLevel( tl );
+	if ( tl )
+		Scope::current().addItem( p );
+	else
+		Scope::current().removeItem( p );
 
-	auto &vars = p->getVariables();
-	auto defs = vars.find( "defines" );
-	if ( defs == vars.end() )
-		defs = vars.emplace( std::make_pair( "defines", Variable( "defines" ) ) ).first;
+	return 0;
+}
 
-	Variable &v = defs->second;
-	v.setToolTag( "cc" );
+static int
+itemSetDefaultTarget( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N != 2 )
+		throw std::runtime_error( "Item:setDefaultTarget() expects 2 arguments - self, boolean" );
 
-	for ( int i = 2; i <= N; ++i )
-		v.add( Lua::Parm<std::string>::get( L, N, i ) );
+	ItemPtr p = extractItem( L, 1 );
+	p->setDefaultTarget( Lua::Parm<bool>::get( L, N, 2 ) );
+
+	return 0;
+}
+
+static int
+itemSetPseudoTarget( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N < 1 || N > 2 )
+		throw std::runtime_error( "Item:setPseudoTarget() expects 1 or 2 arguments - self, [name]" );
+
+	ItemPtr p = extractItem( L, 1 );
+	// only makes sense if this is also a top level item
+	p->setAsTopLevel( true );
+	Scope::current().addItem( p );
+	if ( N == 2 )
+		p->setPseudoTarget( Lua::Parm<std::string>::get( L, N, 2 ) );
 
 	return 0;
 }
@@ -1210,6 +1358,9 @@ static const struct luaL_Reg item_m[] =
 	{ "addIncludes", itemAddIncludes },
 	{ "addDefines", itemAddDefines },
 	{ "includeArtifactDir", itemAddArtifactInclude },
+	{ "setTopLevel", itemSetTopLevel },
+	{ "setDefaultTarget", itemSetDefaultTarget },
+	{ "setPseudoTarget", itemSetPseudoTarget },
 	{ nullptr, nullptr }
 };
 
@@ -1220,7 +1371,7 @@ static const struct luaL_Reg item_class_f[] =
 };
 
 int
-defineConfiguration( lua_State *L )
+luaBuildConfiguration( lua_State *L )
 {
 	if ( lua_gettop( L ) != 1 || ! lua_istable( L, 1 ) )
 		throw std::runtime_error( "Expected 1 argument - a table - to BuildConfiguration" );
@@ -1231,7 +1382,7 @@ defineConfiguration( lua_State *L )
 }
 
 int
-setDefaultConfig( lua_State *L )
+luaDefaultConfiguration( lua_State *L )
 {
 	if ( lua_gettop( L ) != 1 || ! lua_isstring( L, 1 ) )
 		throw std::runtime_error( "Expected 1 argument - a string - to DefaultConfiguration" );
@@ -1254,13 +1405,12 @@ setDefaultConfig( lua_State *L )
 }
 
 
-////////////////////////////////////////
-
-
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 
 static bool
-packageExists( const std::string &name, const std::string &reqVersion )
+luaExternalLibraryExists( const std::string &name, const std::string &reqVersion )
 {
 	if ( PackageConfig::find( name, reqVersion ) )
 		return true;
@@ -1268,7 +1418,7 @@ packageExists( const std::string &name, const std::string &reqVersion )
 }
 
 static int
-packageFind( lua_State *L )
+luaExternalLibrary( lua_State *L )
 {
 	int N = lua_gettop( L );
 	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
@@ -1279,7 +1429,7 @@ packageFind( lua_State *L )
 }
 
 static int
-packageFindRequired( lua_State *L )
+luaRequiredExternalLibrary( lua_State *L )
 {
 	int N = lua_gettop( L );
 	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
@@ -1297,7 +1447,7 @@ packageFindRequired( lua_State *L )
 	pushItem( L, p );
 	return 1;
 }
-	
+
 } // empty namespace
 
 
@@ -1316,11 +1466,11 @@ registerExtensions( void )
 {
 	Engine &eng = Engine::singleton();
 
-	eng.registerFunction( "SourceDir", &SourceDir );
-	eng.registerFunction( "RelativeSourceDir", &RelSourceDir );
-	eng.registerFunction( "SourceFile", &SourceFile );
+	eng.registerFunction( "SourceDir", &luaSourceDir );
+	eng.registerFunction( "RelativeSourceDir", &luaRelativeSourceDir );
+	eng.registerFunction( "SourceFile", &luaSourceFile );
 	eng.registerFunction( "SubDir", &luaSubDir );
-	eng.registerFunction( "SubProject", &luaSubProj );
+	eng.registerFunction( "SubProject", &luaSubProject );
 
 	eng.registerFunction( "CodeFilter", &luaCodeFilter );
 	eng.registerFunction( "CreateFile", &luaCreateFile );
@@ -1342,6 +1492,8 @@ registerExtensions( void )
 	eng.registerFunction( "Include", &luaInclude );
 	eng.registerFunction( "AddDefines", &luaAddDefines );
 
+	eng.registerFunction( "GlobFiles", &luaGlobFiles );
+
 	{
 		eng.pushLibrary( "file" );
 		ON_EXIT{ eng.popLibrary(); };
@@ -1350,8 +1502,8 @@ registerExtensions( void )
 		eng.registerFunction( "diff", &File::diff );
 		eng.registerFunction( "exists", &File::exists );
 		eng.registerFunction( "find", &luaFindFile );
-		eng.registerFunction( "set_exe_path", &luaSetPath );
 		eng.registerFunction( "find_exe", &luaFindExecutable );
+		eng.registerFunction( "set_exe_path", &luaSetPath );
 
 		eng.pushSubLibrary( "path" );
 		ON_EXIT{ eng.popLibrary(); };
@@ -1376,12 +1528,13 @@ registerExtensions( void )
 	
 	eng.registerClass( "Item", item_class_f, item_m );
 
-	eng.registerFunction( "BuildConfiguration", &defineConfiguration );
-	eng.registerFunction( "DefaultConfiguration", &setDefaultConfig );
+	eng.registerFunction( "BuildConfiguration", &luaBuildConfiguration );
+	eng.registerFunction( "DefaultConfiguration", &luaDefaultConfiguration );
 
-	eng.registerFunction( "ExternalLibraryExists", &packageExists );
-	eng.registerFunction( "ExternalLibrary", &packageFind );
-	eng.registerFunction( "RequiredExternalLibrary", &packageFindRequired );
+	// pkg-config like functions
+	eng.registerFunction( "ExternalLibraryExists", &luaExternalLibraryExists );
+	eng.registerFunction( "ExternalLibrary", &luaExternalLibrary );
+	eng.registerFunction( "RequiredExternalLibrary", &luaRequiredExternalLibrary );
 
 }
 
