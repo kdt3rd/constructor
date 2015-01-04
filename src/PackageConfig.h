@@ -63,6 +63,7 @@ public:
 	const std::string &getStaticRequires( void ) const;
 
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
+	virtual void forceTool( const std::string &t );
 	virtual void forceTool( const std::string &ext, const std::string &t );
 	virtual void overrideToolSetting( const std::string &s, const std::string &n );
 

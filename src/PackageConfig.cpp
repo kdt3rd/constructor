@@ -278,6 +278,16 @@ PackageConfig::transform( TransformSet &xform ) const
 
 
 void
+PackageConfig::forceTool( const std::string & )
+{
+	throw std::runtime_error( "Invalid request to force a tool on a Package" );
+}
+
+
+////////////////////////////////////////
+
+
+void
 PackageConfig::forceTool( const std::string &, const std::string & )
 {
 	throw std::runtime_error( "Invalid request to force a tool on a Package" );
