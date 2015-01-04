@@ -74,6 +74,17 @@ find( std::vector<std::string> progs,
 	  const std::vector<std::string> &path,
 	  const std::vector<std::string> &extensions = std::vector<std::string>() );
 
+/// Converts a shell-like glob pattern to a regex useful
+/// for standard regex match utility as best as possible
+std::string globToRegex( const std::string &pattern );
+std::vector<std::string> globRegex( const std::string &path, const std::string &regexPattern );
+
+inline std::vector<std::string> glob( const std::string &path, const std::string &pattern )
+{
+	return globRegex( path, globToRegex( pattern ) );
+}
+
+
 void setPathOverride( const std::vector<std::string> &p );
 const std::vector<std::string> &getPath( void );
 bool findExecutable( std::string &filepath, const std::string &name );

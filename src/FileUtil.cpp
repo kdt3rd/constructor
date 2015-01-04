@@ -33,6 +33,8 @@
 #include <system_error>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <sstream>
 #include <fstream>
@@ -40,6 +42,7 @@
 #include <string.h>
 #include <iostream>
 #include <mutex>
+#include <regex>
 
 
 ////////////////////////////////////////
@@ -450,6 +453,128 @@ find( std::vector<std::string> progs,
 		}
 	}
 	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
+std::string
+globToRegex( const std::string &pattern )
+{
+	std::string ret;
+	ret.reserve( pattern.size() );
+
+	/// @todo { Add more complex transformations - don't handle
+	/// sequence stuff like in zsh or anything complex like that
+	/// (i.e. foo{1..10} for sequences)
+	/// 
+	/// but can do common shell globbing (i.e. ?oo{a,b,c}_*.txt )
+	/// where the following transformations are applied:
+	///
+	/// ? == '.' --  means any character in regex
+	/// * == ".*" -- any sequence of chars
+	/// {a,b,c} is (a|b|c) -- meaning boolean or to match a, b, or c
+	/// }
+	
+	int inBrace = 0;
+	for ( char c: pattern )
+	{
+		switch ( c )
+		{
+			case '.':
+				ret.push_back( '\\' );
+				ret.push_back( '.' );
+				break;
+			case '*':
+				ret.push_back( '.' );
+				ret.push_back( '*' );
+				break;
+			case '?':
+				ret.push_back( '.' );
+				break;
+			case '{':
+				++inBrace;
+				ret.push_back( '(' );
+				break;
+			case ',':
+				if ( inBrace > 0 )
+					ret.push_back( '|' );
+				else
+					ret.push_back( ',' );
+				break;
+			case '}':
+				if ( inBrace > 0 )
+				{
+					--inBrace;
+					ret.push_back( ')' );
+				}
+				else
+					ret.push_back( c );
+				break;
+			default:
+				ret.push_back( c );
+				break;
+		}
+	}
+
+	return std::move( ret );
+}
+
+
+////////////////////////////////////////
+
+
+std::vector<std::string>
+globRegex( const std::string &path, const std::string &pattern )
+{
+#ifdef WIN32
+	std::regex rexp( pattern, std::regex::icase );
+#else
+	std::regex rexp( pattern );
+#endif
+	std::vector<std::string> retval;
+
+	DIR *d = ::opendir( path.c_str() );
+	if ( d )
+	{
+		ON_EXIT{ ::closedir( d ); };
+		std::unique_ptr<uint8_t[]> rdBuf;
+		size_t allocSize = 0;
+		long name_max = fpathconf( dirfd( d ), _PC_NAME_MAX );
+		if ( name_max == -1 )
+		{
+#if defined(NAME_MAX)
+			name_max = (NAME_MAX > 255) ? NAME_MAX : 255;
+#else
+			name_max = 255;
+#endif
+		}
+		allocSize = std::max( sizeof(struct dirent), size_t( offsetof(struct dirent, d_name) + static_cast<size_t>( name_max ) + 1 ) );
+		rdBuf.reset( new uint8_t[allocSize] );
+
+		struct dirent *curDir = reinterpret_cast<struct dirent *>( rdBuf.get() );
+		struct dirent *cur = nullptr;
+		std::cout << " searching " << path << std::endl;
+		while ( readdir_r( d, curDir, &cur ) == 0 )
+		{
+			if ( ! cur )
+				break;
+
+			if ( std::regex_match( cur->d_name, rexp ) )
+			{
+				std::cout << "  -> matching " << cur->d_name << std::endl;
+				retval.emplace_back( std::string( cur->d_name ) );
+			}
+		}
+	}
+	else
+	{
+		/// @TODO: should this be fatal???
+		std::cout << "WARNING: path '" << path << "' does not exist globbing files" << std::endl;
+	}
+
+	return std::move( retval );
 }
 
 
