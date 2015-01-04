@@ -174,3 +174,5 @@ Tool::getOutputs( void ) const
 inline const std::vector<std::string> &
 Tool::getExtensions( void ) const
 { return myExtensions; }
+
+

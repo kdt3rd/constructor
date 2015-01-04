@@ -426,6 +426,7 @@ Tool::parse( const Lua::Value &v )
 	std::string impFile, impStyle;
 	std::vector<std::string> impCmd;
 	std::vector<std::string> cmd;
+
 	for ( auto &i: t )
 	{
 		if ( i.first.type == Lua::KeyType::INDEX )
