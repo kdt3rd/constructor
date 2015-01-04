@@ -162,9 +162,21 @@ Scope::useToolSet( const std::string &tset )
 void
 Scope::addItem( const ItemPtr &i )
 {
-	myItems.push_back( i );
+	// add a check to avoid multiple inserts?
+	myItems.insert( i );
 }
 
+
+////////////////////////////////////////
+
+
+void
+Scope::removeItem( const ItemPtr &i )
+{
+	auto x = myItems.find( i );
+	if ( x != myItems.end() )
+		myItems.erase( x );
+}
 
 ////////////////////////////////////////
 

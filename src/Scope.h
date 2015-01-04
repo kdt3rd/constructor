@@ -25,6 +25,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <set>
 
 #include "Variable.h"
 #include "Item.h"
@@ -81,6 +82,7 @@ public:
 	void useToolSet( const std::string &tset );
 
 	void addItem( const ItemPtr &i );
+	void removeItem( const ItemPtr &i );
 
 	void transform( TransformSet &xform,
 					const Configuration &conf ) const;
@@ -99,7 +101,7 @@ private:
 	VariableSet myOptions;
 	std::vector< std::shared_ptr<Scope> > mySubScopes;
 
-	std::vector<ItemPtr> myItems;
+	std::set<ItemPtr> myItems;
 
 	std::map<std::string, std::vector<std::string> > myToolSets;
 
