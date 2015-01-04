@@ -60,7 +60,9 @@ public:
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 	virtual void copyDependenciesToBuild( TransformSet &xform ) const;
 
+	virtual void forceTool( const std::string &t );
 	virtual void forceTool( const std::string &ext, const std::string &t );
+
 	virtual void overrideToolSetting( const std::string &s, const std::string &n );
 
 	inline VariableSet &getVariables( void );
@@ -74,6 +76,18 @@ public:
 	void extractVariablesExcept( VariableSet &vs, const std::string &v ) const;
 	void extractVariablesExcept( VariableSet &vs, const std::set<std::string> &vl ) const;
 
+	void setPseudoTarget( const std::string &nm );
+
+	inline void setAsTopLevel( bool b );
+	inline bool isTopLevel( void ) const;
+	inline void setUseNameAsInput( bool b );
+	inline bool isUseNameAsInput( void ) const;
+
+	// usually only matters if this is a top-level target, but
+	// defines whether it is built by default or has to be specified
+	inline void setDefaultTarget( bool b );
+	inline bool isDefaultTarget( void ) const;
+
 protected:
 	virtual std::shared_ptr<Tool> getTool( TransformSet &xform ) const;
 	virtual std::shared_ptr<Tool> getTool( TransformSet &xform, const std::string &ext ) const;
@@ -84,10 +98,15 @@ protected:
 private:
 	ID myID;
 	std::string myName;
+	std::string myPseudoName;
 	std::shared_ptr<Directory> myDirectory;
 
-	std::map<std::string, std::string> myForceTool;
+	std::string myForceToolAll;
+	std::map<std::string, std::string> myForceToolExt;
 	std::map<std::string, std::string> myOverrideToolOptions;
+	bool myIsTopLevel = false;
+	bool myUseName = true;
+	bool myDefaultTarget = true;
 };
 
 using ItemPtr = Item::ItemPtr;
@@ -132,6 +151,27 @@ Item::getDir( void ) const
 {
 	return myDirectory;
 }
+
+
+////////////////////////////////////////
+
+
+inline void Item::setAsTopLevel( bool b ) { myIsTopLevel = b; }
+inline bool Item::isTopLevel( void ) const { return myIsTopLevel; }
+
+
+////////////////////////////////////////
+
+
+inline void Item::setUseNameAsInput( bool b ) { myUseName = b; }
+inline bool Item::isUseNameAsInput( void ) const { return myUseName; }
+
+
+////////////////////////////////////////
+
+
+inline void Item::setDefaultTarget( bool b ) { myDefaultTarget = b; }
+inline bool Item::isDefaultTarget( void ) const { return myDefaultTarget; }
 
 
 ////////////////////////////////////////

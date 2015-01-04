@@ -89,6 +89,9 @@ Item::transform( TransformSet &xform ) const
 		return ret;
 
 	ret = std::make_shared<BuildItem>( getName(), getDir() );
+	ret->setDefaultTarget( isDefaultTarget() );
+	ret->setUseName( isUseNameAsInput() );
+	ret->setTopLevel( isTopLevel(), myPseudoName );
 
 	VariableSet buildvars;
 	extractVariables( buildvars );
@@ -141,9 +144,19 @@ Item::copyDependenciesToBuild( TransformSet &xform ) const
 
 
 void
+Item::forceTool( const std::string &t )
+{
+	myForceToolAll = t;
+}
+
+
+////////////////////////////////////////
+
+
+void
 Item::forceTool( const std::string &ext, const std::string &t )
 {
-	myForceTool[ext] = t;
+	myForceToolExt[ext] = t;
 }
 
 
@@ -271,6 +284,16 @@ Item::extractVariablesExcept( VariableSet &vs, const std::set<std::string> &vl )
 ////////////////////////////////////////
 
 
+void
+Item::setPseudoTarget( const std::string &nm )
+{
+	myPseudoName = nm;
+}
+
+
+////////////////////////////////////////
+
+
 std::shared_ptr<Tool>
 Item::getTool( TransformSet &xform ) const
 {
@@ -285,14 +308,18 @@ Item::getTool( TransformSet &xform ) const
 std::shared_ptr<Tool>
 Item::getTool( TransformSet &xform, const std::string &ext ) const
 {
-	auto x = myForceTool.find( ext );
-	if ( x != myForceTool.end() )
+	if ( ! myForceToolAll.empty() )
+		return xform.findToolByTag( myForceToolAll, ext );
+
+	auto x = myForceToolExt.find( ext );
+	if ( x != myForceToolExt.end() )
 	{
 		DEBUG( "Overriding tool for extension '" << ext << "' to '" << x->second << "'" );
 		return xform.findToolByTag( x->second, ext );
 	}
 
 	ItemPtr i = getParent();
+
 	if ( i )
 		return i->getTool( xform, ext );
 
