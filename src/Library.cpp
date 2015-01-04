@@ -34,6 +34,9 @@
 Library::Library( std::string name )
 		: CompileSet( std::move( name ) )
 {
+	setAsTopLevel( true );
+	setUseNameAsInput( false );
+	setDefaultTarget( true );
 }
 
 
@@ -59,6 +62,7 @@ Library::transform( TransformSet &xform ) const
 	ret->setUseName( false );
 	ret->setOutputDir( xform.getLibDir() );
 	ret->setTopLevel( true );
+	ret->setDefaultTarget( true );
 
 	Variable outlibs( "libs" ), outlibdirs( "libdirs" );
 	Variable outflags( "cflags" ), outldflags( "ldflags" );

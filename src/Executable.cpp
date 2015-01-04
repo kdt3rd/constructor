@@ -34,6 +34,9 @@
 Executable::Executable( std::string name )
 		: CompileSet( std::move( name ) )
 {
+	setAsTopLevel( true );
+	setUseNameAsInput( false );
+	setDefaultTarget( true );
 }
 
 
@@ -59,6 +62,7 @@ Executable::transform( TransformSet &xform ) const
 	ret->setUseName( false );
 	ret->setOutputDir( getOutputDir( xform ) );
 	ret->setTopLevel( true );
+	ret->setDefaultTarget( true );
 
 	std::set<std::string> tags;
 	std::queue< std::shared_ptr<BuildItem> > chainsToCheck;
