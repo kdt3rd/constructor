@@ -310,7 +310,8 @@ NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 					  const Configuration &conf,
 					  int argc, const char *argv[] )
 {
-	std::ofstream f( d->makefilename( "build.ninja" ) );
+	std::string buildfn = d->makefilename( "build.ninja" );
+	std::ofstream f( buildfn );
 	f << "ninja_required_version = 1.3\n";
 	f << "builddir = " << d->fullpath() << '\n';
 
@@ -323,7 +324,7 @@ NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 	Directory curD;
 	f <<
 		"\nrule regen_constructor\n"
-		"  command = cd $in" << " &&";
+		"  command = cd $srcdir" << " &&";
 	// TODO: Add environment support???
 	for ( int a = 0; a < argc; ++a )
 		f << ' ' << argv[a];
@@ -332,10 +333,11 @@ NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 		"\n  generator = 1"
 		"\n\n";
 
-	f << "build build.ninja: regen_constructor " << curD.fullpath() << " |";
+	f << "build build.ninja: regen_constructor |";
 	for ( const std::string &x: Lua::visitedFiles() )
 		f << ' ' << x;
-	f << "\n\n";
+	f << "\n  srcdir=" << curD.fullpath();
+	f << "\ndefault build.ninja\n\n";
 }
 
 
