@@ -811,12 +811,14 @@ PackageConfig::makeLibraryReference( const std::string &name,
 #ifdef __APPLE__
 	if ( path.find( ".framework" ) != std::string::npos )
 	{
+		// put it as one value so any repeated-value
+		// compression doesn't remove the -framework bit
+		// but multiple of the same will be cleaned
+		std::string varval = "-framework " + name;
 		Variable &cflags = ret->getVariable( "cflags" );
-		cflags.add( "-framework" );
-		cflags.add( name );
+		cflags.add( varval );
 		Variable &libs = ret->getVariable( "libs" );
-		libs.add( "-framework" );
-		libs.add( name );
+		libs.add( varval );
 		return ret;
 	}
 #endif
