@@ -333,11 +333,25 @@ NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 		"\n  generator = 1"
 		"\n\n";
 
-	f << "build build.ninja: regen_constructor |";
-	for ( const std::string &x: Lua::visitedFiles() )
-		f << ' ' << x;
+	// NB: Need to use a depfile here since someone
+	// may have deleted a file which would cause this step to
+	// fail, but as long as they updated the parent
+	// construct file, it should just re-run.
+	// ninja's behavior for this only works with a depfile
+	// (i.e. for header files that may or may not exist)
+	std::string builddepsfn = d->makefilename( "build.ninja.d" );
+	f << "build build.ninja: regen_constructor";
 	f << "\n  srcdir=" << curD.fullpath();
+	f << "\n  depfile=" << builddepsfn;
+	f << "\n  deps=gcc";
 	f << "\ndefault build.ninja\n\n";
+	{
+		std::ofstream depf( builddepsfn );
+		depf << buildfn << ':';
+		for ( const std::string &x: Lua::visitedFiles() )
+			depf << ' ' << x;
+		depf << "\n\n";
+	}
 }
 
 
