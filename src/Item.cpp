@@ -102,6 +102,11 @@ Item::transform( TransformSet &xform ) const
 	if ( t )
 	{
 		DEBUG( getName() << " transformed by tool '" << t->getTag() << "' (" << t->getName() << ")" );
+		if ( t->getGeneratedExecutable() )
+		{
+			std::shared_ptr<BuildItem> x = t->getGeneratedExecutable()->transform( xform );
+			ret->addDependency( DependencyType::IMPLICIT, x );
+		}
 		ret->setTool( t );
 		ret->setOutputDir( getDir()->reroot( xform.getArtifactDir() ) );
 		std::string overOpt;
