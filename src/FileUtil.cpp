@@ -166,6 +166,20 @@ isDirectory( const char *fn )
 
 
 std::string
+basename( const std::string &fn )
+{
+	std::string::size_type p = fn.find_last_of( '.' );
+	if ( p == std::string::npos )
+		return fn;
+
+	return fn.substr( 0, p );
+}
+
+
+////////////////////////////////////////
+
+
+std::string
 extension( const std::string &fn )
 {
 	std::string::size_type p = fn.find_last_of( '.' );

@@ -47,6 +47,7 @@ bool isAbsolute( const char *path );
 bool exists( const char *path );
 bool isDirectory( const char *path );
 
+std::string basename( const std::string &fn );
 std::string extension( const std::string &fn );
 std::string replaceExtension( const std::string &fn, const std::string &newext );
 

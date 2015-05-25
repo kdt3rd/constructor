@@ -1498,6 +1498,9 @@ registerExtensions( void )
 		eng.pushLibrary( "file" );
 		ON_EXIT{ eng.popLibrary(); };
 
+		eng.registerFunction( "basename", &File::basename );
+		eng.registerFunction( "extension", &File::extension );
+		eng.registerFunction( "replace_extension", &File::replaceExtension );
 		eng.registerFunction( "compare", &File::compare );
 		eng.registerFunction( "diff", &File::diff );
 		eng.registerFunction( "exists", &File::exists );
