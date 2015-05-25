@@ -11,7 +11,7 @@ Relation to CMake
 
 [CMake](http://www.cmake.org) is certainly a great choice for
 many projects, and currently provides one of the better solutions for
-managing different a good solution. However, after using cmake
+managing different compilation platforms. However, after using cmake
 for years, it has a number of weaknesses that warranted another way of
 thinking about build file generation. Here are the weaknesses that
 constructor attempts to address:
