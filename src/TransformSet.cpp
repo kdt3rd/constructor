@@ -42,7 +42,7 @@ TransformSet::TransformSet( const std::shared_ptr<Directory> &d )
 	myLibDirectory->cd( "lib" );
 	myLibDirectory->promoteFull();
 	myArtifactDirectory = std::make_shared<Directory>( *d );
-	myArtifactDirectory->cd( "build" );
+	myArtifactDirectory->cd( "artifacts" );
 	myArtifactDirectory->promoteFull();
 }
 
