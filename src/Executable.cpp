@@ -140,6 +140,14 @@ Executable::transform( TransformSet &xform ) const
 std::shared_ptr<Directory>
 Executable::getOutputDir( TransformSet &xform ) const
 {
-	return xform.getBinDir();
+	const Variable &o = getVariable( "exe_dir" );
+	if ( o.empty() )
+		return xform.getBinDir();
+
+	auto ret = std::make_shared<Directory>( *(xform.getOutDir()) );
+	for ( auto &d: o.values() )
+		ret->cd( d );
+
+	return ret;
 }
 
