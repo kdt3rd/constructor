@@ -13,6 +13,7 @@ local x = Compile(
 	"CodeFilter.cpp",
 	"CodeGenerator.cpp",
 	"CreateFile.cpp",
+	"Pool.cpp",
 	"Tool.cpp",
 	"DefaultTools.cpp",
 	"Configuration.cpp",

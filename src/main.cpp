@@ -88,7 +88,8 @@ usageAndExit( const char *argv0, int es )
 static void
 emitWrapper( Directory &srcDir,
 			 const std::shared_ptr<Generator> &generator,
-			 bool doConfigDir )
+			 bool doConfigDir,
+			 int argc, const char *argv[] )
 {
 	std::string wrapper = srcDir.makefilename( "Makefile" );
 	std::ofstream wf( wrapper );
@@ -96,54 +97,104 @@ emitWrapper( Directory &srcDir,
 	if ( doConfigDir )
 	{
 		const std::vector<Configuration> &clist = Configuration::defined();
-		wf << ".PHONY: all clean";
+		wf <<
+			".SUFFIXES:\n"
+			".DEFAULT: all\n"
+			".ONESHELL:\n"
+			".NOTPARALLEL:\n"
+			".SILENT:\n"
+			"\n"
+			".PHONY: all clean graph config";
 		for ( const Configuration &c: clist )
 			wf << ' ' << c.name();
-		wf << "\n.ONESHELL:\n"
-			".SHELLFLAGS := -e\n"
-			".DEFAULT: all\n"
+		wf <<
 			"\n"
-			"all: "
-		   << Configuration::getDefault().name()
-		   << "\n\n";
+			"LIVE_CONFIG := " << Configuration::getDefault().name() << "\n"
+			"\n";
+
 		for ( const Configuration &c: clist )
 		{
-			wf << c.name() << ":\n";
+			wf <<
+				"ifeq ($(findstring " << c.name() << ",${MAKECMDGOALS})," << c.name() << ")\n"
+				"LIVE_CONFIG := " << c.name() << "\nendif\n";
+		}
+
+		wf <<
+			"\nifeq (\"$(wildcard ${LIVE_CONFIG})\",\"\")\n"
+			"NEED_CONFIG := config\n"
+			"endif\n";
+
+		wf << "\nTARGETS := $(filter-out all clean graph config";
+		for ( const Configuration &c: clist )
+			wf << ' ' << c.name();
+		wf << ",${MAKECMDGOALS})\n"
+			"MAKECMDGOALS :=\n"
+			"\n"
+			"all: ${LIVE_CONFIG}\n"
+			"\n";
+
+		wf << "config:\n"
+			"\techo \"Generating Build Files...\"\n"
+			"\t" << argv[0];
+		for ( int a = 1; a < argc; ++a )
+		{
+			std::string arg = argv[a];
+			if ( arg == "-emit-wrapper" || arg == "--emit-wrapper" )
+				continue;
+			wf << ' ' << argv[a];
+		}
+		wf << "\n\n";
+		
+		for ( const Configuration &c: clist )
+		{
 			Directory cdir;
 			cdir.cd( c.name() );
-			wf << "\t@pushd " << cdir.fullpath() << " > /dev/null && ";
-			generator->targetCall( wf, std::string() );
-			wf << " && popd > /dev/null\n\n";
+			wf << c.name() << "/: ${NEED_CONFIG}\n\n";
+			wf << c.name() << ": " << c.name() << "/\n";
+			wf << "\t@cd " << cdir.fullpath() << "; ";
+			generator->targetCall( wf, "${TARGETS}" );
+			wf << "\n\n";
 		}
+
+		// make it so there is a rule for whatever target is specified
+		// that just passes it on to the real live rule
+		wf <<
+			"\n"
+			"${TARGETS}: all ;\n"
+			"\n";
+
 		wf
 			<< "clean:\n\t@echo \"Cleaning...\"\n";
 		for ( const Configuration &c: clist )
 		{
 			Directory cdir;
 			cdir.cd( c.name() );
-			wf << "\t@pushd " << cdir.fullpath() << " > /dev/null && ";
+			wf << "\t@cd " << cdir.fullpath() << "; ";
 			generator->targetCall( wf, "clean" );
-			wf << " && popd > /dev/null\n";
+			wf << '\n';
 		}
+		wf << "\n";
 	}
 	else
 	{
-//		Directory &outDir = Directory::binary();
 		Directory outDir;
-		wf << ".PHONY: all clean";
-		wf << "\n.ONESHELL:\n"
-			".SHELLFLAGS := -e\n"
+		wf << 
+			".SUFFIXES:\n"
+			".ONESHELL:\n"
+			".NOTPARALLEL:\n"
+			".SILENT:\n"
 			".DEFAULT: all\n"
 			"\n"
+			".PHONY: all clean\n"
+			"\n"
 			"all:\n"
-			"\t@pushd " << outDir.fullpath() << " > /dev/null && ";
+			"\t@cd " << outDir.fullpath() << "; ";
 		generator->targetCall( wf, std::string() );
-		wf << " && popd > /dev/null\n\n"
-		   <<
+		wf <<
 			"clean:\n\t@echo \"Cleaning...\"\n"
-			"\t@pushd " << outDir.fullpath() << " > /dev/null && ";
+			"\t@cd " << outDir.fullpath() << "; ";
 		generator->targetCall( wf, "clean" );
-		wf << " && popd > /dev/null\n\n";
+		wf << "\n\n";
 	}
 }
 
@@ -367,8 +418,7 @@ main( int argc, const char *argv[] )
 		{
 			Directory srcDir;
 			srcDir.cd( subdir );
-			emitWrapper( srcDir, generator, doConfigDir );
-
+			emitWrapper( srcDir, generator, doConfigDir, argc, argv );
 		}
 	}
 	catch ( std::exception &e )

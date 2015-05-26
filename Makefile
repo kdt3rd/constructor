@@ -22,6 +22,7 @@ SRC:= main.cpp \
 	CreateFile.cpp \
 	Rule.cpp \
 	Tool.cpp \
+	Pool.cpp \
 	DefaultTools.cpp \
 	Configuration.cpp \
 	Variable.cpp \

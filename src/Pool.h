@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2014 Kimball Thurston
+// Copyright (c) 2015 Kimball Thurston
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the "Software"),
@@ -20,65 +20,46 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#include "CreateFile.h"
+#pragma once
 
-#include "Debug.h"
-#include "TransformSet.h"
-#include "FileUtil.h"
+#include <string>
 
 
 ////////////////////////////////////////
 
 
-CreateFile::CreateFile( const std::string &name )
-		: Item( name )
+/// @brief Class Pool provides a simple definition for pooling compile
+///        jobs.
+///
+/// When doing -j N in make, or in things like ninja, sometimes there
+/// are tasks that use a lot of resources. This is a way to contain how
+/// many are happening at once. Ninja also has a pre-defined pool called
+/// console that allows interaction with the console, even in a parallel
+/// compile environment (the parallel things in the background keep
+/// happening, buffered!)
+class Pool
 {
-}
+public:
+	Pool( std::string n, int jobs );
+	~Pool( void );
+
+	inline const std::string &getName( void ) const;
+	inline int getMaxJobCount( void ) const;
+	
+private:
+	std::string myName;
+	int myJobCount;
+};
 
 
 ////////////////////////////////////////
 
 
-CreateFile::~CreateFile( void )
-{
-}
+inline const std::string &Pool::getName( void ) const { return myName; }
+
+inline int Pool::getMaxJobCount( void ) const { return myJobCount; }
 
 
-////////////////////////////////////////
 
-
-void
-CreateFile::setLines( const std::vector<std::string> &l )
-{
-	myLines = l;
-}
-
-
-////////////////////////////////////////
-
-
-std::shared_ptr<BuildItem>
-CreateFile::transform( TransformSet &xform ) const
-{
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
-	if ( ret )
-		return ret;
-
-	DEBUG( "transform CreateFile " << getName() );
-	ret = std::make_shared<BuildItem>( getName(), getDir() );
-
-	auto outd = getDir()->reroot( xform.getArtifactDir() );
-	outd->updateIfDifferent( getName(), myLines );
-
-	ret->setOutputDir( outd );
-	ret->setOutputs( { getName() } );
-
-	xform.recordTransform( this, ret );
-
-	return ret;
-}
-
-
-////////////////////////////////////////
 
 

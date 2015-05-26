@@ -58,11 +58,12 @@ Executable::transform( TransformSet &xform ) const
 	if ( ret )
 		return ret;
 
+	DEBUG( "transform Executable " << getName() );
 	ret = std::make_shared<BuildItem>( getName(), getDir() );
 	ret->setUseName( false );
 	ret->setOutputDir( getOutputDir( xform ) );
-	ret->setTopLevel( true );
-	ret->setDefaultTarget( true );
+	ret->setTopLevel( isTopLevel(), getPseudoTarget() );
+	ret->setDefaultTarget( isDefaultTarget() );
 
 	std::set<std::string> tags;
 	std::queue< std::shared_ptr<BuildItem> > chainsToCheck;

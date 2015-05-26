@@ -257,6 +257,7 @@ PackageConfig::transform( TransformSet &xform ) const
 	if ( ret )
 		return ret;
 
+	DEBUG( "transform PackageConfig " << getName() );
 	if ( myPackageFile.empty() )
 		ret = std::make_shared<BuildItem>( getName(), getDir() );
 	else

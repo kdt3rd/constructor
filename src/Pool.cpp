@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2014 Kimball Thurston
+// Copyright (c) 2015 Kimball Thurston
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the "Software"),
@@ -20,65 +20,24 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#include "CreateFile.h"
-
-#include "Debug.h"
-#include "TransformSet.h"
-#include "FileUtil.h"
+#include "Pool.h"
+#include <stdexcept>
 
 
 ////////////////////////////////////////
 
 
-CreateFile::CreateFile( const std::string &name )
-		: Item( name )
+Pool::Pool( std::string n, int jobs )
+		: myName( std::move( n ) ), myJobCount( jobs )
 {
+	if ( jobs <= 0 )
+		throw std::runtime_error( "Invalid max job count specified creating pool" );
 }
 
 
 ////////////////////////////////////////
 
 
-CreateFile::~CreateFile( void )
+Pool::~Pool( void )
 {
 }
-
-
-////////////////////////////////////////
-
-
-void
-CreateFile::setLines( const std::vector<std::string> &l )
-{
-	myLines = l;
-}
-
-
-////////////////////////////////////////
-
-
-std::shared_ptr<BuildItem>
-CreateFile::transform( TransformSet &xform ) const
-{
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
-	if ( ret )
-		return ret;
-
-	DEBUG( "transform CreateFile " << getName() );
-	ret = std::make_shared<BuildItem>( getName(), getDir() );
-
-	auto outd = getDir()->reroot( xform.getArtifactDir() );
-	outd->updateIfDifferent( getName(), myLines );
-
-	ret->setOutputDir( outd );
-	ret->setOutputs( { getName() } );
-
-	xform.recordTransform( this, ret );
-
-	return ret;
-}
-
-
-////////////////////////////////////////
-
-

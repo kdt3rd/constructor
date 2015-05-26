@@ -124,6 +124,9 @@ emitRules( std::ostream &os, const TransformSet &x )
 static void
 emitVariables( std::ostream &os, const TransformSet &x )
 {
+	for ( auto &p: x.getPools() )
+		os << "\npool " << p->getName() << '\n' << "  depth = " << p->getMaxJobCount() << "\n\n";
+
 	const VariableSet &vars = x.getVars();
 	for ( auto i: vars )
 	{
@@ -173,19 +176,26 @@ emitTargets( std::ostream &os, const TransformSet &x )
 	{
 		DEBUG( "Processing build item '" << bi->getName() << "'" );
 		auto t = bi->getTool();
-		if ( t )
+		if ( t || bi->isTopLevelItem() )
 		{
 			auto outd = bi->getOutDir();
 			os << "\nbuild";
 			addOutputList( os, bi );
-			os << ": " << t->getTag();
-			if ( bi->useName() )
-				os << ' ' << escape_path( bi->getDir()->makefilename( bi->getName() ) );
+			std::vector< std::shared_ptr<BuildItem> > deps;
+			if ( t )
+			{
+				os << ": " << t->getTag();
+				if ( bi->useName() )
+					os << ' ' << escape_path( bi->getDir()->makefilename( bi->getName() ) );
 
-			std::vector< std::shared_ptr<BuildItem> > deps =
-				bi->extractDependencies( DependencyType::EXPLICIT );
-			for ( auto &d: deps )
-				addOutputList( os, d );
+				deps = bi->extractDependencies( DependencyType::EXPLICIT );
+				for ( auto &d: deps )
+					addOutputList( os, d );
+			}
+			else
+			{
+				os << ": phony";
+			}
 
 			deps = bi->extractDependencies( DependencyType::IMPLICIT );
 			if ( ! deps.empty() )
@@ -215,6 +225,13 @@ emitTargets( std::ostream &os, const TransformSet &x )
 				}
 				else
 					outv = bv.second.prepended_value( t->getCommandPrefix( bv.first ) );
+				if ( bv.first == "pool" && outv != "console" )
+				{
+					if ( ! x.hasPool( outv ) )
+					{
+						std::cerr << "WARNING: Build Item '" << bi->getName() << "' set to use non-existent pool '" << outv << "'" << std::endl;
+					}
+				}
 				os << "\n  " << bv.first << "=" << outv;
 			}
 
@@ -312,7 +329,7 @@ NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 {
 	std::string buildfn = d->makefilename( "build.ninja" );
 	std::ofstream f( buildfn );
-	f << "ninja_required_version = 1.3\n";
+	f << "ninja_required_version = 1.5\n";
 	f << "builddir = " << d->fullpath() << '\n';
 
 	TransformSet xform( d );

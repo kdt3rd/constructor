@@ -79,6 +79,21 @@ Scope::newSubScope( bool inherits )
 
 
 void
+Scope::addPool( const std::shared_ptr<Pool> &p )
+{
+	for ( std::shared_ptr<Pool> &i: myPools )
+	{
+		if ( i->getName() == p->getName() )
+			throw std::runtime_error( "Duplicate pool definition found" );
+	}
+	myPools.push_back( p );
+}
+
+
+////////////////////////////////////////
+
+
+void
 Scope::addTool( const std::shared_ptr<Tool> &t )
 {
 	bool found = false;
@@ -162,8 +177,15 @@ Scope::useToolSet( const std::string &tset )
 void
 Scope::addItem( const ItemPtr &i )
 {
-	// add a check to avoid multiple inserts?
-	myItems.insert( i );
+	// NB: we use a vector here and prevent multiple inserts such that
+	// we preserve ordering. if we used a set, it would be ordered
+	// randomly based on memory pointer allocated
+	for ( auto &m: myItems )
+	{
+		if ( m == i )
+			return;
+	}
+	myItems.push_back( i );
 }
 
 
@@ -173,9 +195,14 @@ Scope::addItem( const ItemPtr &i )
 void
 Scope::removeItem( const ItemPtr &i )
 {
-	auto x = myItems.find( i );
-	if ( x != myItems.end() )
-		myItems.erase( x );
+	for ( auto m = myItems.begin(); m != myItems.end(); ++m )
+	{
+		if ( (*m) == i )
+		{
+			myItems.erase( m );
+			return;
+		}
+	}
 }
 
 ////////////////////////////////////////
@@ -185,12 +212,16 @@ void
 Scope::transform( TransformSet &xform,
 				  const Configuration &conf ) const
 {
+	DEBUG( "transform Scope..." );
 	for ( const std::shared_ptr<Scope> &ss: mySubScopes )
 	{
 		std::shared_ptr<TransformSet> sx = std::make_shared<TransformSet>( xform.getOutDir() );
 		ss->transform( *sx, conf );
 		xform.addChildScope( sx );
 	}
+
+	for ( auto &p: myPools )
+		xform.addPool( p );
 
 	for ( auto i: myTagMap )
 	{
@@ -250,6 +281,7 @@ Scope::grabScope( const Scope &o )
 	myTools = o.myTools;
 	myEnabledToolsets = o.myEnabledToolsets;
 	myExtensionMap = o.myExtensionMap;
+	myPools = o.myPools;
 
 	myVariables = o.myVariables;
 }

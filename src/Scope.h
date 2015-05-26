@@ -25,11 +25,11 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <set>
 
 #include "Variable.h"
 #include "Item.h"
 #include "Tool.h"
+#include "Pool.h"
 #include "TransformSet.h"
 #include "Directory.h"
 
@@ -74,6 +74,9 @@ public:
 	inline std::vector< std::shared_ptr<Tool> > &getTools( void );
 	inline const std::vector< std::shared_ptr<Tool> > &getTools( void ) const;
 
+	void addPool( const std::shared_ptr<Pool> &t );
+	inline std::vector< std::shared_ptr<Pool> > &getPools( void );
+	
 	void addTool( const std::shared_ptr<Tool> &t );
 	std::shared_ptr<Tool> findTool( const std::string &extension ) const;
 
@@ -101,7 +104,7 @@ private:
 	VariableSet myOptions;
 	std::vector< std::shared_ptr<Scope> > mySubScopes;
 
-	std::set<ItemPtr> myItems;
+	std::vector<ItemPtr> myItems;
 
 	std::map<std::string, std::vector<std::string> > myToolSets;
 
@@ -110,6 +113,8 @@ private:
 	std::vector<std::string> myEnabledToolsets;
 	std::map<std::string, std::vector<std::shared_ptr<Tool> > > myExtensionMap;
 
+	std::vector< std::shared_ptr<Pool> > myPools;
+	
 	bool myInheritParentScope = false;
 };
 
@@ -163,6 +168,14 @@ Scope::getTools( void )
 inline const std::vector< std::shared_ptr<Tool> > &
 Scope::getTools( void ) const
 { return myTools; }
+
+
+////////////////////////////////////////
+
+
+inline std::vector< std::shared_ptr<Pool> > &
+Scope::getPools( void )
+{ return myPools; }
 
 
 ////////////////////////////////////////

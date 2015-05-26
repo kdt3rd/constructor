@@ -28,6 +28,7 @@
 #include "FileUtil.h"
 #include "OSUtil.h"
 #include "StrUtil.h"
+#include "Debug.h"
 
 #include "Directory.h"
 #include "Scope.h"
@@ -138,13 +139,17 @@ recurseAndAdd( std::shared_ptr<CompileSet> &ret,
 	{
 		size_t len = 0;
 		const char *n = lua_tolstring( L, i, &len );
+		DEBUG( "recurseAndAdd " << n );
 		if ( n )
 			ret->addItem( std::string( n, len ) );
 		else
 			throw std::runtime_error( "String argument, but unable to extract string" );
 	}
 	else if ( lua_isuserdata( L, i ) )
+	{
+		DEBUG( "recurseAndAdd existing item " << extractItem( L, i )->getName() );
 		ret->addItem( extractItem( L, i ) );
+	}
 	else if ( lua_istable( L, i ) )
 	{
 		lua_pushnil( L );
@@ -168,6 +173,7 @@ recurseAndAdd( const std::shared_ptr<Set> &ret,
 		case LUA_TNIL:
 			break;
 		case LUA_TSTRING:
+			DEBUG( "recurseAndAdd2 " << curV.asString() );
 			ret->addItem( curV.asString() );
 			break;
 		case LUA_TTABLE:
@@ -175,6 +181,7 @@ recurseAndAdd( const std::shared_ptr<Set> &ret,
 				recurseAndAdd( ret, i.second );
 			break;
 		case LUA_TUSERDATA:
+			DEBUG( "recurseAndAdd2 item " << extractItem( curV )->getName() );
 			ret->addItem( extractItem( curV ) );
 			break;
 		default:
@@ -199,6 +206,7 @@ luaFindExecutable( lua_State *L )
 	{
 		std::string name( ename, len );
 		std::string ret;
+		DEBUG( "luaFindExecutable " << name );
 		if ( File::findExecutable( ret, name ) )
 			lua_pushlstring( L, ret.c_str(), ret.size() );
 		else
@@ -238,6 +246,7 @@ luaSetPath( std::string p )
 {
 	String::substituteVariables( p, false, &pathVarLookup );
 	
+	DEBUG( "luaSetPath " << p );
 	// we will always use unix-style path separators for
 	// simplicity
 	File::setPathOverride( String::split( p, ':' ) );
@@ -258,6 +267,7 @@ luaFindFile( lua_State *L )
 	std::string filepath;
 	bool ret = false;
 
+	DEBUG( "luaFindFile " << names[0] );
 	if ( N == 2 )
 	{
 		std::vector<std::string> paths;
@@ -286,6 +296,7 @@ luaJoinPath( lua_State *L )
 	if ( N < 2 )
 		throw std::runtime_error( "Expecting at least 2 arguments to file.path.join" );
 
+	DEBUG( "luaJoinPath" );
 	Directory d( Lua::Parm<std::string>::get( L, N, 1 ) );
 	for ( int i = 2; i <= N; ++i )
 		d.cd( Lua::Parm<std::string>::get( L, N, i ) );
@@ -298,18 +309,21 @@ luaJoinPath( lua_State *L )
 static std::string
 luaSourceDir( void )
 {
+	DEBUG( "luaSourceDir" );
 	return Directory::current()->fullpath();
 }
 
 static std::string
 luaRelativeSourceDir( void )
 {
+	DEBUG( "luaRelativeSourceDir" );
 	return Directory::current()->relpath();
 }
 
 static std::string
 luaSourceFile( const std::string &fn )
 {
+	DEBUG( "luaSourceFile " << fn );
 	return Directory::current()->makefilename( fn );
 }
 
@@ -382,6 +396,7 @@ luaGlobFiles( lua_State *L )
 	if ( lua_gettop( L ) != 1 || ! lua_isstring( L, 1 ) )
 		throw std::runtime_error( "Expecting a single pattern string argument to GlobaFiles" );
 
+	DEBUG( "luaGlobFiles " << Lua::Parm<std::string>::get( L, 1, 1 ) );
 	std::shared_ptr<CompileSet> ret = std::make_shared<CompileSet>();
 	globDir( ret, Lua::Parm<std::string>::get( L, 1, 1 ) );
 
@@ -445,6 +460,7 @@ luaCodeFilter( lua_State *L )
 	if ( name.empty() )
 		throw std::runtime_error( "Generator definition requires a name" );
 
+	DEBUG( "luaCodeFilter " << name );
 	std::shared_ptr<CodeFilter> ret = std::make_shared<CodeFilter>( name );
 
 	for ( auto &i: t )
@@ -507,6 +523,7 @@ luaCreateFile( lua_State *L )
 		throw std::runtime_error( "CreateFile expects 2 arguments: file name, table of strings - one for each line" );
 
 	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
+	DEBUG( "luaCreateFile " << name );
 	Lua::Value v;
 	v.load( L, 2 );
 	std::shared_ptr<CreateFile> ret = std::make_shared<CreateFile>( name );
@@ -568,6 +585,7 @@ luaGenerateSource( lua_State *L )
 
 	if ( name.empty() )
 		throw std::runtime_error( "GenerateSourceDataFile definition requires an output" );
+	DEBUG( "luaGenerateSource " << name );
 
 	if ( function.empty() )
 		throw std::runtime_error( "GenerateSourceDataFile requires a transform function spec" );
@@ -595,9 +613,29 @@ luaGenerateSource( lua_State *L )
 ////////////////////////////////////////
 
 
+static int
+luaAddPool( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N != 2 || ! lua_isstring( L, 1 ) || ! lua_isnumber( L, 2 ) )
+		throw std::runtime_error( "AddProcessingPool expects 2 arguments: pool name, number of concurrent jobs" );
+
+	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
+	int jobs = Lua::Parm<int>::get( L, N, 2 );
+
+	DEBUG( "luaAddPool " << name );
+	Scope::current().addPool( std::make_shared<Pool>( name, jobs ) );
+	return 0;
+}
+
+
+////////////////////////////////////////
+
+
 void
 luaAddTool( const Lua::Value &v )
 {
+	DEBUG( "luaAddTool" );
 	Scope::current().addTool( Tool::parse( v ) );
 }
 
@@ -625,6 +663,7 @@ luaAddToolSet( const Lua::Value &v )
 	if ( tools.empty() )
 		throw std::runtime_error( "Need list of tools in AddToolSet" );
 
+	DEBUG( "luaAddToolSet " << name );
 	Scope::current().addToolSet( name, tools );
 }
 
@@ -643,6 +682,7 @@ luaAddToolOption( const std::string &t, const std::string &g,
 		}
 	}
 
+	DEBUG( "luaAddToolOption tool " << t );
 	if ( ! found )
 		throw std::runtime_error( "Unable to find tool '" + t + "' in current scope" );
 }
@@ -667,6 +707,7 @@ luaAddToolModulePath( lua_State *L )
 			const char *s = lua_tolstring( L, i, &len );
 			std::string curP( s, len );
 
+			DEBUG( "luaAddToolModulePath " << curP );
 			if ( File::isAbsolute( s ) )
 				theToolModulePath.emplace_back( std::move( curP ) );
 			else
@@ -689,6 +730,7 @@ static int
 luaSetToolModulePath( lua_State *L )
 {
 	theToolModulePath.clear();
+	DEBUG( "luaSetToolModulePath" );
 	luaAddToolModulePath( L );
 	return 0;
 }
@@ -726,6 +768,7 @@ luaLoadToolModule( lua_State *L )
 
 			if ( found )
 			{
+				DEBUG( "luaLoadToolModule " << luaFile );
 				ret += Lua::Engine::singleton().runFile( luaFile.c_str() );
 				theSubDirFiles.push_back( luaFile );
 			}
@@ -754,6 +797,7 @@ luaEnableLangs( lua_State *L )
 			size_t len = 0;
 			const char *s = lua_tolstring( L, i, &len );
 			std::string curLang( s, len );
+			DEBUG( "luaEnableLangs " << curLang );
 			for ( auto &t: Scope::current().getTools() )
 				t->enableLanguage( curLang );
 		}
@@ -778,6 +822,7 @@ luaSetOption( lua_State *L )
 
 	std::string nm = Lua::Parm<std::string>::get( L, N, 1 );
 	std::string val = Lua::Parm<std::string>::get( L, N, 2 );
+	DEBUG( "luaSetOption " << nm );
 	auto &opts = Scope::current().getOptions();
 	auto ne = opts.emplace( std::make_pair( nm, Variable( nm ) ) );
 	ne.first->second.reset( std::move( val ) );
@@ -801,6 +846,7 @@ luaSubDir( lua_State *L )
 	int ret = 0;
 
 	std::string file = Lua::Parm<std::string>::get( L, N, 1 );
+	DEBUG( "luaSubDir " << file );
 	std::shared_ptr<Directory> curDir = Directory::current();
 	std::string tmp;
 	if ( curDir->exists( tmp, file ) )
@@ -831,6 +877,7 @@ luaSubProject( lua_State *L )
 {
 	Scope::pushScope( Scope::current().newSubScope( false ) );
 	ON_EXIT{ Scope::popScope(); };
+	DEBUG( "luaSubProject" );
 	return luaSubDir( L );
 }
 
@@ -844,6 +891,7 @@ luaCompile( lua_State *L )
 		return 1;
 	}
 
+	DEBUG( "luaCompile" );
 	std::shared_ptr<CompileSet> ret = std::make_shared<CompileSet>();
 	for ( int i = 1; i <= N; ++i )
 		recurseAndAdd( ret, L, i );
@@ -861,6 +909,7 @@ luaExecutable( lua_State *L )
 		throw std::runtime_error( "Executable expects a name as the first argument and at least 1 link object" );
 	std::string ename = Lua::Parm<std::string>::get( L, N, 1 );
 
+	DEBUG( "luaExecutable " << ename );
 	std::shared_ptr<CompileSet> ret = std::make_shared<Executable>( std::move( ename ) );
 	for ( int i = 2; i <= N; ++i )
 		recurseAndAdd( ret, L, i );
@@ -880,6 +929,7 @@ luaLibrary( lua_State *L )
 		throw std::runtime_error( "Library expects a name as the first argument and at least 1 link object" );
 	std::string ename = Lua::Parm<std::string>::get( L, N, 1 );
 
+	DEBUG( "luaLibrary " << ename );
 	std::shared_ptr<CompileSet> ret = std::make_shared<Library>( std::move( ename ) );
 	for ( int i = 2; i <= N; ++i )
 		recurseAndAdd( ret, L, i );
@@ -898,6 +948,7 @@ luaUseLibraries( lua_State *L )
 {
 	int N = lua_gettop( L );
 
+	DEBUG( "luaUseLibraries" );
 	std::vector<ItemPtr> ret;
 	for ( int i = 1; i <= N; ++i )
 	{
@@ -968,6 +1019,7 @@ luaInclude( lua_State *L )
 	Variable &v = incPath->second;
 	v.setToolTag( "cc" );
 
+	DEBUG( "luaInclude" );
 	int N = lua_gettop( L );
 	for ( int i = 1; i <= N; ++i )
 		recurseAndAddPath( v, L, i );
@@ -986,6 +1038,7 @@ luaAddDefines( lua_State *L )
 	Variable &v = defs->second;
 	v.setToolTag( "cc" );
 
+	DEBUG( "luaAddDefines" );
 	int N = lua_gettop( L );
 	for ( int i = 1; i <= N; ++i )
 		v.add( Lua::Parm<std::string>::get( L, N, i ) );
@@ -1000,6 +1053,7 @@ itemGetName( lua_State *L )
 		throw std::runtime_error( "Item:name() expects only one argument - self" );
 	ItemPtr p = extractItem( L, 1 );
 	const std::string &n = p->getName();
+	DEBUG( "item:GetName -> " << n );
 	lua_pushlstring( L, n.c_str(), n.size() );
 	return 1;
 }
@@ -1010,6 +1064,7 @@ itemAddDependency( lua_State *L )
 	if ( lua_gettop( L ) != 3 )
 		throw std::runtime_error( "Item:addDependency() expects 3 arguments - self, dependencyType, dependency" );
 	ItemPtr p = extractItem( L, 1 );
+	DEBUG( "item:addDependency " << p->getName() );
 	size_t len = 0;
 	const char *dtp = lua_tolstring( L, 2, &len );
 	if ( dtp )
@@ -1038,6 +1093,7 @@ itemHasDependency( lua_State *L )
 	if ( lua_gettop( L ) != 2 )
 		throw std::runtime_error( "Item:addDependency() expects 2 arguments - self and dependency check" );
 	ItemPtr p = extractItem( L, 1 );
+	DEBUG( "item:hasDependency " << p->getName() );
 	ItemPtr d = extractItem( L, 2 );
 	bool hd = p->hasDependency( d );
 	lua_pushboolean( L, hd ? 1 : 0 );
@@ -1050,6 +1106,7 @@ itemVariables( lua_State *L )
 	if ( lua_gettop( L ) != 1 )
 		throw std::runtime_error( "Item:variables() expects 1 argument - self" );
 	ItemPtr p = extractItem( L, 1 );
+	DEBUG( "item:variables " << p->getName() );
 	Lua::Value ret;
 	Lua::Table &t = ret.initTable();
 	for ( auto &v: p->getVariables() )
@@ -1066,6 +1123,7 @@ itemClearVariable( lua_State *L )
 		throw std::runtime_error( "Item:clearVariable() expects 2 arguments - self, variable name" );
 	ItemPtr p = extractItem( L, 1 );
 	std::string nm = Lua::Parm<std::string>::get( L, 2, 2 );
+	DEBUG( "item:clearVariable " << p->getName() );
 
 	VariableSet &vars = p->getVariables();
 	auto x = vars.find( nm );
@@ -1082,6 +1140,7 @@ itemSetVariable( lua_State *L )
 		throw std::runtime_error( "Item:setVariable() expects 3 or 4 arguments - self, variable name, variable value, bool env check (nil)" );
 	ItemPtr p = extractItem( L, 1 );
 	std::string nm = Lua::Parm<std::string>::get( L, N, 2 );
+	DEBUG( "item:setVariable " << p->getName() << " " << nm );
 	Lua::Value v;
 	v.load( L, 3 );
 	bool envCheck = false;
@@ -1117,6 +1176,7 @@ itemAddToVariable( lua_State *L )
 		throw std::runtime_error( "Item:addToVariable() expects 3 arguments - self, variable name, variable value to add" );
 	ItemPtr p = extractItem( L, 1 );
 	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
+	DEBUG( "item:addToVariable " << p->getName() << " " << nm );
 	Lua::Value v;
 	v.load( L, 3 );
 	if ( v.type() == LUA_TNIL )
@@ -1144,6 +1204,7 @@ itemInheritVariable( lua_State *L )
 		throw std::runtime_error( "Item:inheritVariable() expects 3 arguments - self, variable name, boolean" );
 	ItemPtr p = extractItem( L, 1 );
 	std::string nm = Lua::Parm<std::string>::get( L, 3, 2 );
+	DEBUG( "item:inheritVariable " << p->getName() << " " << nm );
 	bool v = Lua::Parm<bool>::get( L, 3, 3 );
 	VariableSet &vars = p->getVariables();
 	auto x = vars.find( nm );
@@ -1162,6 +1223,7 @@ itemForceTool( lua_State *L )
 	if ( N == 2 || N == 3 )
 	{
 		ItemPtr p = extractItem( L, 1 );
+		DEBUG( "item:forceTool " << p->getName() );
 		if ( N == 3 )
 		{
 			p->forceTool( Lua::Parm<std::string>::get( L, 3, 2 ),
@@ -1182,6 +1244,7 @@ itemOverrideToolSetting( lua_State *L )
 	if ( lua_gettop( L ) != 3 )
 		throw std::runtime_error( "Item:overrideToolSetting() expects 3 arguments - self, tool setting name, setting value" );
 	ItemPtr p = extractItem( L, 1 );
+	DEBUG( "item:overrideToolSetting " << p->getName() );
 	p->overrideToolSetting( Lua::Parm<std::string>::get( L, 3, 2 ),
 							Lua::Parm<std::string>::get( L, 3, 3 ) );
 
@@ -1196,6 +1259,7 @@ itemAddIncludes( lua_State *L )
 		throw std::runtime_error( "Item:addIncludes() expects at least 2 arguments - self then string values" );
 	ItemPtr p = extractItem( L, 1 );
 
+	DEBUG( "item:addIncludes " << p->getName() );
 	auto &vars = p->getVariables();
 	auto incPath = vars.find( "includes" );
 	if ( incPath == vars.end() )
@@ -1226,6 +1290,7 @@ itemAddDefines( lua_State *L )
 		throw std::runtime_error( "Item:addDefines() expects at least 2 arguments - self then string values" );
 	ItemPtr p = extractItem( L, 1 );
 
+	DEBUG( "item:addDefines " << p->getName() );
 	auto &vars = p->getVariables();
 	auto defs = vars.find( "defines" );
 	if ( defs == vars.end() )
@@ -1248,6 +1313,7 @@ itemAddArtifactInclude( lua_State *L )
 		throw std::runtime_error( "Item:includeArtifactDir() expects at least 1 argument - self" );
 	ItemPtr p = extractItem( L, 1 );
 
+	DEBUG( "item:addArtifactInclude " << p->getName() );
 	auto &vars = p->getVariables();
 	auto incPath = vars.find( "includes" );
 	if ( incPath == vars.end() )
@@ -1258,7 +1324,7 @@ itemAddArtifactInclude( lua_State *L )
 	v.setToolTag( "cc" );
 	std::string path = "$builddir";
 	path.push_back( File::pathSeparator() );
-	path.append( "build" );
+	path.append( "artifacts" );
 	path.push_back( File::pathSeparator() );
 	Directory tmp( *(Directory::current()) );
 	tmp.cdUp();
@@ -1279,6 +1345,7 @@ itemSetTopLevel( lua_State *L )
 		throw std::runtime_error( "Item:setTopLevel() expects 2 arguments - self, boolean" );
 
 	ItemPtr p = extractItem( L, 1 );
+	DEBUG( "item:setTopLevel " << p->getName() );
 	bool tl = Lua::Parm<bool>::get( L, N, 2 );
 	p->setAsTopLevel( tl );
 	if ( tl )
@@ -1297,6 +1364,7 @@ itemSetDefaultTarget( lua_State *L )
 		throw std::runtime_error( "Item:setDefaultTarget() expects 2 arguments - self, boolean" );
 
 	ItemPtr p = extractItem( L, 1 );
+	DEBUG( "item:setDefaultTarget " << p->getName() );
 	p->setDefaultTarget( Lua::Parm<bool>::get( L, N, 2 ) );
 
 	return 0;
@@ -1311,10 +1379,26 @@ itemSetPseudoTarget( lua_State *L )
 
 	ItemPtr p = extractItem( L, 1 );
 	// only makes sense if this is also a top level item
+	DEBUG( "item:setPseudoTarget " << p->getName() );
 	p->setAsTopLevel( true );
 	Scope::current().addItem( p );
 	if ( N == 2 )
 		p->setPseudoTarget( Lua::Parm<std::string>::get( L, N, 2 ) );
+
+	return 0;
+}
+
+static int
+itemSetUseName( lua_State *L )
+{
+	int N = lua_gettop( L );
+	if ( N != 2 )
+		throw std::runtime_error( "Item:setUseName() expects 2 arguments - self, bool" );
+
+	ItemPtr p = extractItem( L, 1 );
+	DEBUG( "item:setUseNameAsInput " << p->getName() );
+	p->setUseNameAsInput( Lua::Parm<bool>::get( L, N, 2 ) );
+	Scope::current().addItem( p );
 
 	return 0;
 }
@@ -1333,6 +1417,7 @@ itemCreate( lua_State *L )
 	const char *p = lua_tolstring( L, 1, &len );
 	if ( p )
 	{
+		DEBUG( "item:createItem " << std::string( p, len ) );
 		ItemPtr np = std::make_shared<Item>( std::string( p, len ) );
 		pushItem( L, np );
 	}
@@ -1361,6 +1446,7 @@ static const struct luaL_Reg item_m[] =
 	{ "setTopLevel", itemSetTopLevel },
 	{ "setDefaultTarget", itemSetDefaultTarget },
 	{ "setPseudoTarget", itemSetPseudoTarget },
+	{ "setUseNameForInput", itemSetUseName },
 	{ nullptr, nullptr }
 };
 
@@ -1375,6 +1461,7 @@ luaBuildConfiguration( lua_State *L )
 {
 	if ( lua_gettop( L ) != 1 || ! lua_istable( L, 1 ) )
 		throw std::runtime_error( "Expected 1 argument - a table - to BuildConfiguration" );
+	DEBUG( "luaBuildConfiguration" );
 	Lua::Value v( L, 1 );
 	Configuration::defined().emplace_back( Configuration( v.extractTable() ) );
 
@@ -1388,6 +1475,7 @@ luaDefaultConfiguration( lua_State *L )
 		throw std::runtime_error( "Expected 1 argument - a string - to DefaultConfiguration" );
 
 	const char *s = lua_tolstring( L, 1, NULL );
+	DEBUG( "luaDefaultConfiguration " << s );
 	bool found = false;
 	for ( const Configuration &c: Configuration::defined() )
 	{
@@ -1412,6 +1500,7 @@ luaDefaultConfiguration( lua_State *L )
 static bool
 luaExternalLibraryExists( const std::string &name, const std::string &reqVersion )
 {
+	DEBUG( "luaExternalLibraryExists " << name );
 	if ( PackageConfig::find( name, reqVersion ) )
 		return true;
 	return false;
@@ -1424,6 +1513,7 @@ luaExternalLibrary( lua_State *L )
 	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
 	std::string ver = Lua::Parm<std::string>::get( L, N, 2 );
 
+	DEBUG( "luaExternalLibrary " << name );
 	pushItem( L, PackageConfig::find( name, ver ) );
 	return 1;
 }
@@ -1435,6 +1525,7 @@ luaRequiredExternalLibrary( lua_State *L )
 	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
 	std::string ver = Lua::Parm<std::string>::get( L, N, 2 );
 
+	DEBUG( "luaRequiredExternalLibrary " << name );
 	auto p = PackageConfig::find( name, ver );
 	if ( ! p )
 	{
@@ -1476,6 +1567,7 @@ registerExtensions( void )
 	eng.registerFunction( "CreateFile", &luaCreateFile );
 	eng.registerFunction( "GenerateSourceDataFile", &luaGenerateSource );
 
+	eng.registerFunction( "AddProcessingPool", &luaAddPool );
 	eng.registerFunction( "AddTool", &luaAddTool );
 	eng.registerFunction( "AddToolSet", &luaAddToolSet );
 	eng.registerFunction( "AddToolOption", &luaAddToolOption );

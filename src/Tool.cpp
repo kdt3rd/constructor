@@ -34,7 +34,7 @@
 
 
 Tool::Tool( std::string t, std::string n )
-		: myTag( std::move( t ) ), myName( std::move( n ) )
+		: myTag( std::move( t ) ), myName( std::move( n ) ), myOutputRestat( false )
 {
 }
 
@@ -93,6 +93,46 @@ Tool::getLanguage( void ) const
 		return String::empty();
 	}
 	return myLanguage;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Tool::setPool( const std::string &name )
+{
+	myPool = name;
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+Tool::getPool( void ) const
+{
+	return myPool;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Tool::setOutputRestat( bool on )
+{
+	myOutputRestat = on;
+}
+
+
+////////////////////////////////////////
+
+
+bool
+Tool::isOutputRestat( void ) const
+{
+	return myOutputRestat;
 }
 
 
@@ -397,9 +437,8 @@ Tool::createRule( const TransformSet &xset, bool useBraces ) const
 
 	ret.setDependencyFile( myImplDepName );
 	ret.setDependencyStyle( myImplDepStyle );
-	VERBOSE( "Need to handle job pool and output restat in tool definition" );
-//	ret.setJobPool();
-//	ret.setOutputRestat();
+	ret.setJobPool( myPool );
+	ret.setOutputRestat( myOutputRestat );
 
 	return std::move( ret );
 }
@@ -420,12 +459,14 @@ Tool::parse( const Lua::Value &v )
 	std::vector<std::string> outpExt;
 	ItemPtr exePtr;
 	std::string exe, outputPrefix;
+	std::string pool;
 	OptionGroup opts;
 	OptionDefaultSet optDefaults;
 	OptionDefaultSet flagPrefixes;
 	std::string impFile, impStyle;
 	std::vector<std::string> impCmd;
 	std::vector<std::string> cmd;
+	bool outRestat = false;
 
 	for ( auto &i: t )
 	{
@@ -530,6 +571,10 @@ Tool::parse( const Lua::Value &v )
 		{
 			cmd = i.second.toStringList();
 		}
+		else if ( k == "pool" )
+			pool = i.second.asString();
+		else if ( k == "output_restat" )
+			outRestat = i.second.asBool();
 	}
 
 	std::shared_ptr<Tool> ret = std::make_shared<Tool>( tag, name );
@@ -548,6 +593,8 @@ Tool::parse( const Lua::Value &v )
 	ret->myImplDepName = impFile;
 	ret->myImplDepStyle = impStyle;
 	ret->myImplDepCmd = impCmd;
+	ret->myPool = pool;
+	ret->myOutputRestat = outRestat;
 
 	return ret;
 }

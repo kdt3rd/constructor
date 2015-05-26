@@ -53,6 +53,12 @@ public:
 	void enableLanguage( const std::string &name );
 	const std::string &getLanguage( void ) const;
 
+	void setPool( const std::string &name );
+	const std::string &getPool( void ) const;
+
+	void setOutputRestat( bool on );
+	bool isOutputRestat( void ) const;
+
 	const std::string &getCommandPrefix( const std::string &varname ) const;
 
 	OptionSet &getOption( const std::string &name );
@@ -113,6 +119,8 @@ private:
 	OptionGroup myOptions;
 	OptionDefaultSet myOptionDefaults;
 	std::string myLanguage;
+	std::string myPool;
+	bool myOutputRestat;
 
 	std::string myImplDepName;
 	std::string myImplDepStyle;

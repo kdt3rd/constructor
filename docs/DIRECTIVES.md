@@ -40,6 +40,8 @@ Compile
 
 Executable
 
+  - set "exe_dir" variable to change output location
+
 Library
 
 UseLibraries
@@ -74,7 +76,7 @@ Item
   Item.setVariable
   Item.addToVariable
   Item.inheritVariable
-  Item.forceTool
+  Item.forceTool  - <pseudo> tool for pseudo-only targets
   Item.overrideToolSetting
   Item.addIncludes
   Item.addDefines

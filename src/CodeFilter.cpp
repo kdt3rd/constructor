@@ -72,6 +72,7 @@ CodeFilter::transform( TransformSet &xform ) const
 	if ( ret )
 		return ret;
 
+	DEBUG( "transform CodeFilter " << getName() );
 	ret = std::make_shared<BuildItem>( getName(), getDir() );
 	ret->setUseName( false );
 

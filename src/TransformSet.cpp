@@ -69,6 +69,31 @@ TransformSet::addChildScope( const std::shared_ptr<TransformSet> &cs )
 
 
 void
+TransformSet::addPool( const std::shared_ptr<Pool> &p )
+{
+	myPools.push_back( p );
+}
+
+
+////////////////////////////////////////
+
+
+bool
+TransformSet::hasPool( const std::string &name ) const
+{
+	for ( auto &p: myPools )
+	{
+		if ( p->getName() == name )
+			return true;
+	}
+	return false;
+}
+
+
+////////////////////////////////////////
+
+
+void
 TransformSet::addTool( const std::shared_ptr<Tool> &t )
 {
 	myTools.push_back( t );

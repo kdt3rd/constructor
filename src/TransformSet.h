@@ -27,6 +27,7 @@
 #include <set>
 #include <vector>
 
+#include "Pool.h"
 #include "Tool.h"
 #include "Variable.h"
 #include "Directory.h"
@@ -52,6 +53,10 @@ public:
 
 	void addChildScope( const std::shared_ptr<TransformSet> &cs );
 	inline const std::vector< std::shared_ptr<TransformSet> > &getSubScopes( void ) const;
+
+	void addPool( const std::shared_ptr<Pool> &p );
+	bool hasPool( const std::string &name ) const;
+	inline const std::vector< std::shared_ptr<Pool> > &getPools( void ) const;
 
 	void addTool( const std::shared_ptr<Tool> &t );
 	std::shared_ptr<Tool> getTool( const std::string &tag ) const;
@@ -85,6 +90,7 @@ private:
 	std::shared_ptr<Directory> myLibDirectory;
 	std::shared_ptr<Directory> myArtifactDirectory;
 	std::vector< std::shared_ptr<Tool> > myTools;
+	std::vector< std::shared_ptr<Pool> > myPools;
 	VariableSet myVars;
 	VariableSet myOptions;
 
@@ -155,6 +161,16 @@ inline const std::vector< std::shared_ptr<TransformSet> > &
 TransformSet::getSubScopes( void ) const
 {
 	return myChildScopes;
+}
+
+
+////////////////////////////////////////
+
+
+inline const std::vector< std::shared_ptr<Pool> > &
+TransformSet::getPools( void ) const
+{
+	return myPools;
 }
 
 

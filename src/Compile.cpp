@@ -76,6 +76,7 @@ CompileSet::addItem( std::string name )
 	if ( ! dir().exists( name ) )
 		throw std::runtime_error( "File '" + name + "' does not exist in directory '" + dir().fullpath() + "'" );
 
+	VERBOSE( "CompileSet addItem( '" << name << "' )" );
 	ItemPtr i = std::make_shared<Item>( std::move( name ) );
 	i->setParent( shared_from_this() );
 	myItems.push_back( i );
@@ -92,6 +93,7 @@ CompileSet::transform( TransformSet &xform ) const
 	if ( ret )
 		return ret;
 
+	DEBUG( "transform CompileSet " << getName() );
 	ret = std::make_shared<BuildItem>( getName(), getDir() );
 	ret->setUseName( false );
 	ret->setOutputDir( xform.getOutDir() );

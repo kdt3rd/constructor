@@ -88,6 +88,7 @@ Item::transform( TransformSet &xform ) const
 	if ( ret )
 		return ret;
 
+	DEBUG( "transform Item " << getName() );
 	ret = std::make_shared<BuildItem>( getName(), getDir() );
 	ret->setDefaultTarget( isDefaultTarget() );
 	ret->setUseName( isUseNameAsInput() );
@@ -97,24 +98,32 @@ Item::transform( TransformSet &xform ) const
 	extractVariables( buildvars );
 	ret->setVariables( std::move( buildvars ) );
 
-	std::shared_ptr<Tool> t = getTool( xform );
-
-	if ( t )
+	if ( myForceToolAll == "<pseudo>" )
 	{
-		DEBUG( getName() << " transformed by tool '" << t->getTag() << "' (" << t->getName() << ")" );
-		if ( t->getGeneratedExecutable() )
-		{
-			std::shared_ptr<BuildItem> x = t->getGeneratedExecutable()->transform( xform );
-			ret->addDependency( DependencyType::IMPLICIT, x );
-		}
-		ret->setTool( t );
+		ret->addExternalOutput( getName() );
 		ret->setOutputDir( getDir()->reroot( xform.getArtifactDir() ) );
-		std::string overOpt;
-		for ( auto &i: t->allOptions() )
+	}
+	else
+	{
+		std::shared_ptr<Tool> t = getTool( xform );
+
+		if ( t )
 		{
-			if ( hasToolOverride( i.first, overOpt ) )
-				ret->setVariable( t->getOptionVariable( i.first ),
-								  t->getOptionValue( i.first, overOpt ) );
+			DEBUG( getName() << " transformed by tool '" << t->getTag() << "' (" << t->getName() << ")" );
+			if ( t->getGeneratedExecutable() )
+			{
+				std::shared_ptr<BuildItem> x = t->getGeneratedExecutable()->transform( xform );
+				ret->addDependency( DependencyType::IMPLICIT, x );
+			}
+			ret->setTool( t );
+			ret->setOutputDir( getDir()->reroot( xform.getArtifactDir() ) );
+			std::string overOpt;
+			for ( auto &i: t->allOptions() )
+			{
+				if ( hasToolOverride( i.first, overOpt ) )
+					ret->setVariable( t->getOptionVariable( i.first ),
+									  t->getOptionValue( i.first, overOpt ) );
+			}
 		}
 	}
 

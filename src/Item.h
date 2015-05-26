@@ -77,6 +77,7 @@ public:
 	void extractVariablesExcept( VariableSet &vs, const std::set<std::string> &vl ) const;
 
 	void setPseudoTarget( const std::string &nm );
+	inline const std::string &getPseudoTarget( void ) const;
 
 	inline void setAsTopLevel( bool b );
 	inline bool isTopLevel( void ) const;
@@ -151,6 +152,12 @@ Item::getDir( void ) const
 {
 	return myDirectory;
 }
+
+
+////////////////////////////////////////
+
+
+inline const std::string &Item::getPseudoTarget( void ) const { return myPseudoName;}
 
 
 ////////////////////////////////////////

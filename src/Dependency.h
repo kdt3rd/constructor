@@ -196,7 +196,13 @@ Dependency<Item>::extractDependencies( DependencyType dt ) const
 			retval.push_back( dep.first );
 		}
 	}
-	
+
+	std::sort( retval.begin(), retval.end(),
+			   []( const ItemPtr &a, const ItemPtr &b )
+			   {
+				   return a->getName() < b->getName();
+			   }
+			   );
 
 	return std::move( retval );
 }

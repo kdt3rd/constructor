@@ -85,6 +85,7 @@ CodeGenerator::transform( TransformSet &xform ) const
 	if ( ret )
 		return ret;
 
+	DEBUG( "transform CodeGenerator " << getName() );
 	auto outd = getDir()->reroot( xform.getArtifactDir() );
 	ret = std::make_shared<BuildItem>( getName(), outd );
 
