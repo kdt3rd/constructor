@@ -262,7 +262,7 @@ luaFindFile( lua_State *L )
 	if ( lua_isstring( L, 1 ) )
 		names.emplace_back( Lua::Parm<std::string>::get( L, N, 1 ) );
 	else
-		names = std::move( Lua::Parm< std::vector<std::string> >::get( L, N, 1 ) );
+		names = Lua::Parm< std::vector<std::string> >::get( L, N, 1 );
 
 	std::string filepath;
 	bool ret = false;
@@ -274,7 +274,7 @@ luaFindFile( lua_State *L )
 		if ( lua_isstring( L, 2 ) )
 			paths.emplace_back( Lua::Parm<std::string>::get( L, 2, 2 ) );
 		else
-			paths = std::move( Lua::Parm< std::vector<std::string> >::get( L, 2, 2 ) );
+			paths = Lua::Parm< std::vector<std::string> >::get( L, 2, 2 );
 
 		ret = File::find( filepath, names, paths );
 	}
@@ -968,7 +968,7 @@ luaUseLibraries( lua_State *L )
 		lua_newtable( L );
 		for ( size_t i = 0, RN = ret.size(); i != RN; ++i )
 		{
-			lua_pushunsigned( L, lua_Unsigned( i + 1 ) );
+			lua_pushinteger( L, lua_Integer( i + 1 ) );
 			pushItem( L, ret[i] );
 			lua_rawset( L, -3 );
 		}
@@ -1160,7 +1160,7 @@ itemSetVariable( lua_State *L )
 		x = vars.emplace( std::make_pair( nm, Variable( nm, envCheck ) ) ).first;
 
 	if ( v.type() == LUA_TTABLE )
-		x->second.reset( std::move( v.toStringList() ) );
+		x->second.reset( v.toStringList() );
 	else if ( v.type() == LUA_TSTRING )
 		x->second.reset( v.asString() );
 	else

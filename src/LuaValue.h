@@ -50,7 +50,7 @@ struct Key
 {
 	Key( void );
 	Key( lua_State *L, int idx );
-	Key( lua_Unsigned idx );
+	Key( lua_Integer idx );
 	Key( String t );
 	Key( const char *t );
 	Key( const Key &k );
@@ -64,7 +64,7 @@ struct Key
 
 	union
 	{
-		lua_Unsigned index = 0;
+		lua_Integer index = 0;
 		String tag;
 	};
 	KeyType type = KeyType::INDEX;

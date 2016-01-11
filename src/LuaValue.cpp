@@ -50,7 +50,7 @@ Key::Key( lua_State *L, int idx )
 	{
 		case LUA_TNUMBER:
 			type = KeyType::INDEX;
-			index = lua_tounsigned( L, idx );
+			index = lua_tointeger( L, idx );
 			break;
 		case LUA_TSTRING:
 		{
@@ -69,7 +69,7 @@ Key::Key( lua_State *L, int idx )
 ////////////////////////////////////////
 
 
-Key::Key( lua_Unsigned idx )
+Key::Key( lua_Integer idx )
 		: index( idx ), type( KeyType::INDEX )
 {
 }
@@ -209,7 +209,7 @@ void
 Key::push( lua_State *L ) const
 {
 	if ( type == KeyType::INDEX )
-		lua_pushunsigned( L, index );
+		lua_pushinteger( L, index );
 	else
 		lua_pushlstring( L, tag.c_str(), tag.size() );
 }
@@ -522,7 +522,7 @@ Value::toStringList( void ) const
 			continue;
 		if ( i.second.type() == LUA_TSTRING )
 		{
-			size_t idx = i.first.index;
+			size_t idx = static_cast<size_t>( i.first.index );
 			if ( idx == 0 )
 				throw std::runtime_error( "Invalid index in string list conversion" );
 			--idx;
@@ -532,7 +532,7 @@ Value::toStringList( void ) const
 			ret[idx] = i.second.asString();
 		}
 	}
-	return std::move( ret );
+	return ret;
 }
 
 

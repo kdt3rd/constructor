@@ -7,7 +7,6 @@
 PREFIX:=${HOME}
 OUTPUT:= Build
 
-#SRC:= item.cpp main.cpp variable.cpp
 SRC:= main.cpp \
 	Item.cpp \
 	BuildItem.cpp \
@@ -55,13 +54,13 @@ CXXFLAGS := --std=c++11 --stdlib=libc++ -Wall -Wextra -g -DLUA_USE_MACOSX
 endif
 endif
 
-LUA_VER:=lua-5.2.3
+LUA_VER:=lua-5.3.2
 LUA_DIR:=src/$(LUA_VER)/src
 LUA_SRC:=lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c \
 	lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c \
 	lundump.c lvm.c lzio.c \
 	lauxlib.c lbaselib.c lbitlib.c lcorolib.c ldblib.c liolib.c \
-	lmathlib.c loslib.c lstrlib.c ltablib.c loadlib.c linit.c
+	lmathlib.c loslib.c lstrlib.c ltablib.c lutf8lib.c loadlib.c linit.c
 LUA_OUT:=$(addprefix $(OUTPUT)/,$(LUA_SRC))
 
 all: constructor

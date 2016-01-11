@@ -87,18 +87,24 @@ struct ParmAdapt<size_t>
 {
 	static inline size_t get( lua_State *l, int i )
 	{
-		return lua_tounsigned( l, i );
+		int isok = 0;
+		lua_Integer ret = lua_tointegerx( l, i, &isok );
+		if ( ! isok )
+			throw std::runtime_error( "Parameter not an integer or number" );
+
+		return static_cast<size_t>( ret );
 	}
 	static inline size_t check_and_get( lua_State *l, int i )
 	{
-		if ( ! lua_isnumber( l, i ) )
-			throw std::runtime_error( "Expected a number argument" );
+		if ( ! lua_isinteger( l, i ) && ! lua_isnumber( l, i ) )
+			throw std::runtime_error( "Expected an integer or number argument" );
+
 		return get( l, i );
 	}
 
 	static inline void put( lua_State *l, size_t v )
 	{
-		lua_pushunsigned( l, static_cast<lua_Unsigned>( v ) );
+		lua_pushinteger( l, static_cast<lua_Integer>( v ) );
 	}
 };
 
@@ -157,7 +163,7 @@ struct ParmAdapt<std::string>
 		if ( s )
 			ret.assign( s, n );
 
-		return std::move( ret );
+		return ret;
 	}
 
 	static inline std::string check_and_get( lua_State *l, int i )
@@ -192,10 +198,10 @@ struct ParmAdapt< std::vector<std::string> >
 			size_t idx = ParmAdapt<size_t>::get( l, -2 );
 			if ( ret.size() < idx + 1 )
 				ret.resize( idx + 1 );
-			ret[idx] = std::move( ParmAdapt<std::string>::get( l, -1 ) );
+			ret[idx] = ParmAdapt<std::string>::get( l, -1 );
 			lua_pop( l, 1 );
 		}
-		return std::move( ret );
+		return ret;
 	}
 
 	static inline std::vector<std::string> check_and_get( lua_State *l, int i )
@@ -231,12 +237,12 @@ struct ParmAdapt<Lua::Value>
 	{
 		Lua::Value v;
 		v.load( l, i );
-		return std::move( v );
+		return v;
 	}
 
 	static inline Lua::Value check_and_get( lua_State *l, int i )
 	{
-		return std::move( get( l, i ) );
+		return get( l, i );
 	}
 
 	static inline void put( lua_State *l, const Lua::Value &v )
