@@ -172,7 +172,7 @@ Rule::getCommand( void ) const
 
 		ret.append( i );
 	}
-	return std::move( ret );
+	return ret;
 }
 
 

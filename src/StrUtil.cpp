@@ -70,7 +70,7 @@ split( const std::string &s, const char sep )
 {
 	std::vector<std::string> ret;
 	split_append( ret, s, sep );
-	return std::move( ret );
+	return ret;
 }
 
 
@@ -101,7 +101,7 @@ split_space_or_sep( const std::string &s, const char sep )
 			++cur;
 	}
 
-	return std::move( ret );
+	return ret;
 }
 
 
@@ -185,7 +185,7 @@ shell_split( const std::string &s )
 		}
 	}
 
-	return std::move( ret );
+	return ret;
 }
 
 

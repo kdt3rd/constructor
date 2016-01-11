@@ -80,7 +80,7 @@ public:
 
 			ret.append( f( i ) );
 		}
-		return std::move( ret );
+		return ret;
 	}
 
 

@@ -184,15 +184,15 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 									{ "default", {} },
 									{ "some", { "-Wall" } },
 									{ "strict", { "-Weverything" } },
-									{ "most", { "-Weverything", "-Wno-padded", "-Wno-exit-time-destructors", "-Wno-global-constructors" } },
+									{ "most", { "-Weverything", "-Wno-padded", "-Wno-exit-time-destructors", "-Wno-global-constructors", "-Wno-documentation-unknown-command" } },
 									{ "error", { "-Wall", "-Werror"  } }, } },
 					{ "optimization", { { "debug", { "-g" } },
 										{ "opt", { "-O3" } },
 										{ "size", { "-Os" } },
 										{ "optdebug", { "-g", "-O3" } }, } },
 					{ "language", { { "c++", { "-x", "c++" } },
-									{ "c++11", { "-x", "c++", "-std=c++11", "-Wno-c++98-compat" } },
-									{ "c++14", { "-x", "c++", "-std=c++14", "-Wno-c++98-compat" } } } },
+									{ "c++11", { "-x", "c++", "-std=c++11", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" } },
+									{ "c++14", { "-x", "c++", "-std=c++14", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" } } } },
 					{ "threads", { { "on", { "-pthread" } },
 								   { "off", {} } } },
 					{ "vectorize", { { "none", {} },
@@ -394,8 +394,8 @@ DefaultTools::checkAndAddGCC( Scope &s, const std::map<std::string, std::string>
 										{ "size", { "-Os" } },
 										{ "optdebug", { "-g", "-O3" } }, } },
 					{ "language", { { "c++", { "-x", "c++" } },
-									{ "c++11", { "-x", "c++", "-std=c++11", "-Wno-c++98-compat" } },
-									{ "c++14", { "-x", "c++", "-std=c++14", "-Wno-c++98-compat" } } } },
+									{ "c++11", { "-x", "c++", "-std=c++11", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" } },
+									{ "c++14", { "-x", "c++", "-std=c++14", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" } } } },
 					{ "threads", { { "on", { "-pthread" } },
 								   { "off", {} } } },
 					{ "vectorize", { { "none", {} },
@@ -495,7 +495,7 @@ DefaultTools::checkAndAddArchiver( Scope &s, const std::map<std::string, std::st
 			t->myExtensions = { ".c", ".cpp" };
 			t->myExeName = exe;
 			t->myInputTools = { "cc" };
-			t->myOutputPrefix = { "lib" };
+			t->myOutputPrefix = "lib";
 			t->myOutputs = { ".a" };
 			if ( haveRM )
 				t->myCommand = { rmTool, "-f", "$out", "&&", "$exe", "rcs", "$out", "$in"};
@@ -509,7 +509,7 @@ DefaultTools::checkAndAddArchiver( Scope &s, const std::map<std::string, std::st
 			t = std::make_shared<Tool>( "static_lib_cxx", name );
 			t->myExeName = exe;
 			t->myInputTools = { "cc", "cxx" };
-			t->myOutputPrefix = { "lib" };
+			t->myOutputPrefix = "lib";
 			t->myOutputs = { ".a" };
 			if ( haveRM )
 				t->myCommand = { rmTool, "-f", "$out", "&&", "$exe", "rcs", "$out", "$in"};

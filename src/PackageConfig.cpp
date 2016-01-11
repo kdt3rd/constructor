@@ -669,7 +669,7 @@ PackageConfig::extractOtherModules( const std::string &val, bool required )
 		++p;
 	}
 
-	return std::move( ret );
+	return ret;
 }
 
 

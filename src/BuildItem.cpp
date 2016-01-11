@@ -110,7 +110,7 @@ BuildItem::setTool( const std::shared_ptr<Tool> &t )
 		throw std::runtime_error( "Invalid tool specified for build item " + getName() );
 
 	for ( const std::string &o: myTool->getOutputs() )
-		myOutputs.emplace_back( myTool->getOutputPrefix() + std::move( File::replaceExtension( getName(), o ) ) );
+		myOutputs.emplace_back( myTool->getOutputPrefix() + File::replaceExtension( getName(), o ) );
 
 	if ( myOutputs.empty() )
 		myOutputs.push_back( getName() );

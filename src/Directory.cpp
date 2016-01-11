@@ -168,7 +168,7 @@ Directory::reroot( const std::string &newroot ) const
 	Directory ret( newroot );
 	ret.mySubDirs = mySubDirs;
 	ret.updateFullPath();
-	return std::move( ret );
+	return ret;
 }
 
 
@@ -317,7 +317,7 @@ Directory::relpath( void ) const
 			ret.push_back( File::pathSeparator() );
 		ret.append( p );
 	}
-	return std::move( ret );
+	return ret;
 }
 
 
@@ -411,7 +411,7 @@ Directory::makefilename( const char *fn ) const
 	std::string concatpath = fullpath();
 	concatpath.push_back( File::pathSeparator() );
 	concatpath.append( fn );
-	return std::move( concatpath );
+	return concatpath;
 }
 
 
@@ -424,7 +424,7 @@ Directory::makefilename( const std::string &fn ) const
 	std::string concatpath = fullpath();
 	concatpath.push_back( File::pathSeparator() );
 	concatpath.append( fn );
-	return std::move( concatpath );
+	return concatpath;
 }
 
 
@@ -437,7 +437,7 @@ Directory::relfilename( const std::string &fn ) const
 	std::string cpath = relpath();
 	cpath.push_back( File::pathSeparator() );
 	cpath.append( fn );
-	return std::move( cpath );
+	return cpath;
 }
 
 
@@ -502,7 +502,7 @@ Directory::relativeTo( const Directory &o,
 		ret.append( fn );
 	}
 
-	return std::move( ret );
+	return ret;
 }
 
 

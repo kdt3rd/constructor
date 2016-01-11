@@ -279,7 +279,7 @@ Variable::prepended_value( const std::string &prefix ) const
 		ret.append( i );
 	}
 
-	return std::move( ret );
+	return ret;
 }
 
 

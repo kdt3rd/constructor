@@ -466,7 +466,7 @@ find( std::vector<std::string> progs,
 		{
 		}
 	}
-	return std::move( ret );
+	return ret;
 }
 
 
@@ -532,7 +532,7 @@ globToRegex( const std::string &pattern )
 		}
 	}
 
-	return std::move( ret );
+	return ret;
 }
 
 
@@ -588,7 +588,7 @@ globRegex( const std::string &path, const std::string &pattern )
 		std::cout << "WARNING: path '" << path << "' does not exist globbing files" << std::endl;
 	}
 
-	return std::move( retval );
+	return retval;
 }
 
 

@@ -194,7 +194,7 @@ Tool::getDefaultOption( const std::string &opt ) const
 	if ( x != myOptionDefaults.end() )
 		ret = x->second;
 
-	return std::move( ret );
+	return ret;
 }
 
 
@@ -236,7 +236,7 @@ Tool::getOptionVariable( const std::string &opt ) const
 	varname.push_back( '_' );
 	varname.append( opt );
 	String::sanitize( varname );
-	return std::move( varname );
+	return varname;
 }
 
 
@@ -440,7 +440,7 @@ Tool::createRule( const TransformSet &xset, bool useBraces ) const
 	ret.setJobPool( myPool );
 	ret.setOutputRestat( myOutputRestat );
 
-	return std::move( ret );
+	return ret;
 }
 
 

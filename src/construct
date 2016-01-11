@@ -32,7 +32,7 @@ local x = Compile(
 	"PackageConfig.cpp"
 				 )
 
-local lua_ver = "lua-5.2.3"
+local lua_ver = "lua-5.3.2"
 local lua_dir = lua_ver .. file.path.sep .. "src" .. file.path.sep
 local l = Compile(
 	lua_dir .. "lapi.c",
@@ -65,6 +65,7 @@ local l = Compile(
 	lua_dir .. "loslib.c",
 	lua_dir .. "lstrlib.c",
 	lua_dir .. "ltablib.c",
+	lua_dir .. "lutf8lib.c",
 	lua_dir .. "loadlib.c",
 	lua_dir .. "linit.c"
 				 )
