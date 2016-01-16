@@ -184,7 +184,7 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 									{ "default", {} },
 									{ "some", { "-Wall" } },
 									{ "strict", { "-Weverything" } },
-									{ "most", { "-Weverything", "-Wno-padded", "-Wno-exit-time-destructors", "-Wno-global-constructors", "-Wno-documentation-unknown-command" } },
+									{ "most", { "-Weverything", "-Wno-padded", "-Wno-global-constructors", "-Wno-documentation-unknown-command", "-Wno-mismatched-tags", "-Wno-exit-time-destructors" } },
 									{ "error", { "-Wall", "-Werror"  } }, } },
 					{ "optimization", { { "debug", { "-g" } },
 										{ "opt", { "-O3" } },
