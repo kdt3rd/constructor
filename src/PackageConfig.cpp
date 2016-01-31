@@ -818,7 +818,7 @@ PackageConfig::makeLibraryReference( const std::string &name,
 		std::string varval = "-framework " + name;
 		Variable &cflags = ret->getVariable( "cflags" );
 		cflags.add( varval );
-		Variable &libs = ret->getVariable( "libs" );
+		Variable &libs = ret->getVariable( "ldflags" );
 		libs.add( varval );
 		return ret;
 	}
