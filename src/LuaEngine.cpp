@@ -67,7 +67,9 @@ void throwIfError( lua_State *L, int r, const char *file )
 			msg = std::string( "Error while processing file '" ) + file + std::string( "': Error while running a __gc metamethod");
 			break;
 		case LUA_OK:
+			break;
 		default:
+			msg = std::string( "Unknown error in '" ) + file + std::string( "':\n\t" ) + errmsg;
 			break;
 	}
 //	lua_pop( L, 1 );
