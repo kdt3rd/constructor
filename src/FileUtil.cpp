@@ -41,7 +41,6 @@
 #include <fcntl.h>
 #include <string.h>
 #include <iostream>
-#include <mutex>
 #include <regex>
 
 
@@ -51,10 +50,14 @@
 namespace
 {
 
-static std::once_flag theNeedPathInit;
+static bool thePathInit = false;
 static std::vector<std::string> thePath;
 static void initPath( void )
 {
+	if ( thePathInit )
+		return;
+	thePathInit = true;
+
 	thePath = String::split( OS::getenv( "PATH" ), OS::pathSeparator() );
 }
 static std::string theArgv0;
@@ -598,7 +601,7 @@ globRegex( const std::string &path, const std::string &pattern )
 void
 setPathOverride( const std::vector<std::string> &p )
 {
-	std::call_once( theNeedPathInit, &initPath );
+	initPath();
 	thePath = p;
 }
 
@@ -609,7 +612,7 @@ setPathOverride( const std::vector<std::string> &p )
 const std::vector<std::string> &
 getPath( void )
 {
-	std::call_once( theNeedPathInit, &initPath );
+	initPath();
 	return thePath;
 }
 
@@ -620,7 +623,7 @@ getPath( void )
 bool
 findExecutable( std::string &filepath, const std::string &name )
 {
-	std::call_once( theNeedPathInit, &initPath );
+	initPath();
 
 	bool ret = find( filepath, name, thePath );
 #ifdef WIN32
@@ -637,7 +640,7 @@ findExecutable( std::string &filepath, const std::string &name )
 std::map<std::string, std::string>
 findExecutables( std::vector<std::string> progs )
 {
-	std::call_once( theNeedPathInit, &initPath );
+	initPath();
 
 #ifdef WIN32
 	return find( std::move( progs ), thePath, { ".exe" } );

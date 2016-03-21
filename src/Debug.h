@@ -32,22 +32,42 @@
 
 
 
+#ifndef NDEBUG
 namespace Debug
 {
 extern bool theDebugEnabled;
 inline bool on( void ) { return theDebugEnabled; }
 void enable( bool d );
 }
+#endif
 
 namespace Verbose
 {
 extern bool theVerboseEnabled;
+#ifdef NDEBUG
+inline bool on( void ) { return theVerboseEnabled; }
+#else
 inline bool on( void ) { return theVerboseEnabled || Debug::on(); }
+#endif
 void enable( bool d );
 }
 
-#define DEBUG( x ) if ( Debug::on() ) { std::cout << x << std::endl; }
+namespace Quiet
+{
+extern bool theQuietEnabled;
+inline bool on( void ) { return theQuietEnabled; }
+void enable( bool d );
+}
+
+#ifdef NDEBUG
+# define DEBUG( x )
+#else
+# define DEBUG( x ) if ( Debug::on() ) { std::cout << x << std::endl; }
+#endif
+
 #define VERBOSE( x ) if ( Verbose::on() ) { std::cout << x << std::endl; }
+#define WARNING( x ) if ( ! Quiet::on() ) { std::cout << "WARNING: " << x << std::endl; }
+#define ERROR( x ) { std::cout << "ERROR: " << x << std::endl; }
 
 #define PRECONDITION( x, msg )							\
 	{													\

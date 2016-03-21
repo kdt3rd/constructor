@@ -34,6 +34,11 @@ public:
 	Library( std::string name );
 	virtual ~Library( void );
 
+	inline void setKind( std::string kind ) { myKind = std::move( kind ); }
+
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
+
+private:
+	std::string myKind;
 };
 

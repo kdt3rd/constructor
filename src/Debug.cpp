@@ -25,25 +25,18 @@
 
 ////////////////////////////////////////
 
-
+#ifndef NDEBUG
 namespace Debug
 {
 bool theDebugEnabled = false;
-
-
-////////////////////////////////////////
-
 
 void enable( bool d )
 {
 	theDebugEnabled = d;
 }
 
-
-////////////////////////////////////////
-
-
 } // Debug
+#endif
 
 
 ////////////////////////////////////////
@@ -53,20 +46,27 @@ namespace Verbose
 {
 bool theVerboseEnabled = false;
 
-
-////////////////////////////////////////
-
-
 void enable( bool d )
 {
 	theVerboseEnabled = d;
 }
 
+} // Verbose
+
 
 ////////////////////////////////////////
 
 
-} // Verbose
+namespace Quiet
+{
+bool theQuietEnabled = false;
+
+void enable( bool d )
+{
+	theQuietEnabled = d;
+}
+
+} // Quiet
 
 
 

@@ -1,20 +1,23 @@
 
-local x = Compile(
+local x = source(
 	"main.cpp",
 	"Item.cpp",
 	"BuildItem.cpp",
 	"Scope.cpp",
 	"TransformSet.cpp",
-	"Compile.cpp",
 	"Rule.cpp",
+	"Compile.cpp",
+	"OptionalSource.cpp",
 	"Executable.cpp",
 	"InternalExecutable.cpp",
 	"Library.cpp",
+	"ExternLibrary.cpp",
 	"CodeFilter.cpp",
 	"CodeGenerator.cpp",
 	"CreateFile.cpp",
 	"Pool.cpp",
 	"Tool.cpp",
+	"Toolset.cpp",
 	"DefaultTools.cpp",
 	"Configuration.cpp",
 	"Variable.cpp",
@@ -22,19 +25,28 @@ local x = Compile(
 	"NinjaGenerator.cpp",
 	"MakeGenerator.cpp",
 	"LuaEngine.cpp",
-	"LuaExtensions.cpp",
 	"LuaValue.cpp",
+	"LuaExtensions.cpp",
+	"LuaCodeGenExt.cpp",
+	"LuaCompileExt.cpp",
+	"LuaConfigExt.cpp",
+	"LuaFileExt.cpp",
+	"LuaItemExt.cpp",
+	"LuaScopeExt.cpp",
+	"LuaSysExt.cpp",
+	"LuaToolExt.cpp",
 	"Debug.cpp",
 	"StrUtil.cpp",
 	"OSUtil.cpp",
 	"FileUtil.cpp",
 	"Directory.cpp",
+	"PackageSet.cpp",
 	"PackageConfig.cpp"
 				 )
 
 local lua_ver = "lua-5.3.2"
 local lua_dir = lua_ver .. file.path.sep .. "src" .. file.path.sep
-local l = Compile(
+local l = source(
 	lua_dir .. "lapi.c",
 	lua_dir .. "lcode.c",
 	lua_dir .. "lctype.c",
@@ -69,22 +81,13 @@ local l = Compile(
 	lua_dir .. "loadlib.c",
 	lua_dir .. "linit.c"
 				 )
-l:forceTool( ".c", "cxx" )
-l:overrideToolSetting( "warnings", "some" )
-print( "Configuring lua for system " .. sys.system() .. "..." )
-DL = nil
-if sys.system() == "Linux" then
-	l:addDefines( "LUA_USE_LINUX" )
-	DL = ExternalLibrary( "dl" )
-elseif sys.system() == "Darwin" then
-	l:addDefines( "LUA_USE_MACOSX" )
-elseif sys.system() == "Win32" then
-	l:addDefines( "LUA_WIN" )
-end
-Include( lua_dir )
+l:force_tool( ".c", "cxx" )
+l:override_option( "warnings", "some" )
+l:system_defines( "Linux", "LUA_USE_LINUX" )
+l:system_defines( "Darwin", "LUA_USE_MACOSX" )
+l:system_defines( "Windows", "LUA_WIN" )
 
-lua = Library( "conslua", l )
-exe = Executable( "constructor", x, lua, DL )
--- AddDefines( x, "SOME_DEFINE" )
--- 
--- a = Library( "foo", x, FindPackage( "QtCore" ) )
+executable "constructor"
+  kind "cmd"
+  source( x, l )
+  system_libs( "Linux", "dl" )

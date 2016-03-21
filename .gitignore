@@ -1,7 +1,4 @@
 *~
-build
-build_debug
-Build
-selfBuild
-selfDebug
-selfRelease
+.build
+constructor
+constructor.debug

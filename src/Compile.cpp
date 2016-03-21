@@ -27,6 +27,7 @@
 #include "PackageConfig.h"
 #include "Library.h"
 #include "Executable.h"
+#include "ExternLibrary.h"
 #include <queue>
 
 
@@ -98,40 +99,8 @@ CompileSet::transform( TransformSet &xform ) const
 	ret->setUseName( false );
 	ret->setOutputDir( xform.getOutDir() );
 
-	std::queue< std::shared_ptr<BuildItem> > chainsToCheck;
-	Variable outflags( "cflags" );
-	for ( const ItemPtr &i: myItems )
-	{
-		std::shared_ptr<BuildItem> ci = i->transform( xform );
-		PRECONDITION( ci, "Transform failed on item " << i->getName() );
-		const Library *libDep = dynamic_cast<const Library *>( i.get() );
-		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
-
-		if ( libDep || pkg )
-		{
-			ret->addDependency( DependencyType::IMPLICIT, ci );
-			outflags.addIfMissing( ci->getVariable( "cflags" ).values() );
-		}
-		else if ( dynamic_cast<const Executable *>( i.get() ) )
-		{
-			// executables can't depend on other exes, make this
-			// an order only dependency
-			VERBOSE( "Executable '" << i->getName() << "' will be built before '" << getName() << "' because of declared dependency" );
-			ret->addDependency( DependencyType::ORDER, ci );
-		}
-		else
-			chainsToCheck.push( ci );
-	}
-
 	std::set<std::string> tags;
-	followChains( chainsToCheck, tags, ret, xform );
-
-	if ( ! outflags.empty() )
-	{
-		std::vector< std::shared_ptr<BuildItem> > expDeps = ret->extractDependencies( DependencyType::EXPLICIT );
-		for ( const auto &compItem: expDeps )
-			compItem->addToVariable( "cflags", outflags );
-	}
+	fillBuildItem( ret, xform, tags, false );
 
 	xform.recordTransform( this, ret );
 	return ret;
@@ -163,7 +132,8 @@ CompileSet::followChains( std::queue<std::shared_ptr<BuildItem>> &chainsToCheck,
 			// library or executable would need to promote that
 			// to an explicit dependency somehow
 			i->extractTags( tags );
-			ret->addDependency( DependencyType::EXPLICIT, i );
+			if ( ! ret->flatten( i ) )
+				ret->addDependency( DependencyType::EXPLICIT, i );
 		}
 		else
 		{
@@ -183,7 +153,8 @@ CompileSet::followChains( std::queue<std::shared_ptr<BuildItem>> &chainsToCheck,
 			if ( ! addedChain )
 			{
 				i->extractTags( tags );
-				ret->addDependency( DependencyType::EXPLICIT, i );
+				if ( ! ret->flatten( i ) )
+					ret->addDependency( DependencyType::EXPLICIT, i );
 			}
 		}
 	}
@@ -221,6 +192,166 @@ CompileSet::chainTransform( const std::string &name,
 	}
 
 	return ret;
+}
+
+
+////////////////////////////////////////
+
+
+void
+CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &xform, std::set<std::string> &tags, bool propagateLibs, const std::vector<ItemPtr> &extraItems ) const
+{
+	Variable outdefs( "defines" );
+	outdefs.setToolTag( "cc" );
+	Variable outflags( "cflags" );
+	Variable outinc( "includes" );
+	outinc.setToolTag( "cc" );
+	Variable outlibs( "libs" );
+	Variable outlibdirs( "libdirs" );
+	outlibdirs.setToolTag( "ld" );
+	Variable outldflags( "ldflags" );
+
+	std::queue< std::shared_ptr<BuildItem> > chainsToCheck;
+
+	for ( const ItemPtr &i: myItems )
+	{
+		std::shared_ptr<BuildItem> ci = i->transform( xform );
+		PRECONDITION( ci, "Transform failed on item " << i->getName() );
+
+		const Library *libDep = dynamic_cast<const Library *>( i.get() );
+		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
+		const ExternLibrarySet *eLib = dynamic_cast<const ExternLibrarySet *>( i.get() );
+
+		if ( libDep || pkg || eLib )
+		{
+			bi->addDependency( DependencyType::IMPLICIT, ci );
+			outflags.addIfMissing( ci->getVariable( "cflags" ).values() );
+			outinc.addIfMissing( ci->getVariable( "includes" ).values() );
+
+			outdefs.addIfMissing( ci->getVariable( "defines" ).values() );
+
+			if ( propagateLibs )
+			{
+				outldflags.add( ci->getVariable( "ldflags" ).values() );
+				if ( libDep )
+				{
+					outlibs.addIfMissing( libDep->getName() );
+					outlibdirs.addIfMissing( ci->getOutDir()->fullpath() );
+				}
+
+				outlibs.add( ci->getVariable( "libs" ).values() );
+				outlibdirs.addIfMissing( ci->getVariable( "libdirs" ).values() );
+			}
+			if ( eLib )
+				chainsToCheck.push( ci );
+		}
+		else if ( dynamic_cast<const Executable *>( i.get() ) )
+		{
+			// executables can't depend on other exes, make this
+			// an order only dependency
+			VERBOSE( "Executable '" << i->getName() << "' will be built before '" << getName() << "' because of declared dependency" );
+			bi->addDependency( DependencyType::ORDER, ci );
+		}
+		else
+		{
+			// make it so items in this compile group compile even
+			// though there is no parent
+			if ( ( isTopLevel() || (!getParent()) ) &&
+				 ! ci->getOutputs().empty() )
+			{
+				ci->setTopLevel( true, ci->getOutputs()[0] );
+				ci->setDefaultTarget( true );
+			}
+
+			chainsToCheck.push( ci );
+		}
+	}
+
+	for ( const ItemPtr &i: extraItems )
+	{
+		std::shared_ptr<BuildItem> ci = i->transform( xform );
+		PRECONDITION( ci, "Transform failed on item " << i->getName() );
+
+		const Library *libDep = dynamic_cast<const Library *>( i.get() );
+		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
+		const ExternLibrarySet *eLib = dynamic_cast<const ExternLibrarySet *>( i.get() );
+
+		if ( libDep || pkg )
+		{
+			bi->addDependency( DependencyType::IMPLICIT, ci );
+			outflags.addIfMissing( ci->getVariable( "cflags" ).values() );
+
+			outdefs.addIfMissing( ci->getVariable( "defines" ).values() );
+
+			if ( propagateLibs )
+			{
+				outldflags.add( ci->getVariable( "ldflags" ).values() );
+				if ( libDep )
+				{
+					outlibs.addIfMissing( libDep->getName() );
+					outlibdirs.addIfMissing( ci->getOutDir()->fullpath() );
+				}
+
+				outlibs.add( ci->getVariable( "libs" ).values() );
+				outlibdirs.addIfMissing( ci->getVariable( "libdirs" ).values() );
+			}
+			if ( eLib )
+				chainsToCheck.push( ci );
+		}
+		else if ( dynamic_cast<const Executable *>( i.get() ) )
+		{
+			// executables can't depend on other exes, make this
+			// an order only dependency
+			VERBOSE( "Executable '" << i->getName() << "' will be built before '" << getName() << "' because of declared dependency" );
+			bi->addDependency( DependencyType::ORDER, ci );
+		}
+		else
+		{
+			// make it so items in this compile group compile even
+			// though there is no parent
+			if ( isTopLevel() || (!getParent()) )
+			{
+				ci->setTopLevel( true, ci->getOutputs()[0] );
+				ci->setDefaultTarget( true );
+			}
+
+			chainsToCheck.push( ci );
+		}
+	}
+	
+	followChains( chainsToCheck, tags, bi, xform );
+
+	std::vector< std::shared_ptr<BuildItem> > expDeps = bi->extractDependencies( DependencyType::EXPLICIT );
+	for ( const auto &compItem: expDeps )
+	{
+		if ( !outflags.empty() )
+			compItem->addToVariable( "cflags", outflags );
+		if ( !outinc.empty() )
+			compItem->addToVariable( "includes", outinc );
+	}
+	if ( ! outflags.empty() )
+		bi->addToVariable( "cflags", outflags );
+
+	if ( ! outdefs.empty() )
+		bi->addToVariable( "defines", outdefs );
+
+	if ( ! outinc.empty() )
+	{
+		bi->addToVariable( "includes", outinc );
+	}
+
+	if ( propagateLibs )
+	{
+		if ( ! outlibs.empty() )
+		{
+			outlibs.removeDuplicatesKeepLast();
+			bi->addToVariable( "libs", outlibs );
+		}
+		if ( ! outlibdirs.empty() )
+			bi->addToVariable( "libdirs", outlibdirs );
+		if ( ! outldflags.empty() )
+			bi->addToVariable( "ldflags", outldflags );
+	}
 }
 
 

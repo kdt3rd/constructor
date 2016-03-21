@@ -32,17 +32,6 @@
 ////////////////////////////////////////
 
 
-enum class VersionCompare
-{
-	ANY, // default match any version
-	EQUAL, // equal to (=)
-	NOT_EQUAL, // not equal to (!=)
-	LESS, // less than (<)
-	LESS_EQUAL, // less than or equal to (<=)
-	GREATER, // greater than (>)
-	GREATER_EQUAL // greater than or equal to (>=)
-};
-	
 class PackageConfig : public Item
 {
 public:
@@ -67,21 +56,12 @@ public:
 	virtual void forceTool( const std::string &ext, const std::string &t );
 	virtual void overrideToolSetting( const std::string &s, const std::string &n );
 
-	static std::shared_ptr<PackageConfig> find( const std::string &name,
-												const std::string &reqVersion );
-	static std::shared_ptr<PackageConfig> find( const std::string &name,
-												VersionCompare comp = VersionCompare::ANY,
-												const std::string &reqVersion = std::string() );
-	static std::shared_ptr<PackageConfig> makeLibraryReference( const std::string &name,
-																const std::string &path );
-
 private:
 	const std::string &getAndReturn( const char *tag ) const;
 
 	void parse( void );
 	void extractNameAndValue( const std::string &curline );
-	// do we care about anything but direct requires?
-	std::vector< std::shared_ptr<PackageConfig> > extractOtherModules( const std::string &val, bool required );
+	friend class PackageSet;
 
 	std::string myPackageFile;
 	std::map<std::string, std::string> myLocalVars;

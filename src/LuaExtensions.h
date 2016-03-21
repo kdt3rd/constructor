@@ -37,8 +37,6 @@ void registerExtensions( void );
 
 void startParsing( const std::string &dir );
 
-const std::vector<std::string> &visitedFiles( void );
-
 } // namespace src
 
 

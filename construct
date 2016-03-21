@@ -1,131 +1,40 @@
-function BinaryToCString( data, out, pre )
-	local str = ( pre or "" ) .. "\""
-    for i = 1, #data do
-       	str = str .. string.format( '\\x%02X', data:byte(i) )
-        if i % 16 == 0 then
-			table.insert( out, str .. "\"" )
-			str = ( pre or "" ) .. "\""
-		end
-    end
-	if #str > 0 then
-		table.insert( out, str .. "\"" )
-	end
-end
+assert( check_version and check_version( "1.0" ), "Please upgrade constructor" );
 
-function CreateFile( filename, text )
-	local file = BuildFile( filename )
-	if file.diff( file, text ) then
-		local fh = io.open( file, "w+" )
-		for i = 1, #text do
-			fh:write( text[i], '\n' )
-		end
-		fh:close()
-	end
-	return file
-end
---AddTool{ tag="simp_rsrc",
---		 name="constructor",
---		 exe=Argv0,
---		 cmd={"$exe", "-resource", "$out", "$in"}
---		 restat=true
---	   }
-
-function SimpleResourceFile( outname, srcs, xformFunc, prefix, suffix )
-	local file = BuildFile( outname )
-	if EvaluatingFile == file then
-		text = {}
-		if prefix then
-			for i, p in pairs( prefix ) do
-				table.insert( text, p )
-			end
-		end
-		for i, file in pairs( srcs ) do
-			local data = io.open( SourceFile( file ), "r" )
-			data = data:read( "*a" )
-			xformFunc( text, data )
-		end
-		if suffix then
-			for i, s in pairs( suffix ) do
-				table.insert( text, s )
-			end
-		end
-	else
-		GenerateFile( outname, "simp_rsrc", srcs )
-	end
-end
-
--- for things like Qt, rather than adding a tool that processes
--- .h files by default for moc, make it an explicit step by having
--- a wrapper function around compile that sets the explicit moc
--- tool, then make the moc tool have a .h such that it doesn't
--- try to run moc on every header
+-- define a configuration
 --
--- see forceTool on Item to do this...
+-- options set here apply to the configuration "scope" which means
+-- they only apply to building that configuration. any new
+-- configuration resets the scope
+configuration ".build"
+  optimization "heavy" -- "size"
+  warnings "most"
+  vectorize "native"
+  -- or you can call with a list of things to define
+  -- defines { "NDEBUG", "FOO", "BAR" }
+  defines "NDEBUG"
 
--- lime = Executable( "lime", Compile( "main.cpp" ) )
--- AddTool{ name="lime",
--- 		 exe=lime,
--- 		 input_extensions={ ".lime" },
--- 		 output_extensions={ ".cpp", ".h" },
--- 	   }
--- 		 
--- AddToolset{ name="cross",
--- 			tools={ "mingw-gcc", "mingw-g++" }
--- 		  }
--- 
+--configuration "selfBuild"
+--  optimization "optdebug"	
+--  warnings "most"
+--
+--configuration "selfDebug"
+--  optimization "debug"	
+--  warnings "most"
 
-doxygen = file.find_exe( "doxygen" )
-if doxygen then
-	AddTool{ tag="doxygen",
-			 name="doxygen",
-			 exe=doxygen,
-			 options={
-			 },
-			 option_defaults={
-			 },
-			 cmd={file.find_exe( "env" ), 
-				  "DOX_OUTPUT_DIR=$out",
-				  "DOX_SOURCE_DIR=$srcdir",
-				  "$exe", "$in"},
-			 description="DOC $out",
-	}
-end
+-- finishes the configuration scopes and defines
+-- the default configuration
+default_configuration ".build"
 
-BuildConfiguration{ name="selfRelease", optimization="opt", warnings="most" }
-BuildConfiguration{ name="selfBuild", optimization="optdebug", warnings="most" }
-BuildConfiguration{ name="selfDebug", optimization="debug", warnings="most" }
---BuildConfiguration{ name="selfWin64", opt="optimize", toolset="cross" }
-DefaultConfiguration( "selfBuild" )
+default_library_kind "static" -- "shared", "both", "framework?"
+default_executable_kind "cmd" -- "app"
 
--- --SetWarningLevel( "none" )
--- --SetWarningLevel( "some" )
--- --SetWarningLevel( "error" )
--- SetDefaultWarningLevel( "strict" )
-EnableLanguages( "c++11" )
--- need this for the call_once stuff, it crashes without threads enabled :(
-SetOption( "threads", "on" )
---SetOption( "vectorize", "native" )
--- 
+-- sets an option on the top level scope so it
+-- applies to everything
+language "c++11"
 
---print( "   node: " .. node() )
---print( "     os: " .. system() )
---print( "release: " .. release() )
---print( "version: " .. version() )
---print( "machine: " .. machine() )
---print( "is64bit: " .. tostring(is64bit()) )
+-- recurses into a sub-directory. any options set in the sub directory
+-- only apply to entries in that sub dir or below, although some
+-- things propagate based on usage - i.e. if you use a library, the
+-- #defines and includes are passed through
+subdir "src"
 
---ls = file.find_exe( "ls" )
---if ls then
---	print( "good, found ls: " .. ls )
---end
-
---if PackageExists( "QtOpenGL", "=4.8.6" ) then
---	print( "Wahoo, QtOpenGL 4.8.6 exists!" )
---end
-
---x = ExternalLibrary( "QtOpenGL" )
---if x then
---	print( "Found " .. x:name() .. " prefix " .. x:variables()["prefix"] )
---end
-
-constructor = SubDir( "src" )

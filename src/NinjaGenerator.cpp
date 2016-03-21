@@ -23,7 +23,7 @@
 #include "NinjaGenerator.h"
 #include "FileUtil.h"
 #include "Configuration.h"
-#include "LuaExtensions.h"
+#include "LuaEngine.h"
 #include "BuildItem.h"
 #include "TransformSet.h"
 #include "Scope.h"
@@ -33,6 +33,7 @@
 #include <iostream>
 #include <iomanip>
 #include <set>
+#include <unistd.h>
 
 
 ////////////////////////////////////////
@@ -103,7 +104,8 @@ emitRules( std::ostream &os, const TransformSet &x )
 				os << v.first << '=' << v.second << '\n';
 			os << "\nrule " << r.getName() << '\n';
 			os << " command = " << r.getCommand() << '\n';
-			os << " description = " << r.getDescription() << '\n';
+			if ( ! r.getDescription().empty() )
+				os << " description = " << r.getDescription() << '\n';
 			const std::string &dFile = r.getDependencyFile();
 			if ( ! dFile.empty() )
 			{
@@ -136,28 +138,40 @@ emitVariables( std::ostream &os, const TransformSet &x )
 			if ( ! t )
 				throw std::runtime_error( "Variable set to use tool flag transform, but no tool with tag '" + i.second.getToolTag() + "' found" );
 
-			os << '\n' << i.first << "=" << i.second.prepended_value( t->getCommandPrefix( i.first ) );
+			os << '\n' << i.first << "=" << i.second.prepended_value( t->getCommandPrefix( i.first ), x.getSystem() );
 		}
 		else
-			os << '\n' << i.first << "=" << i.second.value();
+			os << '\n' << i.first << "=" << i.second.value( x.getSystem() );
 	}
 	if ( ! vars.empty() )
 		os << '\n';
 }
 
-static void
+static std::string
 addOutputList( std::ostream &os, const std::shared_ptr<BuildItem> &bi )
 {
+	std::string outshort;
+
 	auto outd = bi->getOutDir();
 	if ( outd )
 	{
 		for ( const std::string &bo: bi->getOutputs() )
+		{
+			if ( outshort.empty() )
+				outshort = bo;
+
 			os << ' ' << escape_path( outd->makefilename( bo ) );
+		}
 	}
 	else
 	{
 		for ( const std::string &bo: bi->getOutputs() )
+		{
+			if ( outshort.empty() )
+				outshort = bo;
+
 			os << ' ' << escape_path( bo );
+		}
 	}
 
 	if ( ! bi->getTool() )
@@ -166,7 +180,10 @@ addOutputList( std::ostream &os, const std::shared_ptr<BuildItem> &bi )
 			bi->extractDependencies( DependencyType::EXPLICIT );
 		for ( auto &d: deps )
 			addOutputList( os, d );
+		outshort.clear();
 	}
+
+	return outshort;
 }
 
 static void
@@ -180,7 +197,7 @@ emitTargets( std::ostream &os, const TransformSet &x )
 		{
 			auto outd = bi->getOutDir();
 			os << "\nbuild";
-			addOutputList( os, bi );
+			std::string outshort = addOutputList( os, bi );
 			std::vector< std::shared_ptr<BuildItem> > deps;
 			if ( t )
 			{
@@ -211,6 +228,8 @@ emitTargets( std::ostream &os, const TransformSet &x )
 				for ( auto &d: deps )
 					addOutputList( os, d );
 			}
+			if ( ! outshort.empty() )
+				os << "\n  out_short = " << outshort;
 
 			auto &bivars = bi->getVariables();
 			for ( auto &bv: bivars )
@@ -221,10 +240,10 @@ emitTargets( std::ostream &os, const TransformSet &x )
 					auto tt = x.getTool( bv.second.getToolTag() );
 					if ( ! tt )
 						throw std::runtime_error( "Variable set to use tool flag transform, but no tool with tag '" + bv.second.getToolTag() + "' found" );
-					outv = bv.second.prepended_value( tt->getCommandPrefix( bv.first ) );
+					outv = bv.second.prepended_value( tt->getCommandPrefix( bv.first ), x.getSystem() );
 				}
 				else
-					outv = bv.second.prepended_value( t->getCommandPrefix( bv.first ) );
+					outv = bv.second.prepended_value( t->getCommandPrefix( bv.first ), x.getSystem() );
 				if ( bv.first == "pool" && outv != "console" )
 				{
 					if ( ! x.hasPool( outv ) )
@@ -246,16 +265,10 @@ emitTargets( std::ostream &os, const TransformSet &x )
 					os << "\ndefault " << bi->getTopLevelName();
 				os << '\n';
 			}
-			// don't need this since ninja implicitly builds
-			// these anyway
-//			if ( bi->isRoot() )
-//			{
-//				
-//			}
 		}
 		else
 		{
-			DEBUG( " --> NO TOOL" );
+			DEBUG( "item " << bi->getName() << " --> NO TOOL" );
 		}
 	}
 }
@@ -279,6 +292,7 @@ emitScope( std::ostream &os,
 	emitVariables( os, x );
 	emitRules( os, x );
 	emitTargets( os, x );
+	os << '\n';
 }
 
 }
@@ -328,46 +342,77 @@ NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 					  int argc, const char *argv[] )
 {
 	std::string buildfn = d->makefilename( "build.ninja" );
-	std::ofstream f( buildfn );
-	f << "ninja_required_version = 1.5\n";
-	f << "builddir = " << d->fullpath() << '\n';
-
-	TransformSet xform( d );
-	Scope::root().transform( xform, conf );
-
-	int scopeCount = 0;
-	emitScope( f, *d, xform, scopeCount );
-
-	Directory curD;
-	f <<
-		"\nrule regen_constructor\n"
-		"  command = cd $srcdir" << " &&";
-	// TODO: Add environment support???
-	for ( int a = 0; a < argc; ++a )
-		f << ' ' << argv[a];
-	f <<
-		"\n  description = Regenerating build files..."
-		"\n  generator = 1"
-		"\n\n";
-
-	// NB: Need to use a depfile here since someone
-	// may have deleted a file which would cause this step to
-	// fail, but as long as they updated the parent
-	// construct file, it should just re-run.
-	// ninja's behavior for this only works with a depfile
-	// (i.e. for header files that may or may not exist)
 	std::string builddepsfn = d->makefilename( "build.ninja.d" );
-	f << "build build.ninja: regen_constructor";
-	f << "\n  srcdir=" << curD.fullpath();
-	f << "\n  depfile=" << builddepsfn;
-	f << "\n  deps=gcc";
-	f << "\ndefault build.ninja\n\n";
+	try
 	{
-		std::ofstream depf( builddepsfn );
-		depf << buildfn << ':';
-		for ( const std::string &x: Lua::visitedFiles() )
-			depf << ' ' << x;
-		depf << "\n\n";
+		std::ofstream f( buildfn );
+		f << "ninja_required_version = 1.5\n";
+		f << "builddir = " << d->fullpath() << '\n';
+
+		TransformSet xform( d, conf.getSystem() );
+		Scope::root().transform( xform, conf );
+
+		int scopeCount = 0;
+		emitScope( f, *d, xform, scopeCount );
+
+		Directory curD;
+		f <<
+			"\nrule regen_constructor\n"
+			"  command = cd $srcdir" << " &&";
+		// TODO: Add environment support???
+		for ( int a = 0; a < argc; ++a )
+			f << ' ' << argv[a];
+		f <<
+			"\n  description = Regenerating build files..."
+			"\n  generator = 1"
+			"\n\n";
+
+		// NB: Need to use a depfile here since someone
+		// may have deleted a file which would cause this step to
+		// fail, but as long as they updated the parent
+		// construct file, it should just re-run.
+		// ninja's behavior for this only works with a depfile
+		// (i.e. for header files that may or may not exist)
+
+		f << "build build.ninja: regen_constructor";
+		f << "\n  srcdir=" << curD.fullpath();
+		f << "\n  depfile=" << builddepsfn;
+		f << "\n  deps=gcc";
+		f << "\ndefault build.ninja\n\n";
+		{
+			std::ofstream depf( builddepsfn );
+			depf << buildfn << ':';
+			for ( const std::string &x: Lua::Engine::singleton().visitedFiles() )
+				depf << ' ' << x;
+			depf << "\n\n";
+		}
+
+		f << "\n\n";
+	}
+	catch ( std::exception &e )
+	{
+		WARNING( "ERROR: " << e.what() );
+		::unlink( buildfn.c_str() );
+		::unlink( builddepsfn.c_str() );
+		if ( conf.isSkipOnError() )
+		{
+			WARNING( "Configuration '" << conf.name() << "' had errors resolving build file, ignoring" );
+		}
+		else
+			throw;
+	}
+	catch ( ... )
+	{
+		::unlink( buildfn.c_str() );
+		::unlink( builddepsfn.c_str() );
+		if ( conf.isSkipOnError() )
+		{
+			WARNING( "Configuration '" << conf.name() << "' had errors resolving build file, ignoring" );
+		}
+		else
+		{
+			throw;
+		}
 	}
 }
 

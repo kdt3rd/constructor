@@ -38,18 +38,19 @@
 #include <list>
 #include <iterator>
 #include <stack>
-#include <mutex>
+
 
 namespace 
 {
-
-static std::once_flag theNeedCWDInit;
 
 static std::string theCWD;
 static std::vector<std::string> theCWDPath;
 
 static void initCWD( void )
 {
+	if ( ! theCWD.empty() )
+		return;
+
 	char *cwd = getcwd( NULL, MAXPATHLEN );
 	if ( ! cwd )
 		throw std::system_error( errno, std::system_category(),
@@ -71,7 +72,7 @@ static std::stack< std::shared_ptr<Directory> > theLiveDirs;
 
 Directory::Directory( void )
 {
-	std::call_once( theNeedCWDInit, &initCWD );
+	initCWD();
 
 	myFullDirs = theCWDPath;
 	myCurFullPath = theCWD;

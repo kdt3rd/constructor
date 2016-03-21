@@ -25,6 +25,7 @@
 #include "Item.h"
 #include "TransformSet.h"
 #include <queue>
+#include <set>
 
 
 ////////////////////////////////////////
@@ -38,6 +39,8 @@ public:
 
 	void addItem( const ItemPtr &i );
 	void addItem( std::string name );
+	inline bool empty( void ) const { return myItems.empty(); }
+	inline size_t size( void ) const { return myItems.size(); }
 
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
@@ -54,6 +57,8 @@ protected:
 	chainTransform( const std::string &name,
 					const std::shared_ptr<Directory> &srcdir,
 					TransformSet &xform ) const;
+
+	void fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &xform, std::set<std::string> &tags, bool propagateLibs, const std::vector<ItemPtr> &extraItems = std::vector<ItemPtr>() ) const;
 
 	std::vector<ItemPtr> myItems;
 };

@@ -71,7 +71,6 @@ public:
 	const Variable &getVariable( const std::string &nm ) const;
 	void setVariable( const std::string &nm, const std::string &value,
 					  bool doSplit = false );
-	bool findVariableValueRecursive( std::string &val, const std::string &nm ) const;
 	void extractVariables( VariableSet &vs ) const;
 	void extractVariablesExcept( VariableSet &vs, const std::string &v ) const;
 	void extractVariablesExcept( VariableSet &vs, const std::set<std::string> &vl ) const;
@@ -157,7 +156,7 @@ Item::getDir( void ) const
 ////////////////////////////////////////
 
 
-inline const std::string &Item::getPseudoTarget( void ) const { return myPseudoName;}
+inline const std::string &Item::getPseudoTarget( void ) const { return myPseudoName; }
 
 
 ////////////////////////////////////////

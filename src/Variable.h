@@ -39,6 +39,11 @@ class Variable
 public:
 	Variable( std::string n, bool checkEnv = false );
 	Variable( const std::string &n, const std::string &val );
+	~Variable( void );
+	Variable( const Variable & ) = default;
+	Variable( Variable && ) = default;
+	Variable &operator=( const Variable & ) = default;
+	Variable &operator=( Variable && ) = default;
 
 	inline const std::string &name( void ) const;
 
@@ -53,25 +58,42 @@ public:
 	void clear( void );
 	void add( std::string v );
 	void add( std::vector<std::string> v );
+	void addPerSystem( const std::string &s, std::string v );
+	void addPerSystem( const std::string &s, std::vector<std::string> v );
 	void addIfMissing( const std::string &v );
 	void addIfMissing( const std::vector<std::string> &v );
+	void addIfMissingSystem( const std::string &s, const std::string &v );
+	void addIfMissingSystem( const std::string &s, const std::vector<std::string> &v );
 	void moveToEnd( const std::string &v );
 	void moveToEnd( const std::vector<std::string> &v );
 	// removes duplicates, keeping last entry
 	// does NOT change relative ordering
 	void removeDuplicatesKeepLast( void );
 
+	// based on the prefix in the flag and the
+	// disposition for that prefix, either keep
+	// the first duplicate or the last duplicate
+	// (false means last, true means first)
+	// so to clean up common cflags + ldflags:
+	// { { "-W", true }, {"-D", true}, {"-I", true},
+	//   { "-L", true }, {"-l", false} }
+	void removeDuplicates( const std::map<std::string, bool> &prefixDisposition );
+
 	void reset( std::string v );
 	void reset( std::vector<std::string> v );
 
-	const std::string &value( void ) const;
+	// adds any values in other not in current
+	void merge( const Variable &other );
+
+	const std::string &value( const std::string &sys ) const;
 
 	// if any of the values in the Variable don't begin
 	// with the provided prefix, it is preprended to that
 	// value.
-	std::string prepended_value( const std::string &prefix ) const;
+	std::string prepended_value( const std::string &prefix, const std::string &sys ) const;
 
 	inline const std::vector<std::string> &values( void ) const;
+	inline const std::map<std::string, std::vector<std::string>> &system_values( void ) const;
 
 	static const Variable &nil( void );
 private:
@@ -79,13 +101,34 @@ private:
 
 	std::string myName;
 	std::vector<std::string> myValues;
+	std::map<std::string, std::vector<std::string>> mySystemValues;
 	mutable std::string myCachedValue;
+	mutable std::string myCachedSystem;
 	std::string myToolTag;
 	bool myInherit = false;
 };
 
+inline bool operator<( const Variable &a, const Variable &b )
+{
+	return a.name() < b.name();
+}
+
+inline bool operator==( const Variable &a, const Variable &b )
+{
+	return ( a.name() == b.name() &&
+			 a.inherit() == b.inherit() &&
+			 a.getToolTag() == b.getToolTag() &&
+			 a.values() == b.values() &&
+			 a.system_values() == b.system_values() );
+}
+inline bool operator!=( const Variable &a, const Variable &b )
+{
+	return !( a == b );
+}
 
 typedef std::map<std::string, Variable> VariableSet;
+
+void merge( VariableSet &vs, const VariableSet &other );
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -137,6 +180,16 @@ inline const std::vector<std::string> &
 Variable::values( void ) const
 {
 	return myValues;
+}
+
+
+////////////////////////////////////////
+
+
+inline const std::map<std::string, std::vector<std::string>> &
+Variable::system_values( void ) const
+{
+	return mySystemValues;
 }
 
 

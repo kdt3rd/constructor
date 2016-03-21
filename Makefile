@@ -1,26 +1,29 @@
-
+.SUFFIXES:
 .DEFAULT: all
 .ONESHELL:
-
-.phony: clean all install constructor
+.SILENT:
+.PHONY: clean all install constructor constructor.debug
 
 PREFIX:=${HOME}
-OUTPUT:= Build
+OUTPUT:= .build
 
 SRC:= main.cpp \
 	Item.cpp \
 	BuildItem.cpp \
 	Scope.cpp \
+	Rule.cpp \
 	TransformSet.cpp \
 	Compile.cpp \
+	OptionalSource.cpp \
 	Executable.cpp \
 	InternalExecutable.cpp \
 	Library.cpp \
+	ExternLibrary.cpp \
 	CodeFilter.cpp \
 	CodeGenerator.cpp \
 	CreateFile.cpp \
-	Rule.cpp \
 	Tool.cpp \
+	Toolset.cpp \
 	Pool.cpp \
 	DefaultTools.cpp \
 	Configuration.cpp \
@@ -29,28 +32,37 @@ SRC:= main.cpp \
 	NinjaGenerator.cpp \
 	MakeGenerator.cpp \
 	LuaEngine.cpp \
-	LuaExtensions.cpp \
 	LuaValue.cpp \
+	LuaExtensions.cpp \
+	LuaCodeGenExt.cpp \
+	LuaCompileExt.cpp \
+	LuaConfigExt.cpp \
+	LuaFileExt.cpp \
+	LuaItemExt.cpp \
+	LuaScopeExt.cpp \
+	LuaSysExt.cpp \
+	LuaToolExt.cpp \
 	Debug.cpp \
 	StrUtil.cpp \
 	OSUtil.cpp \
 	FileUtil.cpp \
 	Directory.cpp \
+	PackageSet.cpp \
 	PackageConfig.cpp
 
 SRC:=$(addprefix $(OUTPUT)/,$(SRC))
 
 COMPILER := g++
-CXXFLAGS := --std=c++11 -Wall -Wextra -g -pthread
-LDFLAGS :=
+CXXFLAGS := --std=c++11 -Wall -Wextra -Og -g
+LDFLAGS := -static-libgcc -static-libstdc++
 OS := $(shell uname -s)
 ifeq ($(OS),Linux)
 CXXFLAGS := $(CXXFLAGS) -DLUA_USE_LINUX
-LDFLAGS := -ldl
+LDFLAGS := $(LDFLAGS) -ldl
 else
 ifeq ($(OS),Darwin)
 COMPILER := clang++
-CXXFLAGS := --std=c++11 --stdlib=libc++ -Wall -Wextra -g -DLUA_USE_MACOSX
+CXXFLAGS := --std=c++11 --stdlib=libc++ -Wall -Wextra -O2 -g -DLUA_USE_MACOSX
 endif
 endif
 
@@ -65,11 +77,23 @@ LUA_OUT:=$(addprefix $(OUTPUT)/,$(LUA_SRC))
 
 all: constructor
 
-constructor: $(OUTPUT)/constructor
+constructor: $(OUTPUT)/bin/constructor
+	@echo "Self-compiling constructor..."
+	@cd $(OUTPUT) && ninja && cd ..
+	@rm -f ./constructor
+	@ln $(OUTPUT)/bin/constructor constructor
+	@echo "Constructor is built and in current directory"
+
+constructor.debug: $(OUTPUT)/constructor
+
+$(OUTPUT)/build.ninja: $(OUTPUT)/constructor
+	@$(OUTPUT)/constructor
+
+$(OUTPUT)/bin/constructor: $(OUTPUT)/build.ninja
 
 $(OUTPUT)/%.o: src/%.cpp | $(OUTPUT)
 	@echo "[CXX] $<"
-	@$(COMPILER) $(CXXFLAGS) -I $(LUA_DIR) -c -MMD -MF $(OUTPUT)/$*.dep -o $@ $<
+	@$(COMPILER) $(CXXFLAGS) -c -MMD -MF $(OUTPUT)/$*.dep -o $@ $<
 
 $(OUTPUT)/%.o: $(LUA_DIR)/%.c | $(OUTPUT)
 	@echo "[CXX] $<"
@@ -80,13 +104,16 @@ $(OUTPUT)/constructor: $(SRC:.cpp=.o) $(LUA_OUT:.c=.o)
 	@$(COMPILER) $(CXXFLAGS) -o $(OUTPUT)/constructor $^ $(LDFLAGS)
 
 $(OUTPUT):
+	@echo "Bootstrapping constructor..."
 	mkdir $(OUTPUT)
 
-install: $(OUTPUT)/constructor
-	@echo "Installing to ${PREFIX}"
-	@cp $(OUTPUT)/constructor ${PREFIX}/bin
+install: constructor
+	@echo "Installing to ${PREFIX}..."
+	@mkdir -p ${PREFIX}/bin
+	@cp ./constructor ${PREFIX}/bin
 
 clean:
 	rm -rf $(OUTPUT)
 
 -include $(SRC:.cpp=.dep)
+-include $(LUA_OUT:.cpp=.dep)

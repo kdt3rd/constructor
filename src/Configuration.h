@@ -25,8 +25,7 @@
 #include <string>
 #include <vector>
 
-#include "LuaValue.h"
-#include "Variable.h"
+#include "Scope.h"
 
 
 ////////////////////////////////////////
@@ -36,18 +35,32 @@ class Configuration
 {
 public:
 	Configuration( void );
-	Configuration( const Lua::Table &t );
+	Configuration( const std::string &n );
 
 	inline const std::string &name( void ) const;
-	inline const VariableSet &getChoices( void ) const;
+	inline Scope &getPseudoScope( void );
+	inline const Scope &getPseudoScope( void ) const;
 
+	const std::string &getSystem( void ) const;
+	void setSystem( std::string s );
+
+	inline void setSkipOnError( bool s ) { mySkipOnError = s; }
+	inline bool isSkipOnError( void ) const { return mySkipOnError; }
 	static const Configuration &getDefault( void );
 	static void setDefault( std::string name );
+	static bool haveDefault( void );
+	static bool haveAny( void );
+	static void checkDefault( void );
+	static void creatingNewConfig( void );
+	static void finishCreatingNewConfig( void );
+	static Configuration &last( void );
 	static std::vector<Configuration> &defined( void );
 
 private:
 	std::string myName;
-	VariableSet myVariables;
+	std::string mySystem;
+	std::shared_ptr<Scope> myPseudoScope;
+	bool mySkipOnError = false;
 };
 
 
@@ -66,10 +79,21 @@ Configuration::name( void ) const
 
 
 inline
-const VariableSet &
-Configuration::getChoices( void ) const
+Scope &
+Configuration::getPseudoScope( void )
 {
-	return myVariables;
+	return *myPseudoScope;
+}
+
+
+////////////////////////////////////////
+
+
+inline
+const Scope &
+Configuration::getPseudoScope( void ) const
+{
+	return *myPseudoScope;
 }
 
 

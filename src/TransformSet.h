@@ -43,8 +43,10 @@ class TransformSet
 public:
 	typedef std::vector< std::shared_ptr<BuildItem> > BuildItemList;
 
-	TransformSet( const std::shared_ptr<Directory> &dir );
+	TransformSet( const std::shared_ptr<Directory> &dir, std::string activeSystem );
 	~TransformSet( void );
+
+	inline const std::string &getSystem( void ) const;
 
 	inline const std::shared_ptr<Directory> &getOutDir( void ) const;
 	inline const std::shared_ptr<Directory> &getBinDir( void ) const;
@@ -62,6 +64,11 @@ public:
 	std::shared_ptr<Tool> getTool( const std::string &tag ) const;
 	void mergeVariables( const VariableSet &vs );
 	void mergeOptions( const VariableSet &vs );
+
+	inline void setLibSearchPath( const std::vector<std::string> &lsearch ) { myLibPath = lsearch; }
+	const std::vector<std::string> &getLibSearchPath( void ) const { return myLibPath; }
+	void setPkgSearchPath( const std::vector<std::string> &psearch ) { myPkgPath = psearch; }
+	const std::vector<std::string> &getPkgSearchPath( void ) const { return myPkgPath; }
 
 	std::shared_ptr<Tool> findTool( const std::string &ext ) const;
 	std::shared_ptr<Tool> findToolByTag( const std::string &tag,
@@ -85,12 +92,18 @@ public:
 	inline const BuildItemList &getBuildItems( void ) const;
 
 private:
+	std::string myCurrentSystem;
+
 	std::shared_ptr<Directory> myDirectory;
 	std::shared_ptr<Directory> myBinDirectory;
 	std::shared_ptr<Directory> myLibDirectory;
 	std::shared_ptr<Directory> myArtifactDirectory;
 	std::vector< std::shared_ptr<Tool> > myTools;
 	std::vector< std::shared_ptr<Pool> > myPools;
+
+	std::vector<std::string> myLibPath;
+	std::vector<std::string> myPkgPath;
+
 	VariableSet myVars;
 	VariableSet myOptions;
 
@@ -103,6 +116,12 @@ private:
 
 ////////////////////////////////////////
 
+
+inline const std::string &
+TransformSet::getSystem( void ) const
+{
+	return myCurrentSystem;
+}
 
 inline const std::shared_ptr<Directory> &
 TransformSet::getOutDir( void ) const

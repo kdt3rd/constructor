@@ -22,6 +22,7 @@
 
 #include "Tool.h"
 #include "LuaEngine.h"
+#include "LuaItemExt.h"
 #include "Scope.h"
 #include "Debug.h"
 #include "StrUtil.h"
@@ -44,55 +45,6 @@ Tool::Tool( std::string t, std::string n )
 
 Tool::~Tool( void )
 {
-}
-
-
-////////////////////////////////////////
-
-
-void
-Tool::enableLanguage( const std::string &nm )
-{
-	auto lang = myOptions.find( "language" );
-	if ( lang != myOptions.end() )
-	{
-		auto carelang = lang->second.find( nm );
-		if ( carelang != lang->second.end() )
-		{
-			if ( ! myLanguage.empty() )
-				throw std::runtime_error( "Only 1 language per tool is currently implemented" );
-
-			myLanguage = nm;
-		}
-	}
-}
-
-
-////////////////////////////////////////
-
-
-const std::string &
-Tool::getLanguage( void ) const
-{
-	if ( myLanguage.empty() )
-	{
-		auto x = myOptionDefaults.find( "language" );
-		if ( x != myOptionDefaults.end() )
-			return x->second;
-
-		auto y = myOptions.find( "language" );
-		if ( y != myOptions.end() )
-		{
-			if ( ! y->second.empty() )
-			{
-				auto z = y->second.begin();
-				return z->first;
-			}
-		}
-
-		return String::empty();
-	}
-	return myLanguage;
 }
 
 
@@ -250,9 +202,13 @@ Tool::addOption( const std::string &opt,
 {
 	auto o = myOptions.find( opt );
 	if ( o == myOptions.end() )
-		throw std::runtime_error( "Option '" + opt + "' does not exist in tool '" + getName() + "'" );
-
-	o->second[nm] = cmd;
+	{
+		myOptions[opt][nm] = cmd;
+		// make the first one the default
+		myOptionDefaults[opt] = nm;
+	}
+	else
+		o->second[nm] = cmd;
 }
 
 
@@ -410,14 +366,9 @@ Tool::createRule( const TransformSet &xset, bool useBraces ) const
 	for ( auto &i: myOptions )
 	{
 		std::string opt;
-		if ( i.first == "language" )
-			opt = getLanguage();
-		else
-		{
-			opt = xset.getOptionValue( i.first );
-			if ( opt.empty() )
-				opt = getDefaultOption( i.first );
-		}
+		opt = xset.getOptionValue( i.first );
+		if ( opt.empty() )
+			opt = getDefaultOption( i.first );
 
 		auto io = i.second.find( opt );
 		if ( io != i.second.end() )
@@ -483,16 +434,10 @@ Tool::parse( const Lua::Value &v )
 		else if ( k == "exe" )
 		{
 			if ( i.second.type() == LUA_TUSERDATA )
-			{
-				void *ud = i.second.asPointer();
-				if ( ud )
-					exePtr = *(reinterpret_cast<ItemPtr *>( ud ) );
-				else
-					throw std::runtime_error( "User data item is not a valid item" );
-			}
+				exePtr = extractItem( i.second );
 			else if ( i.second.type() == LUA_TSTRING )
 				exe = i.second.asString();
-			else
+			else if ( i.second.type() != LUA_TNIL )
 				throw std::runtime_error( "Unknown type provided for executable" );
 		}
 		else if ( k == "input_extensions" )

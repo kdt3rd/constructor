@@ -50,6 +50,5 @@ inline constexpr char pathSeparator( void )
 #endif
 }
 
-
 } // namespace src
 

@@ -50,9 +50,6 @@ public:
 	inline const std::string &getTag( void ) const;
 	inline const std::string &getName( void ) const;
 
-	void enableLanguage( const std::string &name );
-	const std::string &getLanguage( void ) const;
-
 	void setPool( const std::string &name );
 	const std::string &getPool( void ) const;
 
@@ -118,7 +115,6 @@ private:
 
 	OptionGroup myOptions;
 	OptionDefaultSet myOptionDefaults;
-	std::string myLanguage;
 	std::string myPool;
 	bool myOutputRestat;
 

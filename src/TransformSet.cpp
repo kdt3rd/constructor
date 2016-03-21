@@ -29,8 +29,8 @@
 ////////////////////////////////////////
 
 
-TransformSet::TransformSet( const std::shared_ptr<Directory> &d )
-		: myDirectory( d )
+TransformSet::TransformSet( const std::shared_ptr<Directory> &d, std::string sys )
+		: myCurrentSystem( std::move( sys ) ), myDirectory( d )
 {
 	PRECONDITION( myDirectory, "Invalid output directory specified" );
 
@@ -119,13 +119,7 @@ TransformSet::getTool( const std::string &tag ) const
 void
 TransformSet::mergeVariables( const VariableSet &vs )
 {
-	if ( myVars.empty() )
-		myVars = vs;
-	else
-	{
-		for ( auto i: vs )
-			myVars.emplace( std::make_pair( i.first, i.second ) );
-	}
+	merge( myVars, vs );
 }
 
 
@@ -135,13 +129,7 @@ TransformSet::mergeVariables( const VariableSet &vs )
 void
 TransformSet::mergeOptions( const VariableSet &vs )
 {
-	if ( myOptions.empty() )
-		myOptions = vs;
-	else
-	{
-		for ( auto i: vs )
-			myOptions.emplace( std::make_pair( i.first, i.second ) );
-	}
+	merge( myOptions, vs );
 }
 
 
@@ -199,7 +187,7 @@ TransformSet::getVarValue( const std::string &v ) const
 {
 	auto i = myVars.find( v );
 	if ( i != myVars.end() )
-		return i->second.value();
+		return i->second.value( myCurrentSystem );
 
 	return String::empty();
 }
@@ -213,7 +201,7 @@ TransformSet::getOptionValue( const std::string &v ) const
 {
 	auto i = myOptions.find( v );
 	if ( i != myOptions.end() )
-		return i->second.value();
+		return i->second.value( myCurrentSystem );
 
 	return String::empty();
 }

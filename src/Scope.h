@@ -28,10 +28,10 @@
 
 #include "Variable.h"
 #include "Item.h"
-#include "Tool.h"
 #include "Pool.h"
 #include "TransformSet.h"
 #include "Directory.h"
+#include "Toolset.h"
 
 class Configuration;
 
@@ -51,19 +51,13 @@ class Scope : public std::enable_shared_from_this<Scope>
 {
 public:
 	Scope( std::shared_ptr<Scope> parent = std::shared_ptr<Scope>() );
-	~Scope( void );
 
 	inline std::shared_ptr<Scope> getParent( void ) const;
+	inline void setParent( const std::shared_ptr<Scope> &p );
+
 	std::shared_ptr<Scope> newSubScope( bool inherits );
-
+	void removeSubScope( const std::shared_ptr<Scope> &c );
 	inline const std::vector< std::shared_ptr<Scope> > &getSubScopes( void ) const;
-
-//	class VariableGroup
-//	{
-//	};
-//
-//	std::shared_ptr<VariableGroup> pushVariableGroup( void );
-//	void popVariableGroup( void );
 
 	inline VariableSet &getVars( void );
 	inline const VariableSet &getVars( void ) const;
@@ -74,15 +68,19 @@ public:
 	inline std::vector< std::shared_ptr<Tool> > &getTools( void );
 	inline const std::vector< std::shared_ptr<Tool> > &getTools( void ) const;
 
+	bool checkAdopt( const std::shared_ptr<Scope> &child );
+
 	void addPool( const std::shared_ptr<Pool> &t );
 	inline std::vector< std::shared_ptr<Pool> > &getPools( void );
 	
 	void addTool( const std::shared_ptr<Tool> &t );
 	std::shared_ptr<Tool> findTool( const std::string &extension ) const;
 
-	void addToolSet( const std::string &name,
-					 const std::vector<std::string> &tools );
+	void addToolSet( const std::shared_ptr<Toolset> &ts );
 	void useToolSet( const std::string &tset );
+	std::shared_ptr<Toolset> findToolSet( const std::string &tset );
+
+	void modifyActive( std::vector< std::shared_ptr<Toolset> > &tset ) const;
 
 	void addItem( const ItemPtr &i );
 	void removeItem( const ItemPtr &i );
@@ -93,7 +91,7 @@ public:
 	static Scope &root( void );
 	static Scope &current( void );
 	static void pushScope( const std::shared_ptr<Scope> &scope );
-	static void popScope( void );
+	static void popScope( bool adopt = false );
 
 private:
 	void grabScope( const Scope &o );
@@ -106,16 +104,14 @@ private:
 
 	std::vector<ItemPtr> myItems;
 
-	std::map<std::string, std::vector<std::string> > myToolSets;
+	std::map< std::string, std::shared_ptr<Toolset> > myToolSets;
 
-	std::map<std::string, std::vector< std::shared_ptr<Tool> > > myTagMap;
+	std::map< std::string, std::vector< std::shared_ptr<Tool> > > myTagMap;
 	std::vector< std::shared_ptr<Tool> > myTools;
-	std::vector<std::string> myEnabledToolsets;
-	std::map<std::string, std::vector<std::shared_ptr<Tool> > > myExtensionMap;
+	std::vector< std::shared_ptr<Toolset> > myEnabledToolsets;
+	std::map< std::string, std::vector<std::shared_ptr<Tool> > > myExtensionMap;
 
 	std::vector< std::shared_ptr<Pool> > myPools;
-	
-	bool myInheritParentScope = false;
 };
 
 
@@ -131,14 +127,8 @@ inline const std::vector< std::shared_ptr<Scope> > &Scope::getSubScopes( void ) 
 ////////////////////////////////////////
 
 
-//inline void Scope::inherit( bool yesno ) { myInheritParentScope = yesno; }
-//inline bool Scope::inherit( void ) const { return myInheritParentScope; }
-
-
-////////////////////////////////////////
-
-
 inline std::shared_ptr<Scope> Scope::getParent( void ) const { return myParent.lock(); }
+inline void Scope::setParent( const std::shared_ptr<Scope> &p ) { myParent = p; }
 
 
 ////////////////////////////////////////

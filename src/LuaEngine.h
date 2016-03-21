@@ -24,9 +24,7 @@
 
 #include "ScopeGuard.h"
 
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include "LuaInclude.h"
 
 #include <functional>
 #include <utility>
@@ -92,6 +90,10 @@ public:
 		registerFunction( name, std::bind( &FunctionBase::process, mCPPFuncs.back().get(), std::placeholders::_1 ) );
 	}
 
+	void resetModulePath( void );
+	void addModulePath( std::string p );
+	int loadModule( std::string p );
+
 	void pushLibrary( const char *name );
 	void pushSubLibrary( const char *name );
 	void popLibrary( void );
@@ -101,8 +103,12 @@ public:
 						const struct luaL_Reg *classFuncs,
 						const struct luaL_Reg *memberFuncs );
 
+	// implicitly calls addVisitedFile
 	int runFile( const char *filename );
 	int runFile( const char *filename, int envPos );
+
+	void addVisitedFile( const std::string &f );
+	const std::vector<std::string> &visitedFiles( void );
 
 	inline lua_State *state( void ) { return L; }
 	const char *getError( void );
@@ -123,6 +129,9 @@ private:
 	std::stack< std::pair<std::string, bool> > myCurLib;
 	std::stack<int> myFileFuncs;
 	std::stack<std::string> myFileNames;
+
+	std::vector<std::string> myModulePath;
+	std::vector<std::string> myVisitedPaths;
 
 	lua_State *L;
 	int myErrFunc;

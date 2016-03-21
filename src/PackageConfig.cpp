@@ -21,111 +21,12 @@
 //
 
 #include "PackageConfig.h"
-
-#include <dirent.h>
-#include <unistd.h>
-#include <errno.h>
-#include <system_error>
-#include <sys/stat.h>
-#include <sys/param.h>
-#include <stdlib.h>
-#include <string>
-#include <map>
-#include <mutex>
-#include "StrUtil.h"
-#include "FileUtil.h"
-#include "Directory.h"
-#include "OSUtil.h"
-#include "ScopeGuard.h"
-#include "TransformSet.h"
-#include "Debug.h"
 #include <iomanip>
 #include <fstream>
-
-
-////////////////////////////////////////
-
-
-namespace
-{
-
-std::map<std::string, std::string> thePackageConfigs;
-std::map<std::string, std::shared_ptr<PackageConfig> > theParsedPackageConfigs;
-static std::once_flag theNeedInit;
-
-static int theParseDepth = 0;
-
-void
-init( void )
-{
-	std::vector<std::string> searchPaths;
-	const char *pcPath = getenv( "PKG_CONFIG_PATH" );
-	if ( pcPath )
-		String::split_append( searchPaths, std::string( pcPath ), OS::pathSeparator() );
-	pcPath = getenv( "PKG_CONFIG_LIBDIR" );
-	if ( pcPath )
-		String::split_append( searchPaths, std::string( pcPath ), OS::pathSeparator() );
-	else
-	{
-		searchPaths.push_back( "/usr/lib/pkgconfig" );
-		searchPaths.push_back( "/usr/local/lib/pkgconfig" );
-	}
-
-	for ( auto &i: searchPaths )
-	{
-		// first trim any trailing slashes, win32 opendir doesn't seem to like it
-		String::strip( i );
-		File::trimTrailingSeparators( i );
-
-		DIR *d = ::opendir( i.c_str() );
-		if ( d )
-		{
-			ON_EXIT{ ::closedir( d ); };
-
-			std::unique_ptr<uint8_t[]> rdBuf;
-			size_t allocSize = 0;
-			long name_max = fpathconf( dirfd( d ), _PC_NAME_MAX );
-			if ( name_max == -1 )
-			{
-#if defined(NAME_MAX)
-                name_max = (NAME_MAX > 255) ? NAME_MAX : 255;
-#else
-                name_max = 255;
-#endif
-			}
-			allocSize = std::max( sizeof(struct dirent), size_t( offsetof(struct dirent, d_name) + static_cast<size_t>( name_max ) + 1 ) );
-			rdBuf.reset( new uint8_t[allocSize] );
-
-			struct dirent *curDir = reinterpret_cast<struct dirent *>( rdBuf.get() );
-			struct dirent *cur = nullptr;
-			while ( readdir_r( d, curDir, &cur ) == 0 )
-			{
-				if ( ! cur )
-					break;
-
-				std::string cname = cur->d_name;
-				std::string::size_type ePC = cname.rfind( ".pc", std::string::npos, 3 );
-				if ( ePC != std::string::npos )
-				{
-					if ( ePC == ( cname.size() - 3 ) )
-					{
-						std::string name = cname.substr( 0, ePC );
-						// if we found the same name earlier, ignore this one
-						if ( thePackageConfigs.find( name ) == thePackageConfigs.end() )
-						{
-							std::string fullpath = i;
-							fullpath.push_back( File::pathSeparator() );
-							fullpath.append( cname );
-							thePackageConfigs[name] = fullpath;
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-} // empty namespace
+#include "TransformSet.h"
+#include "Debug.h"
+#include "Directory.h"
+#include "StrUtil.h"
 
 
 ////////////////////////////////////////
@@ -270,6 +171,12 @@ PackageConfig::transform( TransformSet &xform ) const
 	ret->addToVariable( "ldflags", getLibs() );
 	ret->addToVariable( "ldflags", getVariable( "ldflags" ) );
 
+	if ( myPackageFile.empty() )
+	{
+		ret->addToVariable( "libdirs", getVariable( "libdirs" ) );
+		ret->addToVariable( "includes", getVariable( "includes" ) );
+	}
+
 	xform.recordTransform( this, ret );
 	return ret;
 }
@@ -364,18 +271,6 @@ PackageConfig::parse( void )
 		extractNameAndValue( parseline );
 	}
 
-	// now load any dependencies. do we care about private requires?
-	const std::string &req = getRequires();
-	if ( ! req.empty() )
-	{
-		++theParseDepth;
-		ON_EXIT{ --theParseDepth; };
-		std::vector< std::shared_ptr<PackageConfig> > deps =
-			extractOtherModules( req, true );
-		for ( auto &d: deps )
-			addDependency( DependencyType::EXPLICIT, d );
-	}
-
 	// now promote everything to item variables we might care about
 	for ( auto &x: myLocalVars )
 		setVariable( x.first, x.second );
@@ -441,7 +336,6 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 		}
 		else if ( nm == "Version" )
 		{
-			VERBOSE( std::setw( theParseDepth * 2 ) << std::setfill( ' ' ) << "" << "Found package '" << getName() << "', version " << val );
 			myValues[nm] = val;
 		}
 		else if ( nm == "Libs.private" || nm == "Libs" )
@@ -452,7 +346,6 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 		}
 		else if ( nm == "Requires.private" || nm == "Requires" )
 		{
-//			myDepends[nm] = extractOtherModules( val, true );
 			myValues[nm] = val;
 		}
 		else if ( nm == "Cflags" || nm == "CFlags" )
@@ -463,7 +356,6 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 		else if ( nm == "Conflicts" )
 		{
 			// do we care about this???
-			//myDepends[nm] = extractOtherModules( val, false );
 			myValues[nm] = val;
 		}
 		else
@@ -493,355 +385,6 @@ PackageConfig::extractNameAndValue( const std::string &curline )
 	{
 		std::cerr << "WARNING: Ignoring bogus line in pkg config file: " << myPackageFile << ": " << curline << std::endl;
 	}
-}
-
-
-////////////////////////////////////////
-
-
-namespace {
-enum class ModNameParseState
-{
-	LOOKING = 0,
-	IN_NAME = 1,
-	LOOKING_OP = 2,
-	IN_OP = 3,
-	LOOKING_VER = 4,
-	IN_VERSION = 5
-};
-}
-
-std::vector< std::shared_ptr<PackageConfig> >
-PackageConfig::extractOtherModules( const std::string &val, bool required )
-{
-	std::vector< std::shared_ptr<PackageConfig> > ret;
-	std::string::size_type p = 0, N = val.size();
-	std::string::size_type nameStart = std::string::npos;
-	std::string::size_type nameEnd = std::string::npos;
-	std::string::size_type opStart = std::string::npos;
-	std::string::size_type opEnd = std::string::npos;
-	std::string::size_type verStart = std::string::npos;
-	std::string::size_type verEnd = std::string::npos;
-
-	ModNameParseState curState = ModNameParseState::LOOKING;
-	ModNameParseState lastState = ModNameParseState::LOOKING;
-	while ( p != N )
-	{
-		char curC = val[p];
-		switch ( curState )
-		{
-			case ModNameParseState::LOOKING:
-				if ( curC != ',' && ! std::isspace( curC ) )
-				{
-					opStart = opEnd = std::string::npos;
-					verStart = verEnd = std::string::npos;
-					nameStart = p;
-					nameEnd = std::string::npos;
-					curState = ModNameParseState::IN_NAME;
-				}
-				break;
-			case ModNameParseState::IN_NAME:
-				if ( std::isspace( curC ) )
-				{
-					nameEnd = p;
-					curState = ModNameParseState::LOOKING_OP;
-				}
-				else if ( curC == ',' )
-				{
-					nameEnd = p;
-					curState = ModNameParseState::LOOKING;
-				}
-
-				if ( ( p + 1 ) == N )
-				{
-					nameEnd = p + 1;
-					curState = ModNameParseState::LOOKING;
-				}
-				break;
-			case ModNameParseState::LOOKING_OP:
-				if ( curC == '<' || curC == '>' || curC == '=' || curC == '!' )
-				{
-					opStart = p;
-					curState = ModNameParseState::IN_OP;
-				}
-				else if ( curC == ',' )
-					curState = ModNameParseState::LOOKING;
-				else if ( ! std::isspace( curC ) )
-				{
-					curState = ModNameParseState::LOOKING;
-					--p;
-				}
-
-				if ( ( p + 1 ) == N )
-					curState = ModNameParseState::LOOKING;
-				break;
-			case ModNameParseState::IN_OP:
-				if ( !( curC == '<' || curC == '>' || curC == '=' || curC == '!' ) )
-				{
-					opEnd = p;
-					curState = ModNameParseState::LOOKING_VER;
-				}
-
-				if ( ( p + 1 ) == N )
-				{
-					opEnd = p + 1;
-					curState = ModNameParseState::LOOKING;
-				}
-				break;
-			case ModNameParseState::LOOKING_VER:
-				if ( ! std::isspace( curC ) )
-				{
-					verStart = p;
-					curState = ModNameParseState::IN_VERSION;
-				}
-				if ( ( p + 1 ) == N )
-					curState = ModNameParseState::LOOKING;
-				break;
-			case ModNameParseState::IN_VERSION:
-				if ( curC == ',' || std::isspace( curC ) )
-				{
-					verEnd = p;
-					curState = ModNameParseState::LOOKING;
-				}
-
-				if ( ( p + 1 ) == N )
-				{
-					verEnd = p + 1;
-					curState = ModNameParseState::LOOKING;
-				}
-				break;
-		}
-
-		if ( curState == ModNameParseState::LOOKING &&
-			 lastState != ModNameParseState::LOOKING )
-		{
-			if ( nameStart == std::string::npos || nameEnd == std::string::npos )
-				throw std::logic_error( "Error in state machine parsing module names" );
-
-			std::string name = val.substr( nameStart, nameEnd - nameStart );
-			std::shared_ptr<PackageConfig> cur;
-			std::string verC, ver;
-			if ( opStart != std::string::npos )
-			{
-				if ( verStart == std::string::npos || verEnd == std::string::npos )
-				{
-					std::cerr << "ERROR: mal-formed package module version check specification: found operator but no version to check against" << std::endl;
-					cur = PackageConfig::find( name );
-				}
-				else
-				{
-					ver = val.substr( verStart, verEnd - verStart );
-					verC = val.substr( opStart, opEnd - opStart );
-					VersionCompare vc = VersionCompare::ANY;
-					if ( verC == "=" )
-						vc = VersionCompare::EQUAL;
-					else if ( verC == "!=" )
-						vc = VersionCompare::NOT_EQUAL;
-					else if ( verC == "<" )
-						vc = VersionCompare::LESS;
-					else if ( verC == "<=" )
-						vc = VersionCompare::LESS_EQUAL;
-					else if ( verC == ">" )
-						vc = VersionCompare::GREATER;
-					else if ( verC == ">=" )
-						vc = VersionCompare::GREATER_EQUAL;
-					else
-						throw std::runtime_error( "Invalid operator string: " + verC );
-					cur = PackageConfig::find( name, vc, ver );
-				}
-			}
-			else
-				cur = PackageConfig::find( name );
-
-			if ( required && ! cur )
-			{
-				std::stringstream msg;
-				msg << "Unable to find required package '" << name << "'";
-				if ( ! ver.empty() )
-					msg << ", version " << verC << ' '<< ver;
-				msg << " - please ensure it is installed or the package config search path is set appropriately";
-				throw std::runtime_error( msg.str() );
-			}
-			if ( cur )
-				ret.emplace_back( std::move( cur ) );
-		}
-		lastState = curState;
-		++p;
-	}
-
-	return ret;
-}
-
-
-////////////////////////////////////////
-
-
-std::shared_ptr<PackageConfig>
-PackageConfig::find( const std::string &name,
-					 const std::string &reqVersion )
-{
-	VersionCompare vc = VersionCompare::ANY;
-	if ( ! reqVersion.empty() )
-	{
-		std::string::size_type verPos = reqVersion.find_first_not_of( "<>=!" );
-		if ( verPos == std::string::npos )
-			throw std::runtime_error( "Invalid version specification, missing version number" );
-		std::string vercmp;
-		std::string ver;
-		if ( verPos > 0 )
-		{
-			vercmp = reqVersion.substr( 0, verPos );
-			ver = reqVersion.substr( verPos );
-		}
-		else
-			ver = reqVersion;
-
-		String::strip( vercmp );
-		String::strip( ver );
-
-		if ( vercmp.empty() || vercmp == "=" )
-			vc = VersionCompare::EQUAL;
-		else if ( vercmp == "!=" )
-			vc = VersionCompare::NOT_EQUAL;
-		else if ( vercmp == "<" )
-			vc = VersionCompare::LESS;
-		else if ( vercmp == "<=" )
-			vc = VersionCompare::LESS_EQUAL;
-		else if ( vercmp == ">" )
-			vc = VersionCompare::GREATER;
-		else if ( vercmp == ">=" )
-			vc = VersionCompare::GREATER_EQUAL;
-
-		return find( name, vc, ver );
-	}
-
-	return find( name, vc, reqVersion );
-}
-
-
-////////////////////////////////////////
-
-
-std::shared_ptr<PackageConfig>
-PackageConfig::find( const std::string &name, VersionCompare comp, const std::string &reqVersion )
-{
-	std::call_once( theNeedInit, &init );
-
-	std::shared_ptr<PackageConfig> ret;
-
-	auto preparsed = theParsedPackageConfigs.find( name );
-	if ( preparsed != theParsedPackageConfigs.end() )
-		ret = preparsed->second;
-	else
-	{
-		auto f = thePackageConfigs.find( name );
-		if ( f != thePackageConfigs.end() )
-		{
-			DEBUG( "using pkg-config information for " << name );
-			ret = std::make_shared<PackageConfig>( f->first, f->second );
-			// we can't call this in the constructor
-			ret->parse();
-			theParsedPackageConfigs[f->first] = ret;
-		}
-		else
-		{
-			DEBUG( "Searching in OS path for library " << name );
-			std::string libpath;
-#ifdef __APPLE__
-			// look for framework
-			if ( File::find( libpath, name, {".framework"}, {"/System/Library/Frameworks", "/Library/Frameworks"} ) )
-			{
-				ret = PackageConfig::makeLibraryReference( name, libpath );
-				theParsedPackageConfigs[name] = ret;
-			} else
-#endif
-#ifndef WIN32
-			if ( File::find( libpath, "lib" + name, {".so", ".a"}, {"/usr/lib", "/usr/local/lib"} ) )
-			{
-				ret = PackageConfig::makeLibraryReference( name, libpath );
-				theParsedPackageConfigs[name] = ret;
-			}
-#else
-#error "Need to implement library search for windows"
-#endif
-		}
-	}
-
-	if ( ret )
-	{
-		if ( ! reqVersion.empty() )
-			DEBUG( "Comparing found version '" << ret->getVersion() << "' to requested version '" << reqVersion << "'" );
-		int rc = String::versionCompare( ret->getVersion(), reqVersion );
-		bool zap = false;
-		switch ( comp )
-		{
-			case VersionCompare::NOT_EQUAL: zap = ( rc == 0 ); break;
-			case VersionCompare::EQUAL: zap = ( rc != 0 ); break;
-			case VersionCompare::LESS: zap = ( rc >= 0 ); break;
-			case VersionCompare::LESS_EQUAL: zap = ( rc > 0 ); break;
-			case VersionCompare::GREATER:zap = ( rc <= 0 ); break;
-			case VersionCompare::GREATER_EQUAL: zap = ( rc < 0 ); break;
-			case VersionCompare::ANY: break;
-		}
-
-		if ( zap )
-		{
-			std::cout << "WARNING: Found package '" << name << "' (" << ret->getName() << "), version " << ret->getVersion()
-					  << " but failed version check against requested version '" << reqVersion << "'" << std::endl;
-			ret.reset();
-		}
-	}
-	return ret;
-}
-
-
-////////////////////////////////////////
-
-
-std::shared_ptr<PackageConfig>
-PackageConfig::makeLibraryReference( const std::string &name,
-									 const std::string &path )
-{
-	std::shared_ptr<PackageConfig> ret = std::make_shared<PackageConfig>( name, std::string() );
-	VERBOSE( "Creating external (non- pkg-config) library reference for '" << name << "'..." );
-
-#ifdef WIN32
-	throw std::runtime_error( "Not yet implemented for Win32" );
-#endif
-
-#ifdef __APPLE__
-	if ( path.find( ".framework" ) != std::string::npos )
-	{
-		// put it as one value so any repeated-value
-		// compression doesn't remove the -framework bit
-		// but multiple of the same will be cleaned
-		std::string varval = "-framework " + name;
-		Variable &cflags = ret->getVariable( "cflags" );
-		cflags.add( varval );
-		Variable &libs = ret->getVariable( "ldflags" );
-		libs.add( varval );
-		return ret;
-	}
-#endif
-	Directory d( path );
-	d.cdUp();
-
-	Variable &libs = ret->getVariable( "ldflags" );
-	libs.add( "-L" );
-	libs.add( d.fullpath() );
-	libs.add( "-l" + name );
-
-	d.cdUp();
-	d.cd( "include" );
-
-//	if ( d.fullpath() != "/usr/include" )
-	{
-		Variable &cflags = ret->getVariable( "cflags" );
-		cflags.add( "-I" );
-		cflags.add( d.fullpath() );
-	}
-
-	return ret;
 }
 
 

@@ -24,7 +24,6 @@
 #include "StrUtil.h"
 #include <sys/utsname.h>
 #include <system_error>
-#include <mutex>
 #include <map>
 
 extern "C"
@@ -53,11 +52,15 @@ bool theIs64bit = false;
 #endif
 std::map<std::string, std::string> theEnv;
 
-static std::once_flag theNeedInit;
+static bool theInitDone = false;
 
 void
 init( void )
 {
+	if ( theInitDone )
+		return;
+	theInitDone = true;
+
 	struct utsname un;
 	if ( uname( &un ) == 0 )
 	{
@@ -109,49 +112,50 @@ namespace OS
 const std::string &
 system( void )
 {
-	std::call_once( theNeedInit, &init );
+	init();
 	return theSystem;
 }
 
 const std::string &
 node( void )
 {
-	std::call_once( theNeedInit, &init );
+	init();
 	return theNode;
 }
 
 const std::string &
 release( void )
 {
-	std::call_once( theNeedInit, &init );
+	init();
 	return theRelease;
 }
 
 const std::string &
 version( void )
 {
-	std::call_once( theNeedInit, &init );
+	init();
 	return theVersion;
 }
 
 const std::string &
 machine( void )
 {
-	std::call_once( theNeedInit, &init );
+	init();
 	return theMachine;
 }
 
 bool
 is64bit( void )
 {
-	std::call_once( theNeedInit, &init );
+	init();
 	return theIs64bit;
 }
 
 const std::string &
 getenv( const std::string &v )
 {
-	std::call_once( theNeedInit, &init );
+	init();
+
 	auto i = theEnv.find( v );
 	if ( i != theEnv.end() )
 		return i->second;

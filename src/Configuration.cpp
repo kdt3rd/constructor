@@ -23,6 +23,7 @@
 #include "Configuration.h"
 #include <iostream>
 #include "Directory.h"
+#include "OSUtil.h"
 
 
 ////////////////////////////////////////
@@ -31,6 +32,7 @@
 namespace
 {
 
+static int theCreating = 0;
 static std::vector<Configuration> theConfigs;
 static std::string theDefaultConfig;
 
@@ -41,40 +43,44 @@ static std::string theDefaultConfig;
 
 
 Configuration::Configuration( void )
+		: myPseudoScope( Scope::current().newSubScope( true ) )
 {
+	Scope::current().removeSubScope( myPseudoScope );
 }
 
 
 ////////////////////////////////////////
 
 
-Configuration::Configuration( const Lua::Table &t )
+Configuration::Configuration( const std::string &n )
+		: myName( n ),
+		  myPseudoScope( Scope::current().newSubScope( true ) )
 {
-	for ( auto i: t )
-	{
-		if ( i.first.type == Lua::KeyType::INDEX )
-			continue;
-
-		if ( i.first.tag == "name" )
-		{
-			if ( i.second.type() != LUA_TSTRING )
-				throw std::runtime_error( "Build configuration requires a name as a string to be provided in configuration table" );
-			myName = i.second.asString();
-		}
-		else
-		{
-			Variable v( i.first.tag );
-			if ( i.second.type() == LUA_TSTRING )
-				v.reset( i.second.asString() );
-			else
-				v.reset( i.second.toStringList() );
-
-			myVariables.emplace( std::make_pair( i.first.tag, std::move( v ) ) );
-		}
-	}
-
+	Scope::current().removeSubScope( myPseudoScope );
 	if ( myName.empty() )
-		throw std::runtime_error( "Build configuration requires a name as a string to be provided in configuration table" );
+		throw std::runtime_error( "Build configuration definition requires a name as a string to be provided" );
+}
+
+
+////////////////////////////////////////
+
+
+const std::string &
+Configuration::getSystem( void ) const
+{
+	if ( mySystem.empty() )
+		return OS::system();
+	return mySystem;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Configuration::setSystem( std::string s )
+{
+	mySystem = std::move( s );
 }
 
 
@@ -107,6 +113,68 @@ Configuration::setDefault( std::string c )
 {
 	theDefaultConfig = std::move( c );
 }
+
+
+////////////////////////////////////////
+
+
+bool
+Configuration::haveDefault( void )
+{
+	return ! theDefaultConfig.empty();
+}
+
+
+////////////////////////////////////////
+
+
+bool
+Configuration::haveAny( void )
+{
+	if ( theCreating > 0 )
+		return false;
+
+	return ! theConfigs.empty();
+}
+
+
+////////////////////////////////////////
+
+
+void
+Configuration::checkDefault( void )
+{
+	if ( ! haveDefault() )
+		throw std::logic_error( "Must specify default_configuration prior to specifying targets or recursing tree" );
+}
+
+
+////////////////////////////////////////
+
+
+void
+Configuration::creatingNewConfig( void )
+{
+	++theCreating;
+}
+void
+Configuration::finishCreatingNewConfig( void )
+{
+	--theCreating;
+}
+
+
+////////////////////////////////////////
+
+
+Configuration &
+Configuration::last( void )
+{
+	if ( theConfigs.empty() )
+		throw std::logic_error( "Attempt to access configurations without checking if any are defined" );
+	return theConfigs.back();
+}
+
 
 
 ////////////////////////////////////////

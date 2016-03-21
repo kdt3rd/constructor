@@ -163,16 +163,6 @@ BuildItem::setOutputs( const std::vector<std::string> &outList )
 
 
 void
-BuildItem::setFlag( const std::string &n, const std::string &v )
-{
-	myFlags[n] = v;
-}
-
-
-////////////////////////////////////////
-
-
-void
 BuildItem::setVariables( VariableSet v )
 {
 	myVariables = std::move( v );
@@ -234,7 +224,11 @@ BuildItem::addToVariable( const std::string &name, const Variable &val )
 	if ( i != myVariables.end() )
 		i->second.moveToEnd( val.values() );
 	else
-		myVariables.emplace( std::make_pair( name, Variable( val ) ) );
+	{
+		auto ni = myVariables.emplace( std::make_pair( name, Variable( val ) ) );
+		if ( val.useToolFlagTransform() )
+			ni.first->second.setToolTag( val.getToolTag() );
+	}
 }
 
 
@@ -254,18 +248,34 @@ BuildItem::getVariable( const std::string &name ) const
 ////////////////////////////////////////
 
 
-const std::string &
-BuildItem::getFlag( const std::string &n ) const
+bool
+BuildItem::flatten( const std::shared_ptr<BuildItem> &i )
 {
-	auto i = myFlags.find( n );
-	if ( i != myFlags.end() )
-		return i->second;
-	return String::empty();
+	if ( !(i->useName()) && i->getOutputs().empty() && ! i->getTool() )
+	{
+		for ( auto &d: i->extractDependencies( DependencyType::EXPLICIT ) )
+			addDependency( DependencyType::EXPLICIT, d );
+		for ( auto &d: i->extractDependencies( DependencyType::CHAIN ) )
+			addDependency( DependencyType::CHAIN, d );
+		for ( auto &d: i->extractDependencies( DependencyType::IMPLICIT ) )
+			addDependency( DependencyType::IMPLICIT, d );
+		for ( auto &d: i->extractDependencies( DependencyType::ORDER ) )
+			addDependency( DependencyType::ORDER, d );
+
+		for ( const auto &v: i->getVariables() )
+		{
+			auto mv = myVariables.find( v.first );
+			if ( mv != myVariables.end() )
+				mv->second.merge( v.second );
+			else
+				myVariables.emplace( std::make_pair( v.first, v.second ) );
+		}
+		return true;
+	}
+	return false;
 }
 
 
 ////////////////////////////////////////
-
-
 
 

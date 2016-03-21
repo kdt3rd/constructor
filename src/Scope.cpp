@@ -24,11 +24,13 @@
 #include <stack>
 #include <stdexcept>
 #include "Tool.h"
+#include "Util.h"
 #include "Debug.h"
 #include "ScopeGuard.h"
 #include "Configuration.h"
 #include "TransformSet.h"
 #include "DefaultTools.h"
+#include "Configuration.h"
 
 
 ////////////////////////////////////////
@@ -49,15 +51,8 @@ static std::stack< std::shared_ptr<Scope> > theScopes;
 Scope::Scope( std::shared_ptr<Scope> parent )
 		: myParent( parent )
 {
-	addDefaultTools();
-}
-
-
-////////////////////////////////////////
-
-
-Scope::~Scope( void )
-{
+	if ( ! parent )
+		addDefaultTools();
 }
 
 
@@ -70,8 +65,81 @@ Scope::newSubScope( bool inherits )
 	mySubScopes.emplace_back( std::make_shared<Scope>( shared_from_this() ) );
 	if ( inherits )
 		mySubScopes.back()->grabScope( *this );
+	else
+		mySubScopes.back()->addDefaultTools();
 
 	return mySubScopes.back();
+}
+
+
+////////////////////////////////////////
+
+
+void
+Scope::removeSubScope( const std::shared_ptr<Scope> &c )
+{
+	for ( auto i = mySubScopes.begin(); i != mySubScopes.end(); ++i )
+	{
+		if ( (*i) == c )
+		{
+			mySubScopes.erase( i );
+			return;
+		}
+	}
+}
+
+
+////////////////////////////////////////
+
+
+bool
+Scope::checkAdopt( const std::shared_ptr<Scope> &child )
+{
+	if ( child->myVariables == myVariables &&
+		 child->myOptions == myOptions &&
+		 child->myToolSets == myToolSets &&
+		 child->myEnabledToolsets == myEnabledToolsets &&
+		 child->myExtensionMap == myExtensionMap &&
+		 child->myPools == myPools )
+	{
+		if ( child->myTools != myTools )
+		{
+			// the child added some tools, pull them back
+			for ( auto &t: child->myTools )
+			{
+				bool found = false;
+				for ( auto &mt: myTools )
+				{
+					if ( mt == t )
+					{
+						found = true;
+						break;
+					}
+				}
+				if ( ! found )
+					addTool( t );
+			}
+		}
+
+		util::append( myItems, child->myItems );
+		for ( auto i = mySubScopes.begin(); i != mySubScopes.end(); ++i )
+		{
+			if ( (*i) == child )
+			{
+				mySubScopes.erase( i );
+				break;
+			}
+		}
+		for ( auto i = child->mySubScopes.begin(); i != child->mySubScopes.end(); ++i )
+		{
+			(*i)->setParent( shared_from_this() );
+			mySubScopes.push_back( (*i) );
+		}
+
+		return true;
+	}
+
+	return false;
 }
 
 
@@ -139,10 +207,6 @@ Scope::findTool( const std::string &extension ) const
 	for ( auto &t: myTools )
 		if ( t->handlesExtension( extension ) )
 			return t;
-
-	if ( myInheritParentScope )
-		return getParent()->findTool( extension );
-
 	return std::shared_ptr<Tool>();
 }
 
@@ -151,13 +215,15 @@ Scope::findTool( const std::string &extension ) const
 
 
 void
-Scope::addToolSet( const std::string &name,
-				   const std::vector<std::string> &tools )
+Scope::addToolSet( const std::shared_ptr<Toolset> &ts )
 {
-	if ( myToolSets.find( name ) != myToolSets.end() )
-		throw std::runtime_error( "ToolSet '" + name + "' already defined" );
+	if ( ! ts )
+		return;
 
-	myToolSets[name] = tools;
+	if ( myToolSets.find( ts->getName() ) != myToolSets.end() )
+		throw std::runtime_error( "ToolSet '" + ts->getName() + "' already defined" );
+
+	myToolSets[ts->getName()] = ts;
 }
 
 
@@ -167,7 +233,73 @@ Scope::addToolSet( const std::string &name,
 void
 Scope::useToolSet( const std::string &tset )
 {
-	myEnabledToolsets.push_back( tset );
+	auto i = myToolSets.find( tset );
+	if ( i == myToolSets.end() )
+		throw std::runtime_error( "Unable to find toolset '" + tset + "' definition" );
+
+	std::shared_ptr<Toolset> ts = i->second;
+
+	bool added = false;
+	// remove any toolset that conflicts
+	for ( auto &i: myEnabledToolsets )
+	{
+		if ( i == ts )
+		{
+			// already using this toolset
+			added = true;
+			break;
+		}
+
+		if ( i->getTag() == ts->getTag() )
+		{
+			VERBOSE( "Replacing toolset '" << i->getName() << "' with '" << tset << "'" );
+			added = true;
+			i = ts;
+		}
+	}
+	if ( ! added )
+		myEnabledToolsets.push_back( ts );
+}
+
+
+////////////////////////////////////////
+
+
+std::shared_ptr<Toolset>
+Scope::findToolSet( const std::string &tset )
+{
+	auto i = myToolSets.find( tset );
+	if ( i == myToolSets.end() )
+		return std::shared_ptr<Toolset>();
+	return i->second;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Scope::modifyActive( std::vector< std::shared_ptr<Toolset> > &tsets ) const
+{
+	if ( myEnabledToolsets.empty() )
+		return;
+
+	for ( const auto &ts: myEnabledToolsets )
+	{
+		bool added = false;
+		// remove any toolset that conflicts
+		for ( auto &i: tsets )
+		{
+			if ( i->getTag() == ts->getTag() )
+			{
+				VERBOSE( "Replacing toolset '" << i->getName() << "' with '" << ts->getName() << "' for current configuration" );
+				added = true;
+				i = ts;
+			}
+		}
+		if ( ! added )
+			tsets.push_back( ts );
+	}
 }
 
 
@@ -215,7 +347,7 @@ Scope::transform( TransformSet &xform,
 	DEBUG( "transform Scope..." );
 	for ( const std::shared_ptr<Scope> &ss: mySubScopes )
 	{
-		std::shared_ptr<TransformSet> sx = std::make_shared<TransformSet>( xform.getOutDir() );
+		std::shared_ptr<TransformSet> sx = std::make_shared<TransformSet>( xform.getOutDir(), conf.getSystem() );
 		ss->transform( *sx, conf );
 		xform.addChildScope( sx );
 	}
@@ -223,7 +355,21 @@ Scope::transform( TransformSet &xform,
 	for ( auto &p: myPools )
 		xform.addPool( p );
 
-	for ( auto i: myTagMap )
+	std::vector< std::shared_ptr<Toolset> > actTset = myEnabledToolsets;
+	conf.getPseudoScope().modifyActive( actTset );
+
+	std::vector<std::string> lsearch;
+	std::vector<std::string> psearch;
+	for ( auto &ts: actTset )
+	{
+		util::append( lsearch, ts->getLibSearchPath() );
+		util::append( psearch, ts->getPkgSearchPath() );
+	}
+
+	xform.setLibSearchPath( lsearch );
+	xform.setPkgSearchPath( psearch );
+
+	for ( auto &i: myTagMap )
 	{
 		if ( i.second.size() == 1 )
 			xform.addTool( i.second.front() );
@@ -232,22 +378,16 @@ Scope::transform( TransformSet &xform,
 			std::shared_ptr<Tool> found;
 			for ( const std::shared_ptr<Tool> &tagTool: i.second )
 			{
-				for ( const std::string &ts: myEnabledToolsets )
+				for ( const std::shared_ptr<Toolset> &ts: actTset )
 				{
-					auto tsi = myToolSets.find( ts );
-					if ( tsi != myToolSets.end() )
+					VERBOSE( "Checking if " << tagTool->getName() << " is in " << ts->getName() );
+					if ( ts->hasTool( tagTool ) )
 					{
-						const std::vector<std::string> &tlist = tsi->second;
-						for ( const std::string &tool: tlist )
-						{
-							if ( tagTool->getName() == tool )
-							{
-								if ( found )
-									throw std::runtime_error( "Tool '" + tool + "' conflicts with tool '" + found->getName() + "' previously matched to active toolset" );
+						VERBOSE( " --> YES" );
+						if ( found )
+							throw std::runtime_error( "Tool '" + tagTool->getName() + "' conflicts with tool '" + found->getName() + "' previously matched to a different active toolset" );
 
-								found = tagTool;
-							}
-						}
+						found = tagTool;
 					}
 				}
 			}
@@ -259,8 +399,9 @@ Scope::transform( TransformSet &xform,
 	}
 
 	xform.mergeVariables( myVariables );
+	xform.mergeVariables( conf.getPseudoScope().getVars() );
 	xform.mergeOptions( myOptions );
-	xform.mergeOptions( conf.getChoices() );
+	xform.mergeOptions( conf.getPseudoScope().getOptions() );
 
 	for ( const ItemPtr &i: myItems )
 		i->transform( xform );
@@ -284,6 +425,7 @@ Scope::grabScope( const Scope &o )
 	myPools = o.myPools;
 
 	myVariables = o.myVariables;
+	myOptions = o.myOptions;
 }
 
 
@@ -320,6 +462,11 @@ Scope::root( void )
 Scope &
 Scope::current( void )
 {
+	// check to see if we need to add it to the
+	// pseudo scope in the configuration
+	if ( Configuration::haveAny() && ! Configuration::haveDefault() )
+		return Configuration::last().getPseudoScope();
+
 	if ( theScopes.empty() )
 		return root();
 	return *(theScopes.top());
@@ -340,10 +487,17 @@ Scope::pushScope( const std::shared_ptr<Scope> &scope )
 
 
 void
-Scope::popScope( void )
+Scope::popScope( bool adopt )
 {
 	if ( theScopes.empty() )
 		throw std::runtime_error( "unbalanced Scope management -- too many pops for pushes" );
+	if ( adopt )
+	{
+		std::shared_ptr<Scope> t = theScopes.top();
+		std::shared_ptr<Scope> p = t->getParent();
+		p->checkAdopt( t );
+	}
+
 	theScopes.pop();
 }
 

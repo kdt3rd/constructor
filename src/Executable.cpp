@@ -66,49 +66,7 @@ Executable::transform( TransformSet &xform ) const
 	ret->setDefaultTarget( isDefaultTarget() );
 
 	std::set<std::string> tags;
-	std::queue< std::shared_ptr<BuildItem> > chainsToCheck;
-	Variable outflags( "cflags" );
-	for ( const ItemPtr &i: myItems )
-	{
-		std::shared_ptr<BuildItem> xi = i->transform( xform );
-		xi->markAsDependent();
-
-		const Library *libDep = dynamic_cast<const Library *>( i.get() );
-		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
-		if ( libDep || pkg )
-		{
-			VERBOSE( "Executable '" << getName() << "' depends on " << i->getName() );
-			ret->addDependency( DependencyType::IMPLICIT, xi );
-			outflags.addIfMissing( xi->getVariable( "cflags" ).values() );
-			ret->addToVariable( "ldflags", xi->getVariable( "ldflags" ) );
-			if ( libDep )
-			{
-				ret->addToVariable( "libs", libDep->getName() );
-				ret->addToVariable( "libdirs", xi->getOutDir()->fullpath() );
-			}
-
-			ret->addToVariable( "libs", xi->getVariable( "libs" ) );
-			ret->addToVariable( "libdirs", xi->getVariable( "libdirs" ) );
-		}
-		else if ( dynamic_cast<const Executable *>( i.get() ) )
-		{
-			// executables can't depend on other exes, make this
-			// an order only dependency
-			VERBOSE( "Executable '" << i->getName() << "' will be built before '" << getName() << "' because of declared dependency" );
-			ret->addDependency( DependencyType::ORDER, xi );
-		}
-		else
-			chainsToCheck.push( xi );
-	}
-
-	followChains( chainsToCheck, tags, ret, xform );
-
-	if ( ! outflags.empty() )
-	{
-		std::vector< std::shared_ptr<BuildItem> > expDeps = ret->extractDependencies( DependencyType::EXPLICIT );
-		for ( const auto &compItem: expDeps )
-			compItem->addToVariable( "cflags", outflags );
-	}
+	fillBuildItem( ret, xform, tags, true );
 
 	if ( tags.empty() )
 		throw std::runtime_error( "No tags available to determine linker for exe " + getName() );

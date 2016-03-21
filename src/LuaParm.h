@@ -22,14 +22,13 @@
 
 #pragma once
 
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include "LuaInclude.h"
 
 #include <string>
 #include <vector>
 #include <type_traits>
 #include "LuaValue.h"
+#include "Util.h"
 
 
 ////////////////////////////////////////
@@ -204,6 +203,34 @@ struct ParmAdapt< std::vector<std::string> >
 		return ret;
 	}
 
+	static inline void recursive_get( std::vector<std::string> &ret, lua_State *l, int i )
+	{
+		if ( lua_isstring( l, i ) )
+			ret.emplace_back( ParmAdapt<std::string>::get( l, i ) );
+		else if ( lua_istable( l, i ) )
+		{
+			lua_pushnil( l );
+			while ( lua_next( l, i ) )
+			{
+				// value at -1, key at -2
+				if ( ! lua_isnumber( l, -2 ) )
+					throw std::runtime_error( "Expected table to be an array (key / index not a number)" );
+				recursive_get( ret, l, lua_gettop( l ) );
+				lua_pop( l, 1 );
+			}
+		}
+		else
+			throw std::runtime_error( "Expected table to be a table of strings or tables of strings" );
+	}
+
+	static inline std::vector<std::string> recursive_get( lua_State *l, int beg, int last )
+	{
+		std::vector<std::string> ret;
+		for ( int i = beg; i <= last; ++i )
+			recursive_get( ret, l, i );
+		return ret;
+	}
+
 	static inline std::vector<std::string> check_and_get( lua_State *l, int i )
 	{
 		if ( lua_istable( l, i ) )
@@ -266,6 +293,14 @@ struct Parm
 			return type();
 
 		return ParmAdapt<type>::check_and_get( l, i );
+	}
+
+	static inline type recursive_get( lua_State *l, int beg, int end )
+	{
+		if ( beg > end )
+			return type();
+
+		return ParmAdapt<type>::recursive_get( l, beg, end );
 	}
 
 	static inline void put( lua_State *l, const type &v )

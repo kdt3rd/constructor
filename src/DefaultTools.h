@@ -24,25 +24,33 @@
 
 #include <string>
 #include <map>
+#include <vector>
+#include <memory>
 
 
 ////////////////////////////////////////
 
 
 class Scope;
+class Toolset;
 
 class DefaultTools
 {
 public:
 	static void checkAndAddCFamilies( Scope &s );
 
+	/// returns the available default tool options which are then
+	/// exposed as functions to modify the current configuration or
+	/// top level scope
+	static const std::vector<std::string> &getOptions( void );
+
 protected:
 #ifdef WIN32
-	static bool checkAndAddCl( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
+	static std::shared_ptr<Toolset> checkAndAddCl( Scope &s, const std::map<std::string, std::string> &exelist );
 #endif
-	static bool checkAndAddClang( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static bool checkAndAddGCC( Scope &s, const std::map<std::string, std::string> &exelist, bool regAsDefault );
-	static void checkAndAddArchiver( Scope &s, const std::map<std::string, std::string> &exelist );
+	static std::shared_ptr<Toolset> checkAndAddClang( Scope &s, const std::map<std::string, std::string> &exelist );
+	static std::shared_ptr<Toolset> checkAndAddGCC( Scope &s, const std::map<std::string, std::string> &exelist );
+	static std::shared_ptr<Toolset> checkAndAddArchiver( Scope &s, const std::map<std::string, std::string> &exelist );
 	static void addSelfGenerator( Scope &s );
 };
 

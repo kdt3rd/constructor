@@ -23,10 +23,11 @@
 #include "MakeGenerator.h"
 #include "FileUtil.h"
 #include "TransformSet.h"
-#include "LuaExtensions.h"
+#include "LuaEngine.h"
 #include "Scope.h"
 #include "Debug.h"
 #include "StrUtil.h"
+#include "Configuration.h"
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -159,7 +160,7 @@ emitTargets( std::ostream &os, std::vector<std::string> &defTargs, std::vector<s
 			auto &bivars = bi->getVariables();
 			for ( auto &bv: bivars )
 			{
-				std::string outv = bv.second.prepended_value( t->getCommandPrefix( bv.first ) );
+				std::string outv = bv.second.prepended_value( t->getCommandPrefix( bv.first ), x.getSystem() );
 				addOutputList( os, bi, false );
 				os << ": override " << bv.first << ":=" << outv << '\n';
 			}
@@ -278,10 +279,10 @@ emitVariables( std::ostream &os, const TransformSet &x )
 			if ( ! t )
 				throw std::runtime_error( "Variable set to use tool flag transform, but no tool with tag '" + i.second.getToolTag() + "' found" );
 
-			os << '\n' << i.first << ":=" << i.second.prepended_value( t->getCommandPrefix( i.first ) );
+			os << '\n' << i.first << ":=" << i.second.prepended_value( t->getCommandPrefix( i.first ), x.getSystem() );
 		}
 		else
-			os << '\n' << i.first << ":=" << i.second.value();
+			os << '\n' << i.first << ":=" << i.second.value( x.getSystem() );
 	}
 	if ( ! vars.empty() )
 		os << '\n';
@@ -382,55 +383,80 @@ MakeGenerator::emit( const std::shared_ptr<Directory> &d,
 					 int argc, const char *argv[] )
 {
 	Directory curD;
+	std::string makefn = d->makefilename( "Makefile" );
+	try
 	{
-		std::ofstream f( d->makefilename( "Makefile" ) );
+		{
+			std::ofstream f( makefn );
 
-		f <<
-			".PHONY: all\n"
-			".ONESHELL:\n"
+			f <<
+				".PHONY: all\n"
+				".ONESHELL:\n"
+				".SUFFIXES:\n"
+				".DEFAULT: all\n"
+				".NOTPARALLEL:\n"
+				"\n"
+				"TARGETS:=$(filter-out all,$(MAKECMDGOALS))\n"
+				"MAKECMDGOALS:=\n"
+				"MAKEFLAGS:=--no-print-directory\n"
+				"all: Makefile.build\n\n"
+				"\t@$(MAKE) -f Makefile.build $(TARGETS)\n\n"
+				"Makefile.build: ";
+			for ( const std::string &x: Lua::Engine::singleton().visitedFiles() )
+				f << ' ' << x;
+			f << "\n\t@echo \"Regenerating build files...\"\n";
+			f << "\t@cd " << curD.fullpath() << " &&";
+			for ( int a = 0; a < argc; ++a )
+				f << ' ' << argv[a];
+		}
+
+		TransformSet xform( d, conf.getSystem() );
+		Scope::root().transform( xform, conf );
+
+		std::ofstream rf( d->makefilename( "Makefile.build" ) );
+		rf <<
+			".PHONY: default all install clean\n"
 			".SUFFIXES:\n"
+			".ONESHELL:\n"
 			".DEFAULT: all\n"
-			".NOTPARALLEL:\n"
-			"\n"
-			"TARGETS:=$(filter-out all,$(MAKECMDGOALS))\n"
-			"MAKECMDGOALS:=\n"
-			"MAKEFLAGS:=--no-print-directory\n"
-			"all: Makefile.build\n\n"
-			"\t@$(MAKE) -f Makefile.build $(TARGETS)\n\n"
-			"Makefile.build: ";
-		for ( const std::string &x: Lua::visitedFiles() )
-			f << ' ' << x;
-		f << "\n\t@echo \"Regenerating build files...\"\n";
-		f << "\t@cd " << curD.fullpath() << " &&";
-		for ( int a = 0; a < argc; ++a )
-			f << ' ' << argv[a];
+			"\n\ndefault: all\n";
+
+		std::vector<std::string> defTargs;
+		int scopeCount = 0;
+		emitScope( rf, defTargs, *d, xform, scopeCount );
+
+		rf << "all:";
+		for ( const std::string &a: defTargs )
+			rf << ' ' << a;
+
+		rf << "\n\ninstall:\n\t@echo \"Installing...\"\n";
+
+		rf << "\n\nclean:";
+		for ( const std::string &a: defTargs )
+			rf << " clean-" << a;
+		rf << "\n\n";
 	}
-
-	TransformSet xform( d );
-	Scope::root().transform( xform, conf );
-
-	std::ofstream rf( d->makefilename( "Makefile.build" ) );
-	rf <<
-		".PHONY: default all install clean\n"
-		".SUFFIXES:\n"
-		".ONESHELL:\n"
-		".DEFAULT: all\n"
-		"\n\ndefault: all\n";
-
-	std::vector<std::string> defTargs;
-	int scopeCount = 0;
-	emitScope( rf, defTargs, *d, xform, scopeCount );
-
-	rf << "all:";
-	for ( const std::string &a: defTargs )
-		rf << ' ' << a;
-
-	rf << "\n\ninstall:\n\t@echo \"Installing...\"\n";
-
-	rf << "\n\nclean:";
-	for ( const std::string &a: defTargs )
-		rf << " clean-" << a;
-	rf << "\n\n";
+	catch ( std::exception &e )
+	{
+		WARNING( "ERROR: " << e.what() );
+		::unlink( makefn.c_str() );
+		if ( conf.isSkipOnError() )
+		{
+			WARNING( "Configuration '" << conf.name() << "' had errors resolving build file, ignoring" );
+		}
+		else
+			throw;
+	}
+	catch ( ... )
+	{
+		::unlink( makefn.c_str() );
+		if ( conf.isSkipOnError() )
+		{
+			WARNING( "Configuration '" << conf.name() << "' had errors resolving build file, ignoring" );
+		}
+		else
+			throw;
+	}
 }
 
 

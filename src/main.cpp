@@ -40,6 +40,7 @@
 #include "NinjaGenerator.h"
 #include "MakeGenerator.h"
 #include "CodeGenerator.h"
+#include "Version.h"
 
 
 ////////////////////////////////////////
@@ -71,7 +72,11 @@ usageAndExit( const char *argv0, int es )
 		" -G|--generator    Specifies which generator to use\n"
 		" --show-generators Displays a list of generators and exits\n"
 		" --verbose         Displays messages as the build tree is processed\n"
-		" --debug           Displays debugging messages\n"
+#ifndef NDEBUG
+		" -d|--debug        Displays debugging messages\n"
+#endif
+		" -q|--quiet        Disables display of warning messages\n"
+		" -v|--version      Displays the constructor version number\n"
 		" -h|--help|-?      This help message\n"
 		"\n"
 		"----\n\n"
@@ -261,15 +266,28 @@ main( int argc, const char *argv[] )
 					continue;
 				}
 
-				if ( tmp == "debug" )
+#ifndef NDEBUG
+				if ( tmp == "d" || tmp == "debug" )
 				{
 					Debug::enable( true );
 					continue;
 				}
-
+#endif
 				if ( tmp == "verbose" )
 				{
 					Verbose::enable( true );
+					continue;
+				}
+
+				if ( tmp == "v" || tmp == "version" )
+				{
+					std::cout << "constructor " << Constructor::version() << std::endl;
+					return 0;
+				}
+
+				if ( tmp == "q" || tmp == "quiet" )
+				{
+					Quiet::enable( true );
 					continue;
 				}
 
@@ -424,7 +442,7 @@ main( int argc, const char *argv[] )
 	catch ( std::exception &e )
 	{
 		std::cerr << "ERROR: " << e.what() << std::endl;
-		return -1;
+		return 1;
 	}
 	catch ( ... )
 	{

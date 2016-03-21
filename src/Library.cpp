@@ -65,57 +65,17 @@ Library::transform( TransformSet &xform ) const
 	ret->setTopLevel( true );
 	ret->setDefaultTarget( true );
 
-	Variable outlibs( "libs" ), outlibdirs( "libdirs" );
-	Variable outflags( "cflags" ), outldflags( "ldflags" );
-	std::set<std::string> tags;
-	std::queue< std::shared_ptr<BuildItem> > chainsToCheck;
-	for ( const ItemPtr &i: myItems )
-	{
-		std::shared_ptr<BuildItem> xi = i->transform( xform );
-		xi->markAsDependent();
-
-		const Library *libDep = dynamic_cast<const Library *>( i.get() );
-		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
-
-		if ( libDep || pkg )
-		{
-			ret->addDependency( DependencyType::IMPLICIT, xi );
-			outflags.addIfMissing( xi->getVariable( "cflags" ).values() );
-			outldflags.add( xi->getVariable( "ldflags" ).values() );
-			if ( libDep )
-				outlibs.addIfMissing( i->getName() );
-			outlibs.add( xi->getVariable( "libs" ).values() );
-			outlibdirs.addIfMissing( xi->getVariable( "libdirs" ).values() );
-		}
-		else if ( dynamic_cast<const Executable *>( i.get() ) )
-		{
-			// executables can't depend on other exes, make this
-			// an order only dependency
-			VERBOSE( "Executable '" << i->getName() << "' will be built before '" << getName() << "' because of declared dependency" );
-			ret->addDependency( DependencyType::ORDER, xi );
-		}
-		else
-			chainsToCheck.push( xi );
-	}
-
-	followChains( chainsToCheck, tags, ret, xform );
-
-	if ( ! outflags.empty() )
-	{
-		std::vector< std::shared_ptr<BuildItem> > expDeps = ret->extractDependencies( DependencyType::EXPLICIT );
-		for ( const auto &compItem: expDeps )
-			compItem->addToVariable( "cflags", outflags );
-	}
-
-	std::string libType;
-	findVariableValueRecursive( libType, "library_type" );
+	std::string libType = myKind;
 	if ( libType.empty() )
-		libType = xform.getVarValue( "default_library_type" );
+		libType = xform.getOptionValue( "default_library_kind" );
 	if ( libType.empty() )
 	{
 		libType = "static";
 		VERBOSE( "No library type declared for '" << getName() << "', defaulting to static" );
 	}
+
+	std::set<std::string> tags;
+	fillBuildItem( ret, xform, tags, libType == "static" );
 
 	std::shared_ptr<Tool> t = xform.findToolForSet( libType, tags );
 	if ( ! t )
@@ -133,19 +93,6 @@ Library::transform( TransformSet &xform ) const
 		throw std::runtime_error( msgbuf.str() );
 	}
 	ret->setTool( t );
-
-	if ( libType == "static" )
-	{
-		if ( ! outlibs.empty() )
-		{
-			outlibs.removeDuplicatesKeepLast();
-			ret->addToVariable( "libs", outlibs );
-		}
-		if ( ! outlibdirs.empty() )
-			ret->addToVariable( "libdirs", outlibdirs );
-		if ( ! outldflags.empty() )
-			ret->addToVariable( "ldflags", outldflags );
-	}
 
 	xform.recordTransform( this, ret );
 	return ret;

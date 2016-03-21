@@ -21,6 +21,13 @@
 //
 
 #include "LuaEngine.h"
+#include "Debug.h"
+#include "FileUtil.h"
+#include "Directory.h"
+
+#include "LuaToolExt.h"
+#include "LuaCompileExt.h"
+
 #include <stdexcept>
 #include <string>
 #include <iostream>
@@ -146,6 +153,62 @@ fileReader( lua_State *, void *ud, size_t *sz )
 	return f->get( sz );
 }
 
+
+////////////////////////////////////////
+
+
+static int
+luaAddModulePath( lua_State *L )
+{
+	int N = lua_gettop( L );
+
+	for ( int i = 1; i <= N; ++i )
+	{
+		if ( lua_isnil( L, i ) )
+			continue;
+
+		if ( lua_isstring( L, i ) )
+		{
+			size_t len = 0;
+			const char *s = lua_tolstring( L, i, &len );
+			std::string curP( s, len );
+
+			DEBUG( "luaAddToolModulePath " << curP );
+			if ( File::isAbsolute( s ) )
+				Lua::Engine::singleton().addModulePath( std::move( curP ) );
+			else
+				Lua::Engine::singleton().addModulePath( Directory::current()->makefilename( curP ) );
+		}
+		else
+		{
+			std::cout << "WARNING: ignoring non-string argument in module path" << std::endl;
+		}
+	}
+
+	return 0;
+}
+
+static int
+luaSetModulePath( lua_State *L )
+{
+	Lua::Engine::singleton().resetModulePath();
+	DEBUG( "luaSetToolModulePath" );
+	return luaAddModulePath( L );
+}
+
+static int
+luaLoadModule( lua_State *L )
+{
+	int N = lua_gettop( L );
+	std::string name = Lua::Parm<std::string>::get( L, N, 1 );
+
+	DEBUG( "luaLoadModule " << name );
+	if ( ! name.empty() )
+		return Lua::Engine::singleton().loadModule( std::move( name ) );
+
+	return 1;
+}
+
 } // empty namespace
 
 
@@ -234,6 +297,33 @@ Engine::Engine( void )
 
 //	lua_pushcfunction( L, &Engine::errorCB );
 	myErrFunc = 0;//lua_gettop( L );
+
+	// Rather than just change the search path
+	// to add ?.construct to the package patterns,
+	// we store the module path and it's usage
+	// such that if the module definition changes,
+	// the file will be regenerated
+    lua_getglobal( L, "package" );
+    if ( ! lua_istable( L, -1 ) )
+		throw std::runtime_error( "Missing package library" );
+
+	lua_pushstring( L, "searchers" );
+	lua_gettable( L, -2 );
+	if ( ! lua_istable( L, -1 ) )
+		throw std::runtime_error( "package library missing searchers table" );
+	int tbl_idx = lua_absindex( L, -1 );
+
+	for ( int64_t n = luaL_len( L, tbl_idx ) + 1; n  > 1; --n )
+	{
+		lua_rawgeti( L, tbl_idx, n - 1 );
+		lua_rawseti( L, tbl_idx, n );
+	}
+	lua_pushcfunction( L, luaLoadModule );
+	lua_rawseti( L, tbl_idx, 1 );
+	lua_pop( L, 2 );
+
+	registerFunction( "set_module_path", &luaSetModulePath );
+	registerFunction( "add_module_path", &luaAddModulePath );
 }
 
 
@@ -250,19 +340,64 @@ Engine::~Engine( void )
 
 
 void
-Engine::registerFunction( const char *name, int (*funcPtr)( lua_State * ) )
+Engine::resetModulePath( void )
 {
-	if ( myCurLib.empty() )
+	myModulePath.clear();
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::addModulePath( std::string p )
+{
+	myModulePath.emplace_back( std::move( p ) );
+}
+
+
+////////////////////////////////////////
+
+
+int
+Engine::loadModule( std::string p )
+{
+	std::string luaFile;
+	bool found = false;
+	if ( myModulePath.empty() )
 	{
-		lua_pushcfunction( L, funcPtr );
-		lua_setglobal( L, name );
+		Directory curD;
+		std::vector<std::string> tmpPath = { curD.fullpath() };
+		found = File::find( luaFile, p + ".construct", tmpPath );
 	}
 	else
-	{
-		lua_pushstring( L, name );
-		lua_pushcfunction( L, funcPtr );
-		lua_rawset( L, -3 );
-	}
+		found = File::find( luaFile, p + ".construct", myModulePath );
+
+	if ( ! found )
+		return 1;
+
+	clearCompileContext();
+	clearToolset();
+
+	std::string tmpname = "@";
+	tmpname.append( p );
+	LuaFile f( luaFile.c_str() );
+	throwIfError( L, lua_load( L, &fileReader, &f, tmpname.c_str(), NULL ), p.c_str() );
+
+	// add filename as argument to module
+	lua_pushstring( L, luaFile.c_str() );
+	return 2;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::registerFunction( const char *name, int (*funcPtr)( lua_State * ) )
+{
+	BoundFunction f = std::bind( funcPtr, std::placeholders::_1 );
+	registerFunction( name, f );
 }
 
 
@@ -357,9 +492,7 @@ Engine::registerClass( const char *name,
 					   const struct luaL_Reg *classFuncs,
 					   const struct luaL_Reg *memberFuncs )
 {
-	std::string metaName = "Constructor.";
-	metaName.append( name );
-	luaL_newmetatable( L, metaName.c_str() );
+	luaL_newmetatable( L, name );
 	lua_pushliteral( L, "__index" );
 	lua_pushvalue( L, -2 );
 	lua_settable( L, -3 );
@@ -399,7 +532,9 @@ Engine::runFile( const char *file, int envPos )
 	if ( ! myCurLib.empty() )
 		throw std::runtime_error( "unbalanced push / pops for library definitions" );
 
-	myFileNames.push( std::string( file ) );
+	std::string fn( file );
+	addVisitedFile( fn );
+	myFileNames.push( fn );
 	ON_EXIT{ myFileNames.pop(); };
 
 	std::string tmpname = "@";
@@ -425,7 +560,7 @@ Engine::runFile( const char *file, int envPos )
 	}
 	{
 		myFileFuncs.push( funcPos );
-		ON_EXIT{ myFileFuncs.pop();};
+		ON_EXIT{ myFileFuncs.pop(); };
 
 		try
 		{
@@ -445,6 +580,31 @@ Engine::runFile( const char *file, int envPos )
 	}
 
 	return 1;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Engine::addVisitedFile( const std::string &f )
+{
+	for ( const auto &i: myVisitedPaths )
+	{
+		if ( i == f )
+			return;
+	}
+	myVisitedPaths.push_back( f );
+}
+
+
+////////////////////////////////////////
+
+
+const std::vector<std::string> &
+Engine::visitedFiles( void )
+{
+	return myVisitedPaths;
 }
 
 
@@ -551,11 +711,18 @@ Engine::errorCB( lua_State *L )
 int
 Engine::dispatchFunc( lua_State *l )
 {
-	size_t funcIdx = static_cast<size_t>( lua_tointeger( l, lua_upvalueindex( 1 ) ) );
-	Engine &eng = singleton();
-	if ( funcIdx < eng.mFuncs.size() )
-		return eng.mFuncs[funcIdx]( l );
-	throw std::runtime_error( "Invalid function index in upvalue" );
+	try
+	{
+		size_t funcIdx = static_cast<size_t>( lua_tointeger( l, lua_upvalueindex( 1 ) ) );
+		Engine &eng = singleton();
+		if ( funcIdx < eng.mFuncs.size() )
+			return eng.mFuncs[funcIdx]( l );
+		throw std::runtime_error( "Invalid function index in upvalue" );
+	}
+	catch ( std::exception &e )
+	{
+		return luaL_error( l, "ERROR: %s", e.what() );
+	}
 }
 
 

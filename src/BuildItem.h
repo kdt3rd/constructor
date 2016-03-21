@@ -64,16 +64,11 @@ public:
 
 	inline const std::vector<std::string> &getOutputs( void ) const;
 
-	void setFlag( const std::string &n, const std::string &v );
-	const std::string &getFlag( const std::string &n ) const;
-
 	void setVariables( VariableSet v );
 	void setVariable( const std::string &name, const std::string &val );
 	void setVariable( const std::string &name, const std::vector<std::string> &val );
 	void addToVariable( const std::string &name, const std::string &val );
-	void addToVariableAtEnd( const std::string &name, const std::string &val );
 	void addToVariable( const std::string &name, const Variable &val );
-	void addToVariableAtEnd( const std::string &name, const Variable &val );
 
 	const Variable &getVariable( const std::string &name ) const;
 	inline const VariableSet &getVariables( void ) const;
@@ -88,12 +83,7 @@ public:
 	inline void setDefaultTarget( bool d );
 	inline bool isDefaultTarget( void ) const;
 
-	inline void markAsDependent( void );
-	// basically, this should be true if no one depends on me, to be
-	// used to find non "top level" targets that won't be built
-	// otherwise
-	inline bool isRoot( void ) const;
-
+	bool flatten( const std::shared_ptr<BuildItem> &i );
 private:
 	std::string myName;
 	std::string myPseudoName;
@@ -103,11 +93,9 @@ private:
 	std::shared_ptr<Directory> myDirectory;
 	std::shared_ptr<Directory> myOutDirectory;
 
-	std::map<std::string, std::string> myFlags;
 	VariableSet myVariables;
 
 	bool myIsTopLevel = false;
-	bool myIsDependent = false;
 	bool myUseName = true;
 	bool myDefaultTarget = true;
 };
@@ -201,21 +189,6 @@ BuildItem::getTopLevelName( void ) const
 
 inline void BuildItem::setDefaultTarget( bool d ) { myDefaultTarget = d; }
 inline bool BuildItem::isDefaultTarget( void ) const { return myDefaultTarget; }
-
-
-////////////////////////////////////////
-
-
-inline void
-BuildItem::markAsDependent( void )
-{
-	myIsDependent = true;
-}
-inline bool
-BuildItem::isRoot( void ) const
-{
-	return myIsDependent;
-}
 
 
 ////////////////////////////////////////
