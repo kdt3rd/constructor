@@ -252,7 +252,8 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			t->myOptions["language"] = theCPPLanguages;
 			t->myOptions["language"]["c++11"] = { "-x", "c++", "-std=c++11", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
 			t->myOptions["language"]["c++14"] = { "-x", "c++", "-std=c++14", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
-			t->myOptionDefaults = theCPPDefaults;			t->myImplDepName = "$out.d";
+			t->myOptionDefaults = theCPPDefaults;
+			t->myImplDepName = "$out.d";
 			t->myImplDepStyle = "gcc";
 			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
 			t->myDescription = "CXX $out_short";
@@ -262,9 +263,32 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			s.addTool( t );
 			cTools->addTool( t );
 
+			t = std::make_shared<Tool>( "objcxx", name );
+			t->myExtensions = { ".mm" };
+			t->myAltExtensions = { ".MM" };
+			t->myOutputs = { ".o" };
+			t->myExeName = exe;
+			t->myOptions = theCommonOptions;
+			t->myOptions["warnings"] = commonWarnings;
+			t->myOptions["warnings"]["most"] = { "-Weverything", "-Wno-padded", "-Wno-global-constructors", "-Wno-documentation-unknown-command", "-Wno-mismatched-tags", "-Wno-exit-time-destructors" };
+			t->myOptions["language"]["c++"] = { "-ObjC++" };
+			t->myOptions["language"]["c++11"] = { "-ObjC++", "-std=c++11", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
+			t->myOptions["language"]["c++14"] = { "-ObjC++", "-std=c++14", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
+			t->myOptionDefaults = theCPPDefaults;
+			t->myImplDepName = "$out.d";
+			t->myImplDepStyle = "gcc";
+			t->myImplDepCmd = { "-MMD", "-MF", "$out.d" };
+			t->myDescription = "OBJCXX $out_short";
+			t->myFlagPrefixes = theVarPrefixes;
+			t->myCommand = theCompileCmd;
+
+			s.addTool( t );
+			cTools->addTool( t );
+
 			t = std::make_shared<Tool>( "ld_cxx", "clang++_linker" );
 			t->myExeName = exe;
-			t->myInputTools = theCPPLinkInputTools;;
+			t->myInputTools = theCPPLinkInputTools;
+			t->myInputTools.push_back( "objcxx" );
 			t->myOptions = theCommonOptions;
 			t->myOptionDefaults = theCPPDefaults;
 			t->myFlagPrefixes = theVarPrefixes;
@@ -425,7 +449,7 @@ DefaultTools::checkAndAddArchiver( Scope &s, const std::map<std::string, std::st
 
 			t = std::make_shared<Tool>( "static_lib_cxx", name );
 			t->myExeName = exe;
-			t->myInputTools = { "cc", "cxx" };
+			t->myInputTools = { "cc", "cxx", "objcxx" };
 			t->myOutputPrefix = "lib";
 			t->myOutputs = { ".a" };
 			if ( haveRM )
