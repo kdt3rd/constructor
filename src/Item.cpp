@@ -125,6 +125,8 @@ Item::transform( TransformSet &xform ) const
 									  t->getOptionValue( i.first, overOpt ) );
 			}
 		}
+		else
+			WARNING( "No tools found for " << getName() );
 	}
 
 	xform.recordTransform( this, ret );
