@@ -86,6 +86,9 @@ ExternLibrarySet::transform( TransformSet &xform ) const
 				extras.push_back( elib );
 		}
 
+		if ( ! myDefinitions.empty() )
+			ret->setVariable( "defines", myDefinitions );
+
 		if ( ok )
 			fillBuildItem( ret, xform, tags, true, extras );
 		else if ( isRequired() )

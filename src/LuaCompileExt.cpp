@@ -369,8 +369,9 @@ extractSysLibs( const Lua::Value &v )
 		{
 			auto sys = t.find( "system" );
 			auto libs = t.find( "libs" );
+			auto defs = t.find( "defines" );
 			if ( sys == t.end() )
-				throw std::runtime_error( "missing system argument to system_libs{ system=\"Foo\", libs={...} }" );
+				throw std::runtime_error( "missing system argument to system_libs{ system=\"Foo\", libs={...} [, defines={...}] }" );
 			if ( libs == t.end() )
 				throw std::runtime_error( "missing libs argument to system_libs{ system=\"Foo\", libs={...} }" );
 
@@ -379,6 +380,13 @@ extractSysLibs( const Lua::Value &v )
 			sLib->setRequired( true );
 			if ( libs->second.type() != LUA_TTABLE )
 				throw std::runtime_error( "libs argument to system_libs should be a table" );
+
+			if ( defs != t.end() )
+			{
+				auto dlist = defs->second.toStringList();
+				for ( auto &d: dlist )
+					sLib->addDefine( std::move( d ) );
+			}
 
 			const Lua::Value::Table &elibs = libs->second.asTable();
 			for ( auto clib: elibs )
@@ -552,6 +560,12 @@ luaAddExternalLib( lua_State *L )
 		else if ( k == "required" )
 		{
 			ret->setRequired( i.second.asBool() );
+		}
+		else if ( k == "defines" )
+		{
+			auto dlist = i.second.toStringList();
+			for ( auto &d: dlist )
+				ret->addDefine( std::move( d ) );
 		}
 		else if ( k == "source" )
 		{

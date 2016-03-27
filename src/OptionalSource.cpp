@@ -79,6 +79,16 @@ OptionalSource::addCondition( std::string tag, std::string val )
 ////////////////////////////////////////
 
 
+void
+OptionalSource::addDefine( std::string d )
+{
+	myDefinitions.emplace_back( std::move( d ) );
+}
+
+
+////////////////////////////////////////
+
+
 std::shared_ptr<BuildItem>
 OptionalSource::transform( TransformSet &xform ) const
 {
@@ -93,6 +103,9 @@ OptionalSource::transform( TransformSet &xform ) const
 	if ( matches( xform ) )
 	{
 		DEBUG( "transform ENABLED OptionalSource " << getName() );
+		if ( ! myDefinitions.empty() )
+			ret->setVariable( "defines", myDefinitions );
+
 		std::set<std::string> tags;
 		fillBuildItem( ret, xform, tags, false );
 	}

@@ -437,6 +437,7 @@ DefaultTools::checkAndAddArchiver( Scope &s, const std::map<std::string, std::st
 			t->myInputTools = { "cc" };
 			t->myOutputPrefix = "lib";
 			t->myOutputs = { ".a" };
+			t->myFlagPrefixes = theVarPrefixes;
 			if ( haveRM )
 				t->myCommand = { rmTool, "-f", "$out", "&&", "$exe", "rcs", "$out", "$in"};
 			else
@@ -452,6 +453,7 @@ DefaultTools::checkAndAddArchiver( Scope &s, const std::map<std::string, std::st
 			t->myInputTools = { "cc", "cxx", "objcxx" };
 			t->myOutputPrefix = "lib";
 			t->myOutputs = { ".a" };
+			t->myFlagPrefixes = theVarPrefixes;
 			if ( haveRM )
 				t->myCommand = { rmTool, "-f", "$out", "&&", "$exe", "rcs", "$out", "$in"};
 			else

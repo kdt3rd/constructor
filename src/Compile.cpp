@@ -328,17 +328,16 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 			compItem->addToVariable( "cflags", outflags );
 		if ( !outinc.empty() )
 			compItem->addToVariable( "includes", outinc );
+		if ( !outdefs.empty() )
+			compItem->addToVariable( "defines", outdefs );
 	}
+
 	if ( ! outflags.empty() )
 		bi->addToVariable( "cflags", outflags );
-
 	if ( ! outdefs.empty() )
 		bi->addToVariable( "defines", outdefs );
-
 	if ( ! outinc.empty() )
-	{
 		bi->addToVariable( "includes", outinc );
-	}
 
 	if ( propagateLibs )
 	{

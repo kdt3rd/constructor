@@ -37,11 +37,13 @@ public:
 	virtual ~OptionalSource( void );
 
 	void addCondition( std::string tag, std::string val );
+	void addDefine( std::string d );
 
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
 protected:
 	bool matches( TransformSet &xform ) const;
+	std::vector<std::string> myDefinitions;
 
 private:
 	std::map<std::string, std::string> myConditions;
