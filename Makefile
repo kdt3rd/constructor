@@ -54,11 +54,11 @@ SRC:=$(addprefix $(OUTPUT)/,$(SRC))
 
 COMPILER := g++
 CXXFLAGS := --std=c++11 -Wall -Wextra -Og -g
-LDFLAGS := -static-libgcc -static-libstdc++
+LDFLAGS :=
 OS := $(shell uname -s)
 ifeq ($(OS),Linux)
 CXXFLAGS := $(CXXFLAGS) -DLUA_USE_LINUX
-LDFLAGS := $(LDFLAGS) -ldl
+LDFLAGS := -static-libgcc -static-libstdc++ -ldl
 else
 ifeq ($(OS),Darwin)
 COMPILER := clang++

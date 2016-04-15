@@ -241,20 +241,20 @@ Scope::useToolSet( const std::string &tset )
 
 	bool added = false;
 	// remove any toolset that conflicts
-	for ( auto &i: myEnabledToolsets )
+	for ( auto &et: myEnabledToolsets )
 	{
-		if ( i == ts )
+		if ( et == ts )
 		{
 			// already using this toolset
 			added = true;
 			break;
 		}
 
-		if ( i->getTag() == ts->getTag() )
+		if ( et->getTag() == ts->getTag() )
 		{
-			VERBOSE( "Replacing toolset '" << i->getName() << "' with '" << tset << "'" );
+			VERBOSE( "Replacing toolset '" << et->getName() << "' with '" << tset << "'" );
 			added = true;
-			i = ts;
+			et = ts;
 		}
 	}
 	if ( ! added )

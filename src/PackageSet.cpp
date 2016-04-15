@@ -213,7 +213,6 @@ PackageSet::find( const std::string &name,
 		}
 		throw;
 	}
-	return std::shared_ptr<PackageConfig>();
 }
 
 
@@ -262,6 +261,20 @@ PackageSet::find( const std::string &name, VersionCompare comp, const std::strin
 					ret = makeLibraryReference( name, libpath );
 					myParsedPackageConfigs[name] = ret;
 				}
+				else
+				{
+					auto p = name.find( "lib" );
+					std::string altname = name;
+					if ( p != std::string::npos && ( (p + 3) == altname.size() ) )
+					{
+						altname.erase( p );
+						if ( File::find( libpath, "lib" + altname, {".dylib", ".a"}, myLibSearchPath ) )
+						{
+							ret = makeLibraryReference( altname, libpath );
+							myParsedPackageConfigs[name] = ret;
+						}
+					}
+				}
 			}
 			else if ( mySystem == "Windows" )
 			{
@@ -270,6 +283,20 @@ PackageSet::find( const std::string &name, VersionCompare comp, const std::strin
 					ret = makeLibraryReference( name, libpath );
 					myParsedPackageConfigs[name] = ret;
 				}
+				else
+				{
+					auto p = name.find( "lib" );
+					std::string altname = name;
+					if ( p != std::string::npos && ( (p + 3) == altname.size() ) )
+					{
+						altname.erase( p );
+						if ( File::find( libpath, altname, {".lib", ".a"}, myLibSearchPath ) )
+						{
+							ret = makeLibraryReference( altname, libpath );
+							myParsedPackageConfigs[name] = ret;
+						}
+					}
+				}
 			}
 			else
 			{
@@ -277,6 +304,20 @@ PackageSet::find( const std::string &name, VersionCompare comp, const std::strin
 				{
 					ret = makeLibraryReference( name, libpath );
 					myParsedPackageConfigs[name] = ret;
+				}
+				else
+				{
+					auto p = name.find( "lib" );
+					std::string altname = name;
+					if ( p != std::string::npos && ( (p + 3) == altname.size() ) )
+					{
+						altname.erase( p );
+						if ( File::find( libpath, "lib" + altname, {".so", ".a"}, myLibSearchPath ) )
+						{
+							ret = makeLibraryReference( altname, libpath );
+							myParsedPackageConfigs[name] = ret;
+						}
+					}
 				}
 			}
 		}
