@@ -79,7 +79,7 @@ ExternLibrarySet::transform( TransformSet &xform ) const
 			auto elib = ps.find( l.first, l.second, xform.getLibSearchPath(), xform.getPkgSearchPath() );
 			if ( ! elib )
 			{
-				WARNING( "Unable to find external library '" << l.first << "' (version: " << (l.second.empty()?std::string("<any>"):l.second) << ")" );
+				WARNING( "Unable to find external library '" << l.first << "' (version: " << (l.second.empty()?std::string("<any>"):l.second) << ") for system " << xform.getSystem() );
 				ok = false;
 			}
 			else
