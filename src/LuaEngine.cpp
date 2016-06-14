@@ -691,13 +691,11 @@ Engine::errorCB( lua_State *L )
 		const char *tmsg = lua_tostring( L, T );
 		if ( tmsg )
 			msgbuf << tmsg;
-		std::cout << "errorCB: T " << tmsg << std::endl;
+		else
+			msgbuf << "<non-string error message>";
 	}
 	else
-	{
-		std::cout << "errorCB: T " << T << std::endl;
 		msgbuf << "<nil error message>";
-	}
 	
 	std::string tmp = msgbuf.str();
 	lua_pushlstring( L, tmp.c_str(), tmp.size() );
