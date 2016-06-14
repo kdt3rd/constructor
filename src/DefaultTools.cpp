@@ -66,8 +66,8 @@ Tool::OptionSet theCLanguages{
 	{ "C11", { "-std=c11" } } };
 Tool::OptionSet theCPPLanguages{
 	{ "c++", { "-x", "c++" } },
-	{ "c++11", { "-x", "c++", "-std=c++11" } },
-	{ "c++14", { "-x", "c++", "-std=c++14" } }
+	{ "c++11", { "-x", "c++", "-std=c++11", "-Wc++11-compat" } },
+	{ "c++14", { "-x", "c++", "-std=c++14", "-Wc++11-compat", "-Wc++14-compat" } }
 };
 Tool::OptionSet theCPPLinkLanguages{
 	{ "c++", {} },
