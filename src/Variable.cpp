@@ -285,7 +285,7 @@ Variable::removeDuplicates( const std::map<std::string, bool> &prefixDisposition
 		bool first = true;
 		for ( auto &x: prefixDisposition )
 		{
-			if ( cur.find( x.first ) == 0 )
+			if ( cur.compare( 0, x.first.size(), x.first ) == 0 )
 			{
 				inPref = true;
 				first = x.second;
