@@ -69,7 +69,7 @@ ExternLibrarySet::transform( TransformSet &xform ) const
 
 	if ( matches( xform ) )
 	{
-		DEBUG( "transform ENABLED OptionalSource " << getName() );
+		DEBUG( "transform ENABLED ExternLibrary " << getName() );
 		std::set<std::string> tags;
 		bool ok = true;
 		std::vector<ItemPtr> extras;
@@ -86,11 +86,13 @@ ExternLibrarySet::transform( TransformSet &xform ) const
 				extras.push_back( elib );
 		}
 
-		if ( ! myDefinitions.empty() )
-			ret->setVariable( "defines", myDefinitions );
-
 		if ( ok )
+		{
+			if ( ! myDefinitions.empty() )
+				ret->setVariable( "defines", myDefinitions );
+
 			fillBuildItem( ret, xform, tags, true, extras );
+		}
 		else if ( isRequired() )
 			throw std::runtime_error( "Unable to resolve external libraries for required libraries" );
 	}
