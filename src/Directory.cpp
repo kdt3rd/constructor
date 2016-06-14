@@ -83,9 +83,8 @@ Directory::Directory( void )
 
 
 Directory::Directory( const std::string &root )
+		: myFullDirs( String::split( root, File::pathSeparator() ) ), myCurFullPath( root )
 {
-	myFullDirs = String::split( root, File::pathSeparator() );
-	myCurFullPath = root;
 }
 
 
@@ -582,6 +581,18 @@ Directory::pushd( const std::string &d )
 	newD->cd( d );
 	theLastDir = current();
 	theLiveDirs.push( newD );
+	return theLiveDirs.top();
+}
+
+
+////////////////////////////////////////
+
+
+const std::shared_ptr<Directory> &
+Directory::pushd( const std::shared_ptr<Directory> &subd )
+{
+	theLastDir = current();
+	theLiveDirs.push( subd );
 	return theLiveDirs.top();
 }
 

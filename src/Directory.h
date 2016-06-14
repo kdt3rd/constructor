@@ -85,6 +85,7 @@ public:
 	// support running scripts in the future, this may have to change
 	static const std::shared_ptr<Directory> &current( void );
 	static const std::shared_ptr<Directory> &pushd( const std::string &subd );
+	static const std::shared_ptr<Directory> &pushd( const std::shared_ptr<Directory> &subd );
 	static const std::shared_ptr<Directory> &popd( void );
 	static const std::shared_ptr<Directory> &last( void );
 
