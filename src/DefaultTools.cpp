@@ -67,12 +67,14 @@ Tool::OptionSet theCLanguages{
 Tool::OptionSet theCPPLanguages{
 	{ "c++", { "-x", "c++" } },
 	{ "c++11", { "-x", "c++", "-std=c++11", "-Wc++11-compat" } },
-	{ "c++14", { "-x", "c++", "-std=c++14", "-Wc++11-compat", "-Wc++14-compat" } }
+	{ "c++14", { "-x", "c++", "-std=c++14", "-Wc++11-compat", "-Wc++14-compat" } },
+	{ "c++17", { "-x", "c++", "-std=c++17", "-Wc++11-compat", "-Wc++14-compat" } }
 };
 Tool::OptionSet theCPPLinkLanguages{
 	{ "c++", {} },
 	{ "c++11", { "-std=c++11" } },
-	{ "c++14", { "-std=c++14" } }
+	{ "c++14", { "-std=c++14" } },
+	{ "c++17", { "-std=c++17" } }
 };
 Tool::OptionDefaultSet theCDefaults{
 	{ "optimization", "opt" },
@@ -252,6 +254,7 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			t->myOptions["language"] = theCPPLanguages;
 			t->myOptions["language"]["c++11"] = { "-x", "c++", "-std=c++11", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
 			t->myOptions["language"]["c++14"] = { "-x", "c++", "-std=c++14", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
+			t->myOptions["language"]["c++17"] = { "-x", "c++", "-std=c++17", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
 			t->myOptionDefaults = theCPPDefaults;
 			t->myImplDepName = "$out.d";
 			t->myImplDepStyle = "gcc";
@@ -274,6 +277,7 @@ DefaultTools::checkAndAddClang( Scope &s, const std::map<std::string, std::strin
 			t->myOptions["language"]["c++"] = { "-ObjC++" };
 			t->myOptions["language"]["c++11"] = { "-ObjC++", "-std=c++11", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
 			t->myOptions["language"]["c++14"] = { "-ObjC++", "-std=c++14", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
+			t->myOptions["language"]["c++17"] = { "-ObjC++", "-std=c++17", "-Wno-c++98-compat", "-Wno-c++98-compat-pedantic" };
 			t->myOptionDefaults = theCPPDefaults;
 			t->myImplDepName = "$out.d";
 			t->myImplDepStyle = "gcc";
