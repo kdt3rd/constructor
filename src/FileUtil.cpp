@@ -556,6 +556,36 @@ globRegex( const std::string &path, const std::string &pattern )
 	if ( d )
 	{
 		ON_EXIT{ ::closedir( d ); };
+			// glibc deprecates readdir_r in 2.24
+#if defined(__GNU_LIBRARY__) && ( __GLIBC__ > 2 || ( __GLIBC__ == 2 && __GLIBC_MINOR__ >= 24 ) ) 
+		while ( true )
+		{
+			errno = 0;
+			struct dirent *result = ::readdir( d );
+			if ( result )
+			{
+				if ( result->d_name[0] == '.' )
+				{
+					if ( result->d_name[1] == '\0' ||
+						 ( result->d_name[1] == '.' && result->d_name[2] == '\0' ) )
+					{
+						continue;
+					}
+				}
+				if ( std::regex_match( result->d_name, rexp ) )
+				{
+					std::cout << "  -> matching " << result->d_name << std::endl;
+					retval.emplace_back( std::string( result->d_name ) );
+				}
+				continue;
+			}
+			else if ( errno != 0 )
+				throw std::system_error( errno, std::system_category(), "reading directory " + path );
+
+			// errno == 0, no result -> end of stream
+			break;
+		}
+#else
 		std::unique_ptr<uint8_t[]> rdBuf;
 		size_t allocSize = 0;
 		long name_max = fpathconf( dirfd( d ), _PC_NAME_MAX );
@@ -584,6 +614,7 @@ globRegex( const std::string &path, const std::string &pattern )
 				retval.emplace_back( std::string( cur->d_name ) );
 			}
 		}
+#endif
 	}
 	else
 	{
