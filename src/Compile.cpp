@@ -210,6 +210,7 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 	Variable outlibdirs( "libdirs" );
 	outlibdirs.setToolTag( "ld" );
 	Variable outldflags( "ldflags" );
+	Variable outldflagsS( "ldflags_static" );
 
 	std::queue< std::shared_ptr<BuildItem> > chainsToCheck;
 
@@ -233,6 +234,7 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 			if ( propagateLibs )
 			{
 				outldflags.add( ci->getVariable( "ldflags" ).values() );
+				outldflagsS.add( ci->getVariable( "ldflags_static" ).values() );
 				if ( libDep )
 				{
 					outlibs.addIfMissing( libDep->getName() );
@@ -286,6 +288,7 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 			if ( propagateLibs )
 			{
 				outldflags.add( ci->getVariable( "ldflags" ).values() );
+				outldflagsS.add( ci->getVariable( "ldflags_static" ).values() );
 				if ( libDep )
 				{
 					outlibs.addIfMissing( libDep->getName() );
@@ -350,6 +353,8 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 			bi->addToVariable( "libdirs", outlibdirs );
 		if ( ! outldflags.empty() )
 			bi->addToVariable( "ldflags", outldflags );
+		if ( ! outldflagsS.empty() )
+			bi->addToVariable( "ldflags_static", outldflagsS );
 	}
 }
 
