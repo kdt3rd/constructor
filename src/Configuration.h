@@ -53,6 +53,9 @@ public:
 	static void checkDefault( void );
 	static void creatingNewConfig( void );
 	static void finishCreatingNewConfig( void );
+	static bool inSubProject( void );
+	static void pushSubProject( void );
+	static void popSubProject( void );
 	static Configuration &last( void );
 	static std::vector<Configuration> &defined( void );
 

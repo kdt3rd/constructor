@@ -33,6 +33,10 @@ namespace
 {
 
 static int theCreating = 0;
+struct CurSubProject
+{
+};	
+static int theSubProject = 0;
 static std::vector<Configuration> theConfigs;
 static std::string theDefaultConfig;
 
@@ -162,6 +166,34 @@ Configuration::finishCreatingNewConfig( void )
 {
 	--theCreating;
 }
+
+
+////////////////////////////////////////
+
+
+bool
+Configuration::inSubProject( void )
+{
+	return theSubProject > 0;
+}
+
+
+////////////////////////////////////////
+
+
+void
+Configuration::pushSubProject( void )
+{
+}
+
+
+////////////////////////////////////////
+
+
+void Configuration::popSubProject( void )
+{
+}
+
 
 
 ////////////////////////////////////////

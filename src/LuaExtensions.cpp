@@ -170,29 +170,34 @@ luaSubProject( lua_State *L )
 	std::string file = Lua::Parm<std::string>::get( L, N, 1 );
 	DEBUG( "luaSubDir " << file );
 	std::shared_ptr<Directory> curDir = Directory::current();
-	std::string tmp;
-	if ( curDir->exists( tmp, file ) )
+	if ( File::isAbsolute( file.c_str() ) )
 	{
-		curDir = Directory::pushd( file );
-		ON_EXIT{ Directory::popd(); };
-
-		Lua::clearToolset();
-		Lua::clearCompileContext();
-
-		Scope::pushScope( Scope::current().newSubScope( false ) );
-		ON_EXIT{ Scope::popScope( false ); };
-
-		std::string nextFile;
-		if ( curDir->exists( nextFile, buildFileName() ) )
-			ret = Lua::Engine::singleton().runFile( nextFile.c_str() );
-		else
-			throw std::runtime_error( "Unable to find a '" + std::string( buildFileName() ) + "' in " + curDir->fullpath() );
-
-		Lua::clearToolset();
-		Lua::clearCompileContext();
+		std::shared_ptr<Directory> nRoot = std::make_shared<Directory>( file );
+		curDir = Directory::pushd( nRoot );
 	}
 	else
-		throw std::runtime_error( "Sub Directory '" + file + "' does not exist in " + curDir->fullpath() );
+	{
+		std::string tmp;
+		if ( ! curDir->exists( tmp, file ) )
+			throw std::runtime_error( "Sub Directory '" + file + "' does not exist in " + curDir->fullpath() );
+		curDir = Directory::pushd( file );
+	}
+	ON_EXIT{ Directory::popd(); };
+
+	Lua::clearToolset();
+	Lua::clearCompileContext();
+
+	Scope::pushScope( Scope::current().newSubScope( false ) );
+	ON_EXIT{ Scope::popScope( false ); };
+
+	std::string nextFile;
+	if ( curDir->exists( nextFile, buildFileName() ) )
+		ret = Lua::Engine::singleton().runFile( nextFile.c_str() );
+	else
+		throw std::runtime_error( "Unable to find a '" + std::string( buildFileName() ) + "' in " + curDir->fullpath() );
+
+	Lua::clearToolset();
+	Lua::clearCompileContext();
 
 	return ret;
 }
