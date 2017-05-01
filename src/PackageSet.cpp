@@ -426,7 +426,41 @@ PackageSet::init( void )
 		if ( d )
 		{
 			ON_EXIT{ ::closedir( d ); };
+			// glibc deprecates readdir_r in 2.24...
+#if defined(__GNU_LIBRARY__) && ( __GLIBC__ > 2 || ( __GLIBC__ == 2 && __GLIBC_MINOR__ >= 24 ) ) 
+			while ( true )
+			{
+				errno = 0;
+				struct dirent *cur = ::readdir( d );
+				if ( ! cur )
+				{
+					if ( errno != 0 )
+					{
+						std::cerr << "WARNING: error reading directory '" << i << "'" << std::endl;
+					}
+					break;
+				}
 
+				std::string cname = cur->d_name;
+				std::string::size_type ePC = cname.rfind( ".pc", std::string::npos, 3 );
+				if ( ePC != std::string::npos )
+				{
+					if ( ePC == ( cname.size() - 3 ) )
+					{
+						std::string name = cname.substr( 0, ePC );
+						// if we found the same name earlier, ignore this one
+						if ( myPackageConfigs.find( name ) == myPackageConfigs.end() )
+						{
+							std::string fullpath = i;
+							fullpath.push_back( File::pathSeparator() );
+							fullpath.append( cname );
+							DEBUG( name << ": " << fullpath );
+							myPackageConfigs[name] = fullpath;
+						}
+					}
+				}
+			}
+#else
 			std::unique_ptr<uint8_t[]> rdBuf;
 			size_t allocSize = 0;
 			long name_max = fpathconf( dirfd( d ), _PC_NAME_MAX );
@@ -466,6 +500,7 @@ PackageSet::init( void )
 					}
 				}
 			}
+#endif
 		}
 	}
 }
