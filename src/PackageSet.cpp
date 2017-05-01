@@ -186,7 +186,7 @@ PackageSet::find( const std::string &name,
 		std::swap( tpc, myPackageConfigs );
 		std::swap( tppc, myParsedPackageConfigs );
 	}
-	
+
 	try
 	{
 		auto ret = find( name, reqVersion );
@@ -239,6 +239,7 @@ PackageSet::find( const std::string &name, VersionCompare comp, const std::strin
 			ret = std::make_shared<PackageConfig>( f->first, f->second );
 			// we can't call this in the constructor
 			ret->parse();
+			//std::cout << "found package '" << name << "' for system " << mySystem << std::endl;
 			myParsedPackageConfigs[f->first] = ret;
 			// pull in any dependent libraries
 			extractOtherModules( *ret, ret->getRequires(), true );
@@ -280,6 +281,12 @@ PackageSet::find( const std::string &name, VersionCompare comp, const std::strin
 			{
 				if ( File::find( libpath, name, {".lib", ".a"}, myLibSearchPath ) )
 				{
+					ret = makeLibraryReference( name, libpath );
+					myParsedPackageConfigs[name] = ret;
+				}
+				else if ( File::find( libpath, "lib" + name, {".dll.a", ".a"}, myLibSearchPath ) )
+				{
+					// for mingw
 					ret = makeLibraryReference( name, libpath );
 					myParsedPackageConfigs[name] = ret;
 				}
@@ -415,6 +422,7 @@ PackageSet::init( void )
 		return;
 	myInit = true;
 
+	DEBUG( "---------- PackageSet::init --------------" );
 
 	for ( auto &i: myPkgSearchPath )
 	{

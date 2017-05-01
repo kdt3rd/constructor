@@ -170,6 +170,7 @@ PackageConfig::transform( TransformSet &xform ) const
 	ret->addToVariable( "cflags", getVariable( "cflags" ) );
 	ret->addToVariable( "ldflags", getLibs() );
 	ret->addToVariable( "ldflags", getVariable( "ldflags" ) );
+	ret->addToVariable( "ldflags_static", getStaticLibs() );
 
 	if ( myPackageFile.empty() )
 	{
