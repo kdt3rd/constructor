@@ -34,7 +34,7 @@ public:
 	Executable( std::string name );
 	virtual ~Executable( void );
 
-	inline void setKind( std::string kind ) { myKind = std::move( kind ); }
+	void setKind( std::string kind );
 
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 

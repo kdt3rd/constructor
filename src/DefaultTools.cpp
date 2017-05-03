@@ -34,6 +34,7 @@
 namespace
 {
 #ifdef WIN32
+// remember to register style for app vs cmd
 #else
 std::vector<std::string> theCLinkInputTools{ "cc", "static_lib", "dynamic_lib" };
 std::vector<std::string> theCPPLinkInputTools{ "cc", "cxx", "static_lib", "static_lib_cxx", "dynamic_lib", "dynamic_lib_cxx" };
@@ -48,6 +49,10 @@ Tool::OptionGroup theCommonOptions
 	{ "threads", {
 			{ "on", { "-pthread" } },
 			{ "off", {} }, } },
+	{ "style", {
+			{ "default", {} },
+			{ "app", {} },
+			{ "cmd", {} }, } },
 	{ "vectorize", {
 			{ "none", {} },
 			{ "SSE", { "-msse" } },
@@ -78,6 +83,7 @@ Tool::OptionSet theCPPLinkLanguages{
 };
 Tool::OptionDefaultSet theCDefaults{
 	{ "optimization", "opt" },
+	{ "style", "default" },
 	{ "warnings", "default" },
 	{ "language", "C" },
 	{ "threads", "off" },
@@ -85,14 +91,15 @@ Tool::OptionDefaultSet theCDefaults{
 };
 Tool::OptionDefaultSet theCPPDefaults{
 	{ "optimization", "opt" },
+	{ "style", "default" },
 	{ "warnings", "default" },
 	{ "language", "c++" },
 	{ "threads", "off" },
 	{ "vectorize", "none" }
 };
 
-std::vector<std::string> theCompileCmd{ "$exe", "$threads", "$language", "$optimization", "$warnings", "$vectorize", "$cflags", "$defines", "$includes", "-pipe", "-c", "-o", "$out", "$in" };
-std::vector<std::string> theLinkCmd{ "$exe", "$threads", "$language", "$optimization", "$vectorize", "$cflags", "-pipe", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
+std::vector<std::string> theCompileCmd{ "$exe", "$threads", "$language", "$style", "$optimization", "$warnings", "$vectorize", "$cflags", "$defines", "$includes", "-pipe", "-c", "-o", "$out", "$in" };
+std::vector<std::string> theLinkCmd{ "$exe", "$threads", "$language", "$style", "$optimization", "$vectorize", "$cflags", "-pipe", "-o", "$out", "$in", "$ldflags", "$libdirs", "$libs" };
 
 Tool::OptionDefaultSet theVarPrefixes{
 	{ "includes", "-I" },
@@ -168,6 +175,7 @@ DefaultTools::getOptions( void )
 		"warnings",
 		"optimization",
 		"language",
+		"style",
 		"threads",
 		"vectorize"
 	};

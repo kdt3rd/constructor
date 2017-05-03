@@ -47,6 +47,20 @@ Executable::~Executable( void )
 {
 }
 
+////////////////////////////////////////
+
+void
+Executable::setKind( std::string kind )
+{
+	myKind = std::move( kind );
+	if ( myKind == "app" || myKind == "cmd" )
+	{
+#ifdef __APPLE__
+		std::cout << "WARNING: Need add logic to compile / link tools like 'ld' to make an app bundle" << std::endl;
+#endif
+		overrideToolSetting( "style", myKind );
+	}
+}
 
 ////////////////////////////////////////
 
