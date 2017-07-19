@@ -222,10 +222,12 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 		const Library *libDep = dynamic_cast<const Library *>( i.get() );
 		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
 		const ExternLibrarySet *eLib = dynamic_cast<const ExternLibrarySet *>( i.get() );
+		const OptionalSource *optSrc = dynamic_cast<const OptionalSource *>( i.get() );
 
-		if ( libDep || pkg || eLib )
+		if ( libDep || pkg || eLib || optSrc )
 		{
-			bi->addDependency( DependencyType::IMPLICIT, ci );
+			if ( ! optSrc )
+				bi->addDependency( DependencyType::IMPLICIT, ci );
 			outflags.addIfMissing( ci->getVariable( "cflags" ).values() );
 			outinc.addIfMissing( ci->getVariable( "includes" ).values() );
 
@@ -244,7 +246,7 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 				outlibs.add( ci->getVariable( "libs" ).values() );
 				outlibdirs.addIfMissing( ci->getVariable( "libdirs" ).values() );
 			}
-			if ( eLib )
+			if ( eLib || optSrc )
 				chainsToCheck.push( ci );
 		}
 		else if ( dynamic_cast<const Executable *>( i.get() ) )
@@ -276,7 +278,6 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 
 		const Library *libDep = dynamic_cast<const Library *>( i.get() );
 		const PackageConfig *pkg = dynamic_cast<const PackageConfig *>( i.get() );
-		const ExternLibrarySet *eLib = dynamic_cast<const ExternLibrarySet *>( i.get() );
 
 		if ( libDep || pkg )
 		{
@@ -298,8 +299,6 @@ CompileSet::fillBuildItem( const std::shared_ptr<BuildItem> &bi, TransformSet &x
 				outlibs.add( ci->getVariable( "libs" ).values() );
 				outlibdirs.addIfMissing( ci->getVariable( "libdirs" ).values() );
 			}
-			if ( eLib )
-				chainsToCheck.push( ci );
 		}
 		else if ( dynamic_cast<const Executable *>( i.get() ) )
 		{

@@ -36,14 +36,21 @@ public:
 	OptionalSource( std::string nm );
 	virtual ~OptionalSource( void );
 
+	void addExternRef( std::string l, std::string v );
+
 	void addCondition( std::string tag, std::string val );
 	void addDefine( std::string d );
+
+	inline void setRequired( bool r ) { myIsRequired = r; }
+	inline bool isRequired( void ) const { return myIsRequired; }
 
 	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
 
 protected:
 	bool matches( TransformSet &xform ) const;
 	std::vector<std::string> myDefinitions;
+	std::vector< std::pair<std::string, std::string> > myExternLibs;
+	bool myIsRequired = false;
 
 private:
 	std::map<std::string, std::string> myConditions;

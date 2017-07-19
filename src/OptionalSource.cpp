@@ -21,6 +21,7 @@
 //
 
 #include "OptionalSource.h"
+#include "PackageSet.h"
 #include "Debug.h"
 #include <stdexcept>
 #include "TransformSet.h"
@@ -80,6 +81,16 @@ OptionalSource::addCondition( std::string tag, std::string val )
 
 
 void
+OptionalSource::addExternRef( std::string l, std::string v )
+{
+	myExternLibs.emplace_back( std::make_pair( std::move( l ), std::move( v ) ) );
+}
+
+
+////////////////////////////////////////
+
+
+void
 OptionalSource::addDefine( std::string d )
 {
 	myDefinitions.emplace_back( std::move( d ) );
@@ -102,12 +113,32 @@ OptionalSource::transform( TransformSet &xform ) const
 
 	if ( matches( xform ) )
 	{
-		DEBUG( "transform ENABLED OptionalSource " << getName() );
-		if ( ! myDefinitions.empty() )
-			ret->setVariable( "defines", myDefinitions );
+		DEBUG( "transform ENABLED " << getName() );
+		bool ok = true;
+		std::vector<ItemPtr> extras;
+		PackageSet &ps = PackageSet::get( xform.getSystem() );
+		for ( auto &l: myExternLibs )
+		{
+			auto elib = ps.find( l.first, l.second, xform.getLibSearchPath(), xform.getPkgSearchPath() );
+			if ( ! elib )
+			{
+				WARNING( "Unable to find external library '" << l.first << "' (version: " << (l.second.empty()?std::string("<any>"):l.second) << ") for system " << xform.getSystem() );
+				ok = false;
+			}
+			else
+				extras.push_back( elib );
+		}
 
-		std::set<std::string> tags;
-		fillBuildItem( ret, xform, tags, false );
+		if ( ok )
+		{
+			if ( ! myDefinitions.empty() )
+				ret->setVariable( "defines", myDefinitions );
+
+			std::set<std::string> tags;
+			fillBuildItem( ret, xform, tags, true, extras );
+		}
+		else if ( isRequired() )
+			throw std::runtime_error( "Unable to resolve external libraries for required libraries" );
 	}
 
 	xform.recordTransform( this, ret );

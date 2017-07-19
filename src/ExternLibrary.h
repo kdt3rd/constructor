@@ -33,17 +33,6 @@ class ExternLibrarySet : public OptionalSource
 public:
 	ExternLibrarySet( void );
 	virtual ~ExternLibrarySet( void );
-
-	void addExternRef( std::string l, std::string v );
-
-	inline void setRequired( bool r ) { myIsRequired = r; }
-	inline bool isRequired( void ) const { return myIsRequired; }
-	
-	virtual std::shared_ptr<BuildItem> transform( TransformSet &xform ) const;
-
-private:
-	bool myIsRequired = false;
-	std::vector< std::pair<std::string, std::string> > myExternLibs;
 };
 
 

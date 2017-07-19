@@ -91,15 +91,15 @@ extractOptionalCompile( const Lua::Value &v )
 		auto i = t.begin();
 		if ( i->first.type == Lua::KeyType::STRING )
 		{
-			auto sys = t.find( "system" );
 			auto src = t.find( "source" );
-			if ( sys == t.end() )
-				throw std::runtime_error( "missing system arguement to optional_source{ system=\"Foo\", source={...} }" );
 			if ( src == t.end() )
-				throw std::runtime_error( "missing source arguement to optional_source{ system=\"Foo\", source={...} }" );
+				throw std::runtime_error( "missing source argument to optional_source{ source={...} [, system=\"Foo\", defines={...}, has_lib=\"Bar\", libs={...} ] }" );
+			auto sys = t.find( "system" );
+			auto libs = t.find( "libs" );
+			if ( sys == t.end() && libs == t.end() )
+				throw std::runtime_error( "missing conditional argument(s) to optional_source{ source={...} [, system=\"Foo\", libs={...} ] [, defines={...} ] }" );
 
 			auto s = std::make_shared<OptionalSource>();
-			s->addCondition( "system", sys->second.asString() );
 
 			const Lua::Value::Table &srcT = src->second.asTable();
 			for ( auto cSrc: srcT )
@@ -117,6 +117,47 @@ extractOptionalCompile( const Lua::Value &v )
 				else
 					throw std::runtime_error( "Bad item in source table passed to optional_source, expect array of strings or items" );
 			}
+
+			if ( sys != t.end() )
+				s->addCondition( "system", sys->second.asString() );
+			if ( libs != t.end() )
+			{
+				if ( libs->second.type() != LUA_TTABLE )
+					throw std::runtime_error( "libs argument to optional_source should be a table" );
+
+				const Lua::Value::Table &elibs = libs->second.asTable();
+				for ( auto clib: elibs )
+				{
+					if ( clib.first.type != Lua::KeyType::INDEX )
+						throw std::runtime_error( "Bad libs table to optional_source, expect array of libs" );
+					if ( clib.second.type() == LUA_TSTRING )
+					{
+						s->addExternRef( clib.second.asString(), std::string() );
+					}
+					else if ( clib.second.type() == LUA_TTABLE )
+					{
+						const Lua::Value::Table &st = clib.second.asTable();
+						auto lname = st.find( lua_Integer(1) );
+						auto vertag = st.find( lua_Integer(2) );
+						if ( lname == st.end() || vertag == st.end() )
+							throw std::runtime_error( "Invalid array of {name,version} to system_libs" );
+
+						s->addExternRef( lname->second.asString(),
+										 vertag->second.asString() );
+					}
+					else
+						throw std::runtime_error( "Bad item in libs table passed optional_source, expect array of strings or {name,version} table pairs" );
+				}
+			}
+			
+			auto defs = t.find( "defines" );
+			if ( defs != t.end() )
+			{
+				auto dlist = defs->second.toStringList();
+				for ( auto &d: dlist )
+					s->addDefine( std::move( d ) );
+			}
+
 			opts.emplace_back( std::move( s ) );
 		}
 		else

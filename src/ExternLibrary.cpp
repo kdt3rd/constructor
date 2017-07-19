@@ -21,9 +21,6 @@
 //
 
 #include "ExternLibrary.h"
-#include "PackageSet.h"
-#include "Debug.h"
-#include <stdexcept>
 
 
 ////////////////////////////////////////
@@ -40,65 +37,6 @@ ExternLibrarySet::ExternLibrarySet( void )
 
 ExternLibrarySet::~ExternLibrarySet( void )
 {
-}
-
-
-////////////////////////////////////////
-
-
-void
-ExternLibrarySet::addExternRef( std::string l, std::string v )
-{
-	myExternLibs.emplace_back( std::make_pair( std::move( l ), std::move( v ) ) );
-}
-
-
-////////////////////////////////////////
-
-
-std::shared_ptr<BuildItem>
-ExternLibrarySet::transform( TransformSet &xform ) const
-{
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
-	if ( ret )
-		return ret;
-
-	ret = std::make_shared<BuildItem>( getName(), getDir() );
-	ret->setUseName( false );
-	ret->setOutputDir( xform.getOutDir() );
-
-	if ( matches( xform ) )
-	{
-		DEBUG( "transform ENABLED ExternLibrary " << getName() );
-		std::set<std::string> tags;
-		bool ok = true;
-		std::vector<ItemPtr> extras;
-		PackageSet &ps = PackageSet::get( xform.getSystem() );
-		for ( auto &l: myExternLibs )
-		{
-			auto elib = ps.find( l.first, l.second, xform.getLibSearchPath(), xform.getPkgSearchPath() );
-			if ( ! elib )
-			{
-				WARNING( "Unable to find external library '" << l.first << "' (version: " << (l.second.empty()?std::string("<any>"):l.second) << ") for system " << xform.getSystem() );
-				ok = false;
-			}
-			else
-				extras.push_back( elib );
-		}
-
-		if ( ok )
-		{
-			if ( ! myDefinitions.empty() )
-				ret->setVariable( "defines", myDefinitions );
-
-			fillBuildItem( ret, xform, tags, true, extras );
-		}
-		else if ( isRequired() )
-			throw std::runtime_error( "Unable to resolve external libraries for required libraries" );
-	}
-
-	xform.recordTransform( this, ret );
-	return ret;
 }
 
 
