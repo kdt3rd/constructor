@@ -244,7 +244,8 @@ CodeGenerator::emitCode( const std::string &outfn,
 				outlines.push_back( "\"\"" );
 			else
 			{
-				curLine.push_back( '"' );
+				if ( ! atLineBeg )
+					curLine.push_back( '"' );
 				outlines.emplace_back( std::move( curLine ) );
 			}
 
