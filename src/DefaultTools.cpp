@@ -47,7 +47,11 @@ Tool::OptionGroup theCommonOptions
 			{ "size", { "-Os" } },
 			{ "optdebug", { "-g", "-O3" } }, } },
 	{ "threads", {
+#ifdef __APPLE__
+			{ "on", { } },
+#else
 			{ "on", { "-pthread" } },
+#endif
 			{ "off", {} }, } },
 	{ "style", {
 			{ "default", {} },

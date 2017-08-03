@@ -714,9 +714,10 @@ PackageSet::makeLibraryReference( const std::string &name,
 		// put it as one value so any repeated-value
 		// compression doesn't remove the -framework bit
 		// but multiple of the same will be cleaned
+		std::string incval = "-F " + name;
 		std::string varval = "-framework " + name;
-		Variable &cflags = ret->getVariable( "cflags" );
-		cflags.add( varval );
+		Variable &incs = ret->getVariable( "includes" );
+		incs.add( incval );
 		Variable &libs = ret->getVariable( "ldflags" );
 		libs.add( varval );
 		return ret;
