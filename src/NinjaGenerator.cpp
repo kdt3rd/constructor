@@ -377,14 +377,20 @@ NinjaGenerator::emit( const std::shared_ptr<Directory> &d,
 		f << "build build.ninja: regen_constructor";
 		f << "\n  srcdir=" << curD.fullpath();
 		f << "\n  depfile=" << builddepsfn;
-		f << "\n  deps=gcc";
+		// NB: we do not specify this such that ninja
+		// doesn't rm the build.ninja.d file after sucking it
+		// into the .ninja_deps file, triggering the file
+//		f << "\n  deps=gcc";
 		f << "\ndefault build.ninja\n\n";
 		{
-			std::ofstream depf( builddepsfn );
-			depf << buildfn << ':';
+			std::stringstream deplist;
+			// and then ninja expects it to be a local dependency
+//			deplist << buildfn << ':';
+			deplist << "build.ninja:";
 			for ( const std::string &x: Lua::Engine::singleton().visitedFiles() )
-				depf << ' ' << x;
-			depf << "\n\n";
+				deplist << ' ' << x;
+
+			d->updateIfDifferent( "build.ninja.d", std::vector<std::string>{ deplist.str() } );
 		}
 
 		f << "\n\n";
