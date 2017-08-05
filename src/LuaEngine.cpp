@@ -595,6 +595,7 @@ Engine::addVisitedFile( const std::string &f )
 			return;
 	}
 	myVisitedPaths.push_back( f );
+	std::sort( myVisitedPaths.begin(), myVisitedPaths.end() );
 }
 
 
