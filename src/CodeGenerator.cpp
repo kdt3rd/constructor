@@ -242,10 +242,9 @@ CodeGenerator::emitCode( const std::string &outfn,
 			}
 			if ( nbytes == 0 )
 				outlines.push_back( "\"\"" );
-			else
+			else if ( ! atLineBeg )
 			{
-				if ( ! atLineBeg )
-					curLine.push_back( '"' );
+				curLine.push_back( '"' );
 				outlines.emplace_back( std::move( curLine ) );
 			}
 
