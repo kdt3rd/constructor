@@ -200,7 +200,9 @@ Dependency<Item>::extractDependencies( DependencyType dt ) const
 	std::sort( retval.begin(), retval.end(),
 			   []( const ItemPtr &a, const ItemPtr &b )
 			   {
-				   return a->getName() < b->getName();
+				   return (a->getName() < b->getName() ||
+						   (a->getName() == b->getName() &&
+							a->getDir()->fullpath() < b->getDir()->fullpath()));
 			   }
 			   );
 
