@@ -409,6 +409,21 @@ PackageSet::PackageSet( const std::string &s )
 		myLibSearchPath.emplace_back( "/usr/local/lib" );
 #endif
 	}
+	else
+	{
+		const char *pcPath = getenv( "PKG_CONFIG_PATH" );
+		if ( pcPath )
+			addPackagePath( std::string( pcPath ) );
+		pcPath = getenv( "PKG_CONFIG_LIBDIR" );
+		if ( pcPath )
+			addPackagePath( std::string( pcPath ) );
+
+		if ( mySystem == "Windows" )
+		{
+			addPackagePath( "/usr/x86_64-w64-mingw32/lib/pkgconfig" );
+			addPackagePath( "/usr/x86_64-w64-mingw32/lib" );
+		}
+	}
 }
 
 
