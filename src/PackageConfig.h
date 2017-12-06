@@ -26,6 +26,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <iostream>
 #include "Item.h"
 
 
@@ -69,3 +70,21 @@ private:
 	std::string myNilValue;
 };
 
+inline std::ostream &operator<<( std::ostream &os, const PackageConfig &pc )
+{
+	os << "{"
+	   << "\n  name: " << pc.getName()
+	   << "\n  file: " << pc.getFilename()
+	   << "\n  version: " << pc.getVersion()
+	   << "\n  package: " << pc.getPackage()
+	   << "\n  description: " << pc.getDescription()
+	   << "\n  conflicts: " << pc.getConflicts()
+	   << "\n  url: " << pc.getURL()
+	   << "\n  cflags: " << pc.getCFlags()
+	   << "\n  libs: " << pc.getLibs()
+	   << "\n  statlibs: " << pc.getStaticLibs()
+	   << "\n  requires: " << pc.getRequires()
+	   << "\n  statreq: " << pc.getStaticRequires() << "\n}";
+
+	return os;
+}
