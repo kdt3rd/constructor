@@ -251,7 +251,8 @@ emitTargets( std::ostream &os, const TransformSet &x )
 						std::cerr << "WARNING: Build Item '" << bi->getName() << "' set to use non-existent pool '" << outv << "'" << std::endl;
 					}
 				}
-				os << "\n  " << bv.first << "=" << outv;
+				if ( ! outv.empty() )
+					os << "\n  " << bv.first << "= $" << bv.first << ' ' << outv;
 			}
 
 			if ( bi->isTopLevelItem() )
