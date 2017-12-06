@@ -418,10 +418,11 @@ PackageSet::PackageSet( const std::string &s )
 		if ( pcPath )
 			addPackagePath( std::string( pcPath ) );
 
+		// TBD: hack!
 		if ( mySystem == "Windows" )
 		{
 			addPackagePath( "/usr/x86_64-w64-mingw32/lib/pkgconfig" );
-			addPackagePath( "/usr/x86_64-w64-mingw32/lib" );
+			myLibSearchPath.emplace_back( "/usr/x86_64-w64-mingw32/lib" );
 		}
 	}
 }
