@@ -211,9 +211,9 @@ TransformSet::getOptionValue( const std::string &v ) const
 
 
 bool
-TransformSet::isTransformed( const Item *i ) const
+TransformSet::isTransformed( uint64_t id ) const
 {
-	auto bi = myTransformMap.find( i );
+	auto bi = myTransformMap.find( id );
 	return bi != myTransformMap.end();
 }
 
@@ -222,9 +222,9 @@ TransformSet::isTransformed( const Item *i ) const
 
 
 std::shared_ptr<BuildItem>
-TransformSet::getTransform( const Item *i ) const
+TransformSet::getTransform( uint64_t id ) const
 {
-	auto bi = myTransformMap.find( i );
+	auto bi = myTransformMap.find( id );
 	if ( bi != myTransformMap.end() )
 		return bi->second;
 	return std::shared_ptr<BuildItem>();
@@ -235,11 +235,11 @@ TransformSet::getTransform( const Item *i ) const
 
 
 void
-TransformSet::recordTransform( const Item *i,
+TransformSet::recordTransform( uint64_t id,
 							   const std::shared_ptr<BuildItem> &bi )
 {
 	add( bi );
-	myTransformMap[i] = bi;
+	myTransformMap[id] = bi;
 }
 
 

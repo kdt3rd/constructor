@@ -90,7 +90,7 @@ CompileSet::addItem( std::string name )
 std::shared_ptr<BuildItem>
 CompileSet::transform( TransformSet &xform ) const
 {
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	std::shared_ptr<BuildItem> ret = xform.getTransform( getID() );
 	if ( ret )
 		return ret;
 
@@ -102,7 +102,7 @@ CompileSet::transform( TransformSet &xform ) const
 	std::set<std::string> tags;
 	fillBuildItem( ret, xform, tags, false );
 
-	xform.recordTransform( this, ret );
+	xform.recordTransform( getID(), ret );
 	return ret;
 }
 

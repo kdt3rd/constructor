@@ -68,7 +68,7 @@ Executable::setKind( std::string kind )
 std::shared_ptr<BuildItem>
 Executable::transform( TransformSet &xform ) const
 {
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	std::shared_ptr<BuildItem> ret = xform.getTransform( getID() );
 	if ( ret )
 		return ret;
 
@@ -102,7 +102,7 @@ Executable::transform( TransformSet &xform ) const
 	}
 	ret->setTool( t );
 
-	xform.recordTransform( this, ret );
+	xform.recordTransform( getID(), ret );
 	return ret;
 }
 

@@ -154,7 +154,7 @@ PackageConfig::getStaticRequires( void ) const
 std::shared_ptr<BuildItem>
 PackageConfig::transform( TransformSet &xform ) const
 {
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	std::shared_ptr<BuildItem> ret = xform.getTransform( getID() );
 	if ( ret )
 		return ret;
 
@@ -178,7 +178,7 @@ PackageConfig::transform( TransformSet &xform ) const
 		ret->addToVariable( "includes", getVariable( "includes" ) );
 	}
 
-	xform.recordTransform( this, ret );
+	xform.recordTransform( getID(), ret );
 	return ret;
 }
 

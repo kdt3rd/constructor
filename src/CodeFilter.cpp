@@ -68,7 +68,7 @@ CodeFilter::setOutputs( std::vector<std::string> o )
 std::shared_ptr<BuildItem>
 CodeFilter::transform( TransformSet &xform ) const
 {
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	std::shared_ptr<BuildItem> ret = xform.getTransform( getID() );
 	if ( ret )
 		return ret;
 
@@ -108,7 +108,7 @@ CodeFilter::transform( TransformSet &xform ) const
 		ret->setOutputs( myOutputs );
 	}
 
-	xform.recordTransform( this, ret );
+	xform.recordTransform( getID(), ret );
 
 	return ret;
 }

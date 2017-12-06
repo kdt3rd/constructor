@@ -302,7 +302,7 @@ struct ToolSubst
 		ItemPtr ei = myTool.getGeneratedExecutable();
 		if ( ei )
 		{
-			std::shared_ptr<BuildItem> bi = myXformSet.getTransform( ei.get() );
+			std::shared_ptr<BuildItem> bi = myXformSet.getTransform( ei.get()->getID() );
 			if ( ! bi )
 				throw std::runtime_error( "Unable to find transformed build tool" );
 

@@ -82,9 +82,9 @@ public:
 	inline const VariableSet &getOptions( void ) const;
 	const std::string &getOptionValue( const std::string &v ) const;
 
-	bool isTransformed( const Item *i ) const;
-	std::shared_ptr<BuildItem> getTransform( const Item *i ) const;
-	void recordTransform( const Item *i,
+	bool isTransformed( uint64_t id ) const;
+	std::shared_ptr<BuildItem> getTransform( uint64_t id ) const;
+	void recordTransform( uint64_t id,
 						  const std::shared_ptr<BuildItem> &bi );
 	void add( const std::shared_ptr<BuildItem> &bi );
 	void add( const BuildItemList &items );
@@ -108,7 +108,7 @@ private:
 	VariableSet myOptions;
 
 	std::vector< std::shared_ptr<BuildItem> > myBuildItems;
-	std::map< const Item *, std::shared_ptr<BuildItem> > myTransformMap;
+	std::map< uint64_t, std::shared_ptr<BuildItem> > myTransformMap;
 
 	std::vector< std::shared_ptr<TransformSet> > myChildScopes;
 };

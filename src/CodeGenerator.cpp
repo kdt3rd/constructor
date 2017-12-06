@@ -81,7 +81,7 @@ CodeGenerator::setFileInfo( const std::vector<std::string> &filePrefix,
 std::shared_ptr<BuildItem>
 CodeGenerator::transform( TransformSet &xform ) const
 {
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	std::shared_ptr<BuildItem> ret = xform.getTransform( getID() );
 	if ( ret )
 		return ret;
 
@@ -123,7 +123,7 @@ CodeGenerator::transform( TransformSet &xform ) const
 		ret->addDependency( DependencyType::EXPLICIT, inp );
 	}
 
-	xform.recordTransform( this, ret );
+	xform.recordTransform( getID(), ret );
 	return ret;
 }
 

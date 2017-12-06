@@ -103,7 +103,7 @@ OptionalSource::addDefine( std::string d )
 std::shared_ptr<BuildItem>
 OptionalSource::transform( TransformSet &xform ) const
 {
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	std::shared_ptr<BuildItem> ret = xform.getTransform( getID() );
 	if ( ret )
 		return ret;
 
@@ -141,7 +141,7 @@ OptionalSource::transform( TransformSet &xform ) const
 			throw std::runtime_error( "Unable to resolve external libraries for required libraries" );
 	}
 
-	xform.recordTransform( this, ret );
+	xform.recordTransform( getID(), ret );
 	return ret;
 }
 

@@ -84,7 +84,7 @@ Item::getName( void ) const
 std::shared_ptr<BuildItem>
 Item::transform( TransformSet &xform ) const
 {
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	std::shared_ptr<BuildItem> ret = xform.getTransform( getID() );
 	if ( ret )
 		return ret;
 
@@ -129,7 +129,7 @@ Item::transform( TransformSet &xform ) const
 			WARNING( "No tools found for " << getName() );
 	}
 
-	xform.recordTransform( this, ret );
+	xform.recordTransform( getID(), ret );
 	return ret;
 }
 
@@ -140,7 +140,7 @@ Item::transform( TransformSet &xform ) const
 void
 Item::copyDependenciesToBuild( TransformSet &xform ) const
 {
-	std::shared_ptr<BuildItem> ret = xform.getTransform( this );
+	std::shared_ptr<BuildItem> ret = xform.getTransform( getID() );
 	if ( ! ret )
 		return;
 
@@ -148,7 +148,7 @@ Item::copyDependenciesToBuild( TransformSet &xform ) const
 	{
 		if ( dep.first )
 		{
-			std::shared_ptr<BuildItem> d = xform.getTransform( dep.first.get() );
+			std::shared_ptr<BuildItem> d = xform.getTransform( dep.first->getID() );
 			if ( d )
 				ret->addDependency( dep.second, d );
 		}
