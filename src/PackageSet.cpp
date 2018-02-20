@@ -187,6 +187,10 @@ PackageSet::find( const std::string &name,
 		std::swap( tppc, myParsedPackageConfigs );
 	}
 
+	//std::cout << "searching for '" << name << "' in:";
+	//for ( auto &p: myPkgSearchPath )
+	//	std::cout << "\n  " << p;
+	//std::cout << std::endl;
 	try
 	{
 		auto ret = find( name, reqVersion );
@@ -243,6 +247,7 @@ PackageSet::find( const std::string &name, VersionCompare comp, const std::strin
 			myParsedPackageConfigs[f->first] = ret;
 			// pull in any dependent libraries
 			extractOtherModules( *ret, ret->getRequires(), true );
+			//extractOtherModules( *ret, ret->getStaticRequires(), true );
 		}
 		else
 		{
@@ -396,7 +401,9 @@ PackageSet::PackageSet( const std::string &s )
 		else
 		{
 			myPkgSearchPath.push_back( "/usr/lib/pkgconfig" );
+			myPkgSearchPath.push_back( "/usr/share/pkgconfig" );
 			myPkgSearchPath.push_back( "/usr/local/lib/pkgconfig" );
+			myPkgSearchPath.push_back( "/usr/local/share/pkgconfig" );
 		}
 
 #ifdef __APPLE__
@@ -695,7 +702,7 @@ PackageSet::extractOtherModules( PackageConfig &pc, const std::string &val, bool
 			if ( required && ! cur )
 			{
 				std::stringstream msg;
-				msg << "Unable to find required package '" << name << "'";
+				msg << pc.getPackage() << ": Unable to find required package '" << name << "'";
 				if ( ! ver.empty() )
 					msg << ", version " << verC << ' '<< ver;
 				msg << " - please ensure it is installed or the package config search path is set appropriately";
