@@ -438,10 +438,10 @@ MakeGenerator::emit( const std::shared_ptr<Directory> &d,
 	}
 	catch ( std::exception &e )
 	{
-		WARNING( "ERROR: " << e.what() );
 		::unlink( makefn.c_str() );
 		if ( conf.isSkipOnError() )
 		{
+			WARNING( "ERROR: " << e.what() );
 			WARNING( "Configuration '" << conf.name() << "' had errors resolving build file, ignoring" );
 		}
 		else
